@@ -1,0 +1,221 @@
+#!/usr/bin/env python3
+
+import os
+import sys
+import argparse
+import multiprocessing
+import timeit
+import time
+import yaml
+
+
+def main():
+    
+    #create top-level parser
+    parser = argparse.ArgumentParser(prog='pyseqtools.py')
+    subparsers = parser.add_subparsers(help='sub-command help')
+    
+    #create subparser for crispr screen analysis commands
+    parser_crispr = subparsers.add_parser('crispr', 
+                                          help='CRISPR-Cas9 screen analysis help')
+
+    parser_crispr.add_argument("-l","--library",
+                               required = "--csv2fasta" not in sys.argv,
+                               choices = crispr_library_list,
+                               help="CRISPR library")
+    parser_crispr.add_argument("-t","--threads",
+                               required = False, 
+                               default=1,
+                               metavar="<int>",
+                               help = "Number of CPU threads to use (default is 1). Use max to apply all available CPU threads")
+    parser_crispr.add_argument("-r", "--rename",
+                               required = False, 
+                               action='store_true',
+                               help = "Rename fastq files according to rename.config")
+    parser_crispr.add_argument("-m", "--mismatch",
+                               required = False,
+                               choices=("0","1"),
+                               metavar = "N",
+                               help = "Number of mismatches (0 or 1) allowed during alignment",
+                               default = 0)
+    parser_crispr.add_argument("-a", "--analysis",
+                               required = False,
+                               default = "mageck",
+                               choices = ["mageck", "bagel2"],
+                               help="Statistical analysis with MAGeCK or BAGEL2 (default is MAGeCK)")
+    parser_crispr.add_argument("-f","--fdr",
+                               required=False,
+                               metavar = "<FDR value>",
+                               default = 0.25,help="Set FDR cut off for MAGeCK hits (default is 0.25)")
+    parser_crispr.add_argument("--cnv",
+                               required=False,
+                               metavar = "<CCLE cell line>",
+                               default = None,help="Activate CNV correction for MAGeCK/BAGEL2 with given cell line")
+    parser_crispr.add_argument("--go",
+                               required = False,
+                               action = 'store_true',
+                               default = None,
+                               help="Gene set enrichment analysis with enrichR")
+    parser_crispr.add_argument("--gene-sets",
+                               required = False,
+                               metavar = "<GO gene set>",
+                               default = ["GO_Molecular_Function_2021",
+                                          "GO_Cellular_Component_2021",
+                                          "GO_Biological_Process_2021"], 
+                               help = "Gene sets used for GO analysis (default is GO_Molecular_Function_2021, GO_Cellular_Component_2021, and GO_Biological_Process_2021). Gene sets can be found on https://maayanlab.cloud/Enrichr/#stats")
+    parser_crispr.add_argument("--essential-genes",
+                               required = False,
+                               metavar = "<Custom essential gene list>",
+                               default = os.path.join(script_dir,"core-essential-genes.csv"), #"path to Hart list"
+                               help = "Essential gene list (default is Hart et al 2015 Cell)")
+    parser_crispr.add_argument("--csv2fasta",
+                               required = False,
+                               metavar = "<CSV file>",
+                               default = None,help = "Convert CSV file with sgRNA names and sequences to fasta format. The first column should contain sgRNA names and the second sgRNA sequences (headers can be anything).")
+    parser_crispr.add_argument("--skip-fastqc",
+                               required = False,
+                               action = 'store_true',
+                               default = False,
+                               help = "Skip FastQC/MultiQC")
+    parser_crispr.add_argument("--skip-stats",
+                               required = False,
+                               action = 'store_true',
+                               default = False,
+                               help = "Skip MAGeCK/BAGEL2")
+     
+    # create the parser for RNA-Seq-analysis
+    parser_rnaseq = subparsers.add_parser('rna-seq', 
+                                          help='RNA-Seq analysis help')
+    parser_rnaseq.add_argument("--opt3", 
+                               action = 'store_true')
+    
+    
+    parser_rnaseq.add_argument("-t", "--threads",
+                               required = False,
+                               default = 1,
+                               metavar = "<int>",
+                               help = "Number of CPU threads to use (default is 1). Use max to apply all available CPU threads. For Salmon 8-12 threads are optimal")
+    parser_rnaseq.add_argument("-r", "--reference",
+                               required = False,
+                               choices = genome_list,
+                               help = "Reference genome")
+    parser_rnaseq.add_argument("-s", "--species",
+                               required = True,
+                               choices = ["mouse","human"],
+                               help = "Set species.")
+    parser_rnaseq.add_argument("-a", "--align",
+                               required = False,
+                               choices = ["salmon","hisat2"],
+                               default = "salmon",
+                               help = "Choose aligner. Default is Salmon.")
+    parser_rnaseq.add_argument("-p","--pvalue",
+                               required = False,
+                               metavar = "<P value>",
+                               default = 0.001,
+                               help = "Set P value cut off (default is 0.001")
+    parser_rnaseq.add_argument("--go",
+                               required = False,
+                               action = 'store_true',
+                               help = "Gene set enrichment analysis with Enrichr")
+    parser_rnaseq.add_argument("--gene-sets",
+                               required = False,
+                               metavar = "<GO gene set>",
+                               default = ["GO_Molecular_Function_2021",
+                                          "GO_Cellular_Component_2021",
+                                          "GO_Biological_Process_2021"],
+                               help = "Gene sets used for GO analysis (default is GO_Molecular_Function_2021, GO_Cellular_Component_2021, and GO_Biological_Process_2021). Gene sets can be found on https://maayanlab.cloud/Enrichr/#stats")
+    parser_rnaseq.add_argument("--skip-fastqc",
+                               required = False,
+                               action = 'store_true',
+                               default = False,
+                               help = "Skip FastQC/MultiQC")
+    
+    #create subparser for ChIP-Seq analysis commands
+    parser_chip = subparsers.add_parser('chip-seq', 
+                                          help='ChIP-Seq analysis help')
+    
+    parser_chip.add_argument("-t", "--threads",
+                             required = False,
+                             default = 1,
+                             help = "<INT> number of CPU threads to use (default is 1). Use max to apply all available CPU threads")
+    parser_chip.add_argument("-r", "--rename", 
+                             required = False, 
+                             action = 'store_true', 
+                             help = "Rename fq files")
+    parser_chip.add_argument("-f", "--fastqc", 
+                             required = False,
+                             action = 'store_true',
+                             help = "Perform FASTQC")
+    parser_chip.add_argument("-g", "--genome", 
+                             required = False,
+                             default = 'hg19',
+                             help = "Choose reference genome (default is hg19)")
+    parser_chip.add_argument("-a", "--align",
+                             choices = ['hisat2',
+                                        'bwa'], 
+                             required = False,
+                             help = "Trim and align raw data to index using HISAT2 or BWA")
+    parser_chip.add_argument("-d", "--deduplication", 
+                             required = False, 
+                             action = 'store_true',
+                             help = "Perform deduplication of BAM files")
+    parser_chip.add_argument("-s", "--downsample", 
+                             required = False, 
+                             action = 'store_true',
+                             help = "Perform downsampling of BAM files")
+    parser_chip.add_argument("-b", "--bigwig", 
+                             required = False,
+                             action = 'store_true',
+                             help = "Create BigWig files")
+    parser_chip.add_argument("-q", "--qc", 
+                             required = False, 
+                             action = 'store_true',
+                             help = "Perform QC analysis of BAM files")
+    parser_chip.add_argument("-p", "--peaks", 
+                             required = False, 
+                             action = 'store_true',
+                             help = "Call and annotate peaks")
+    parser_chip.add_argument("-n", "--ngsplot", 
+                             required = False, 
+                             action = 'store_true',
+                             help = "Generate metageneplots and heatmaps with ngs.plot")
+    
+    
+    
+    
+    print(parser.parse_args())
+    
+if __name__ == "__main__":
+    #start run timer
+    start = timeit.default_timer()
+    
+    script_dir=os.path.abspath(os.path.dirname(__file__))
+    #work_dir=os.getcwd()
+    
+    ###loads available CRISPR libraries from library.yaml
+    with open(os.path.join(script_dir,"yaml","crispr-libraries.yaml")) as file:
+        library=yaml.full_load(file)
+    crispr_library_list=list(library.keys())
+    
+    ###loads RNA-Seq settings
+    if os.path.exists(os.path.join(script_dir,"yaml","rna-seq.yaml")) == True:
+        with open(os.path.join(script_dir,"yaml","rna-seq.yaml")) as file:
+            rna_seq=yaml.full_load(file)
+    else:
+        print("ERROR: rna-seq.yaml not found in yaml folder. Please provide this file for further analysis.")
+        sys.exit()
+
+    genome_list=rna_seq["FASTA"]    
+
+    ###loads ChIP-Seq settings
+    
+    
+    main()
+    
+    
+    #print total run time
+    stop = timeit.default_timer()
+    total_time = stop - start
+    ty_res = time.gmtime(total_time)
+    res = time.strftime("%H:%M:%S",ty_res)
+    print('Total run time: ', res)
