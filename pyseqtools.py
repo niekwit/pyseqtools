@@ -7,34 +7,38 @@ import multiprocessing
 import timeit
 import time
 import yaml
+import pickle
 
 
 def main():
     
     #create top-level parser
-    parser = argparse.ArgumentParser(prog='pyseqtools.py')
-    subparsers = parser.add_subparsers(help='sub-command help')
+    parser = argparse.ArgumentParser(prog = 'pyseqtools.py')
+    subparsers = parser.add_subparsers(help ='Available options:',
+                                       dest='module')
+    
+    #create subparsers for each module, i.e. functionality
     
     #create subparser for crispr screen analysis commands
     parser_crispr = subparsers.add_parser('crispr', 
-                                          help='CRISPR-Cas9 screen analysis help')
+                                          help = 'CRISPR-Cas9 screen analysis')
 
-    parser_crispr.add_argument("-l","--library",
+    parser_crispr.add_argument("-l", "--library",
                                required = "--csv2fasta" not in sys.argv,
                                choices = crispr_library_list,
-                               help="CRISPR library")
-    parser_crispr.add_argument("-t","--threads",
+                               help = "CRISPR library")
+    parser_crispr.add_argument("-t", "--threads",
                                required = False, 
-                               default=1,
+                               default = 1,
                                metavar="<int>",
                                help = "Number of CPU threads to use (default is 1). Use max to apply all available CPU threads")
     parser_crispr.add_argument("-r", "--rename",
                                required = False, 
-                               action='store_true',
+                               action = 'store_true',
                                help = "Rename fastq files according to rename.config")
     parser_crispr.add_argument("-m", "--mismatch",
                                required = False,
-                               choices=("0","1"),
+                               choices = ("0","1"),
                                metavar = "N",
                                help = "Number of mismatches (0 or 1) allowed during alignment",
                                default = 0)
@@ -42,9 +46,9 @@ def main():
                                required = False,
                                default = "mageck",
                                choices = ["mageck", "bagel2"],
-                               help="Statistical analysis with MAGeCK or BAGEL2 (default is MAGeCK)")
-    parser_crispr.add_argument("-f","--fdr",
-                               required=False,
+                               help = "Statistical analysis with MAGeCK or BAGEL2 (default is MAGeCK)")
+    parser_crispr.add_argument("-f", "--fdr",
+                               required = False,
                                metavar = "<FDR value>",
                                default = 0.25,help="Set FDR cut off for MAGeCK hits (default is 0.25)")
     parser_crispr.add_argument("--cnv",
@@ -55,7 +59,7 @@ def main():
                                required = False,
                                action = 'store_true',
                                default = None,
-                               help="Gene set enrichment analysis with enrichR")
+                               help = "Gene set enrichment analysis with enrichR")
     parser_crispr.add_argument("--gene-sets",
                                required = False,
                                metavar = "<GO gene set>",
@@ -83,13 +87,11 @@ def main():
                                default = False,
                                help = "Skip MAGeCK/BAGEL2")
      
+    
     # create the parser for RNA-Seq-analysis
     parser_rnaseq = subparsers.add_parser('rna-seq', 
-                                          help='RNA-Seq analysis help')
-    parser_rnaseq.add_argument("--opt3", 
-                               action = 'store_true')
-    
-    
+                                          help='RNA-Seq analysis')
+            
     parser_rnaseq.add_argument("-t", "--threads",
                                required = False,
                                default = 1,
@@ -97,7 +99,7 @@ def main():
                                help = "Number of CPU threads to use (default is 1). Use max to apply all available CPU threads. For Salmon 8-12 threads are optimal")
     parser_rnaseq.add_argument("-r", "--reference",
                                required = False,
-                               choices = genome_list,
+                               choices = rna_seq_genomeList,
                                help = "Reference genome")
     parser_rnaseq.add_argument("-s", "--species",
                                required = True,
@@ -108,7 +110,7 @@ def main():
                                choices = ["salmon","hisat2"],
                                default = "salmon",
                                help = "Choose aligner. Default is Salmon.")
-    parser_rnaseq.add_argument("-p","--pvalue",
+    parser_rnaseq.add_argument("-p", "--pvalue",
                                required = False,
                                metavar = "<P value>",
                                default = 0.001,
@@ -132,7 +134,7 @@ def main():
     
     #create subparser for ChIP-Seq analysis commands
     parser_chip = subparsers.add_parser('chip-seq', 
-                                          help='ChIP-Seq analysis help')
+                                          help='ChIP-Seq analysis')
     
     parser_chip.add_argument("-t", "--threads",
                              required = False,
@@ -179,23 +181,182 @@ def main():
                              required = False, 
                              action = 'store_true',
                              help = "Generate metageneplots and heatmaps with ngs.plot")
+       
+        
+    #create dictionary with command line arguments
+    args = vars(parser.parse_args())
     
+    def crispr(args):
+         #csv to fasta conversion
+        csv=args["csv2fasta"]
+        if csv is not None:
+            if not os.path.isfile(csv):
+                sys.exit("ERROR: invalid file path given")
+            else:
+                utils.csv2fasta(csv,script_dir)
     
+        ###check if software requirements are met
+        try:
+            exe_dict=pickle.load(open(os.path.join(script_dir,".exe_dict.obj"),"rb"))
+            dep_list=("fastqc","bowtie2","mageck","bagel2")
+            for i in dep_list:
+                if not i in exe_dict:
+                    sys.exit("ERROR: %s directory not found\nRun setup.py again\n" % i)
+        except FileNotFoundError:
+            sys.exit("setup.py not run before first analysis")
     
+        ###set thread count for processing
+        threads=utils.set_threads(args)
+        
+        ###Check md5 checksums
+        utils.checkMd5(work_dir)
+        
+        ###run modules based on parsed arguments:
+        ##rename files
+        rename=args["rename"]
+        if rename == True:
+            utils.rename(work_dir)
     
-    print(parser.parse_args())
+        #determine file extension raw data
+        file_extension=utils.get_extension(work_dir)
+    
+        ##Run FastQC/MultiQC
+        skip_fastqc=args["skip_fastqc"]
+        if not skip_fastqc:
+            utils.fastqc(work_dir,threads,file_extension,exe_dict)
+        else:
+            print("Skipping FastQC/MultiQC analysis")
+    
+        ##count reads
+        #check if bowtie2 index is build for CRISPR library
+        crispr_library=args["library"]
+        utils.check_index(crispr_libraries,crispr_library,script_dir,exe_dict,work_dir)
+    
+        #check if file with just guide names exists
+        utils.guide_names(crispr_libraries,crispr_library)
+    
+        #count sgRNAs
+        mismatch=args["mismatch"]
+        utils.count(crispr_libraries,crispr_library,mismatch,threads,script_dir,work_dir,exe_dict)
+    
+        #plot alignment rates
+        utils.plot_alignment_rate(work_dir)
+    
+        #plot sample coverage (read count / library size)
+        utils.plot_coverage(work_dir,crispr_libraries,crispr_library)
+    
+        #join count files
+        if not utils.file_exists(os.path.join(work_dir,
+                                    "count",
+                                    'counts-aggregated.tsv')):
+            utils.join_counts(work_dir,crispr_libraries,crispr_library)
+        #normalise read count table
+        if not utils.file_exists(os.path.join(work_dir,
+                                    "count",
+                                    "counts-aggregated-normalised.csv")):
+            utils.normalise(work_dir)
+    
+        ##run library analysis
+        utils.lib_analysis(work_dir,crispr_libraries,crispr_library,script_dir)
+        utils.gcBias(work_dir,crispr_libraries,crispr_library)
+    
+        ##run stats on counts
+        analysis=args["analysis"]
+        go=args["go"]
+        fdr=float(args["fdr"])
+        cnv=args["cnv"]
+    
+        skip_stats=args["skip_stats"]
+        if not skip_stats:
+            if analysis == "mageck":
+                utils.mageck(work_dir,script_dir,cnv,fdr)
+    
+                
+            elif analysis == "bagel2":
+                print("Running BAGEL2")
+                utils.remove_duplicates(work_dir)
+                utils.convert4bagel(work_dir,crispr_libraries,crispr_library)
+                utils.bagel2(work_dir,script_dir,exe_dict,fdr)
+        
+        #run essential gene list comparison
+        essential_genes=args["essential_genes"]
+        utils.essentialGenes(work_dir,analysis,essential_genes,fdr)
+    
+        if go == True:
+            gene_sets=args["gene_sets"]
+            utils.goPython(work_dir,fdr,crispr_libraries,crispr_library,analysis,gene_sets)
+    
+    def rna_seq(args):
+        ####set thread count for processing
+        max_threads=str(multiprocessing.cpu_count())
+        threads=args["threads"]
+        if threads == "max":
+            threads=max_threads
+    
+        ### Check md5sums
+        utils.checkMd5(work_dir)
+    
+        ###Run FastQC/MultiQC
+        file_extension=utils.getExtension(work_dir)
+        skip_fastqc=args["skip_fastqc"]
+        if not skip_fastqc:
+            utils.fastqc(work_dir,threads,file_extension)
+        else:
+            print("Skipping FastQC/MultiQC analysis")
+    
+        ###Set species variable
+        species=args["species"]
+        
+        ###trim and align
+        pvalue=args["pvalue"]
+        align=args["align"]
+        if align.lower() == "salmon":
+            utils.trim(threads,work_dir)
+            salmon_index=settings["salmon_index"]["gencode-v35"]
+            gtf=settings["salmon_gtf"]["gencode-v35"]
+            fasta=settings["FASTA"]["gencode-v35"]
+            utils.salmon(salmon_index,str(threads),work_dir,gtf,fasta,script_dir,settings)
+            utils.plotMappingRate(work_dir)
+            utils.plotPCA(work_dir,script_dir)
+            utils.diff_expr(work_dir,gtf,script_dir,species,pvalue)
+            utils.plotVolcano(work_dir)
+        elif align.lower() == "hisat2":
+            utils.trim(threads,work_dir)
+            #hisat2()
+    
+    go=args["go"]
+    
+    if go == True:
+        gene_sets=args["gene_sets"]
+        utils.geneSetEnrichment(work_dir,pvalue,gene_sets)
+    
+    def chip_seq(args):
+        pass
+    
+    #execute selected module
+    if args["module"] == "crispr":
+        crispr(args)
+    elif args["module"] == "rna-seq":
+        rna_seq(args)
+    elif args["module"] == "chip-seq":
+        chip_seq(args)
+    
     
 if __name__ == "__main__":
     #start run timer
     start = timeit.default_timer()
     
     script_dir=os.path.abspath(os.path.dirname(__file__))
-    #work_dir=os.getcwd()
+    work_dir=os.getcwd()
+    
+    #adds script directory to runtime for importing modules
+    sys.path.append(script_dir)
+    import utils_pyseqtools as utils
     
     ###loads available CRISPR libraries from library.yaml
     with open(os.path.join(script_dir,"yaml","crispr-libraries.yaml")) as file:
-        library=yaml.full_load(file)
-    crispr_library_list=list(library.keys())
+        crispr_libraries=yaml.full_load(file)
+    crispr_library_list=list(crispr_libraries.keys())
     
     ###loads RNA-Seq settings
     if os.path.exists(os.path.join(script_dir,"yaml","rna-seq.yaml")) == True:
@@ -204,8 +365,11 @@ if __name__ == "__main__":
     else:
         print("ERROR: rna-seq.yaml not found in yaml folder. Please provide this file for further analysis.")
         sys.exit()
-
-    genome_list=rna_seq["FASTA"]    
+    
+        
+    rna_seq_genomeList=[]
+    for key, value in rna_seq["FASTA"].items():
+        rna_seq_genomeList.append(key)
 
     ###loads ChIP-Seq settings
     
