@@ -17,6 +17,34 @@ from tqdm.auto import tqdm
 import gseapy as gp
 import hashlib
 
+###GENERAL FUNCTIONS
+def checkPATH(module):
+    '''
+    checks if software requirement are set in $PATH
+    '''
+    path = os.getenv("PATH")
+    crisprDep = ["mageck", "fastqc", "samtools"]
+    rnaseqDep = ["salmon", "hisat2"]
+    chipseqDep = ["ngsplot", "bwa", "hisat2"]
+    cutrunDep = []
+    
+        
+    if module == "crispr":
+        for i in crisprDep:
+            if i not in path:
+                sys.exit(i +" not set in $PATH")
+    elif module == "rna-seq":
+        for i in rnaseqDep:
+            if i not in path:
+                sys.exit(i +" not set in $PATH")
+    elif module == "chip-seq":
+        for i in chipseqDep:
+            if i not in path:
+                sys.exit(i +" not set in $PATH")
+    elif module == "cutrun":
+        for i in cutrunDep:
+            if i not in path:
+                sys.exit(i +" not set in $PATH")
 
 def checkMd5(work_dir):
     md5sum_file = os.path.join(work_dir,"raw-data", "md5sums.csv")     
@@ -92,6 +120,33 @@ def file_exists(file): #check if file exists/is not size zero
     else:
         return(False)
 
+def fastqc(work_dir,threads,file_extension,exe_dict):
+    fastqc_exe=os.path.join(exe_dict["fastqc"],"fastqc")
+    if not os.path.isdir(os.path.join(work_dir,"fastqc")) or len(os.listdir(os.path.join(work_dir,"fastqc"))) == 0:
+        os.makedirs(os.path.join(work_dir,"fastqc"),exist_ok=True)
+        fastqc_command=fastqc_exe+" --threads "+str(threads)+" --quiet -o fastqc/ raw-data/*"+file_extension
+        multiqc_command=["multiqc","-o","fastqc/","fastqc/"]
+        #log commands
+        with open(os.path.join(work_dir,"commands.log"),"w") as file:
+            file.write("FastQC: ")
+            print(fastqc_command, file=file)
+            file.write("MultiQC: ")
+            print(*multiqc_command, sep=" ", file=file)
+        try:
+            print("Running FastQC on raw data")
+            subprocess.run(fastqc_command, shell=True)
+        except:
+            sys.exit("ERROR: FastQC failed, check logs")
+        print("Running MultiQC")
+        subprocess.run(multiqc_command)
+    else:
+        print("Skipping FastQC/MultiQC (already performed)")
+
+
+
+
+
+#CRISPR SCREEN ANALYSIS SPECIFIC FUNCTIONS
 def csv2fasta(csv,script_dir):
     df_CSV=pd.read_csv(csv)
     line_number_fasta=len(df_CSV) * 2
@@ -125,27 +180,7 @@ def csv2fasta(csv,script_dir):
     #exit message
     sys.exit("Fasta file created and added to library.yaml\nPlease provid more CRISPR library information in this file before first run.")
 
-def fastqc(work_dir,threads,file_extension,exe_dict):
-    fastqc_exe=os.path.join(exe_dict["fastqc"],"fastqc")
-    if not os.path.isdir(os.path.join(work_dir,"fastqc")) or len(os.listdir(os.path.join(work_dir,"fastqc"))) == 0:
-        os.makedirs(os.path.join(work_dir,"fastqc"),exist_ok=True)
-        fastqc_command=fastqc_exe+" --threads "+str(threads)+" --quiet -o fastqc/ raw-data/*"+file_extension
-        multiqc_command=["multiqc","-o","fastqc/","fastqc/"]
-        #log commands
-        with open(os.path.join(work_dir,"commands.log"),"w") as file:
-            file.write("FastQC: ")
-            print(fastqc_command, file=file)
-            file.write("MultiQC: ")
-            print(*multiqc_command, sep=" ", file=file)
-        try:
-            print("Running FastQC on raw data")
-            subprocess.run(fastqc_command, shell=True)
-        except:
-            sys.exit("ERROR: FastQC failed, check logs")
-        print("Running MultiQC")
-        subprocess.run(multiqc_command)
-    else:
-        print("Skipping FastQC/MultiQC (already performed)")
+
 
 def check_index(library,crispr_library,script_dir,exe_dict,work_dir):
     bowtie2_dir=exe_dict["bowtie2"]

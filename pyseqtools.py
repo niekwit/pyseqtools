@@ -13,15 +13,16 @@ import pickle
 def main():
     
     #create top-level parser
-    parser = argparse.ArgumentParser(prog = 'pyseqtools.py')
-    subparsers = parser.add_subparsers(help ='Available options:',
-                                       dest='module')
+    parser = argparse.ArgumentParser(prog = 'pyseqtools.py',
+                                     description = "Analysis of a variety of NGS data")
+    subparsers = parser.add_subparsers(help ='Available analyses:',
+                                       dest ='module')
     
     #create subparsers for each module, i.e. functionality
     
     #create subparser for crispr screen analysis commands
     parser_crispr = subparsers.add_parser('crispr', 
-                                          help = 'CRISPR-Cas9 screen analysis')
+                                          help = 'CRISPR screens')
 
     parser_crispr.add_argument("-l", "--library",
                                required = "--csv2fasta" not in sys.argv,
@@ -90,7 +91,7 @@ def main():
     
     # create the parser for RNA-Seq-analysis
     parser_rnaseq = subparsers.add_parser('rna-seq', 
-                                          help='RNA-Seq analysis')
+                                          help='RNA-Seq')
             
     parser_rnaseq.add_argument("-t", "--threads",
                                required = False,
@@ -134,7 +135,7 @@ def main():
     
     #create subparser for ChIP-Seq analysis commands
     parser_chip = subparsers.add_parser('chip-seq', 
-                                          help='ChIP-Seq analysis')
+                                          help='ChIP-Seq')
     
     parser_chip.add_argument("-t", "--threads",
                              required = False,
@@ -181,10 +182,20 @@ def main():
                              required = False, 
                              action = 'store_true',
                              help = "Generate metageneplots and heatmaps with ngs.plot")
-       
+    
+    #create subparser for CUT&RUN analysis commands
+    parser_cutrun = subparsers.add_parser('cutrun', 
+                                          help='CUT & RUN')
+    
+    parser_cutrun.add_argument("-t", "--threads",
+                             required = False,
+                             default = 1,
+                             help = "<INT> number of CPU threads to use (default is 1). Use max to apply all available CPU threads")
         
     #create dictionary with command line arguments
     args = vars(parser.parse_args())
+    
+    
     
     def crispr(args):
          #csv to fasta conversion
@@ -288,8 +299,8 @@ def main():
     
     def rna_seq(args):
         ####set thread count for processing
-        max_threads=str(multiprocessing.cpu_count())
-        threads=args["threads"]
+        max_threads = str(multiprocessing.cpu_count())
+        threads = args["threads"]
         if threads == "max":
             threads=max_threads
     
@@ -298,24 +309,24 @@ def main():
     
         ###Run FastQC/MultiQC
         file_extension=utils.getExtension(work_dir)
-        skip_fastqc=args["skip_fastqc"]
+        skip_fastqc = args["skip_fastqc"]
         if not skip_fastqc:
             utils.fastqc(work_dir,threads,file_extension)
         else:
             print("Skipping FastQC/MultiQC analysis")
     
         ###Set species variable
-        species=args["species"]
+        species = args["species"]
         
         ###trim and align
-        pvalue=args["pvalue"]
-        align=args["align"]
+        pvalue = args["pvalue"]
+        align = args["align"]
         if align.lower() == "salmon":
             utils.trim(threads,work_dir)
-            salmon_index=settings["salmon_index"]["gencode-v35"]
-            gtf=settings["salmon_gtf"]["gencode-v35"]
-            fasta=settings["FASTA"]["gencode-v35"]
-            utils.salmon(salmon_index,str(threads),work_dir,gtf,fasta,script_dir,settings)
+            salmon_index=rna_seq["salmon_index"]["gencode-v35"]
+            gtf=rna_seq["salmon_gtf"]["gencode-v35"]
+            fasta=rna_seq["FASTA"]["gencode-v35"]
+            utils.salmon(salmon_index,str(threads),work_dir,gtf,fasta,script_dir,rna_seq)
             utils.plotMappingRate(work_dir)
             utils.plotPCA(work_dir,script_dir)
             utils.diff_expr(work_dir,gtf,script_dir,species,pvalue)
@@ -324,7 +335,7 @@ def main():
             utils.trim(threads,work_dir)
             #hisat2()
     
-    go=args["go"]
+    go = args["go"]
     
     if go == True:
         gene_sets=args["gene_sets"]
@@ -361,7 +372,7 @@ if __name__ == "__main__":
     ###loads RNA-Seq settings
     if os.path.exists(os.path.join(script_dir,"yaml","rna-seq.yaml")) == True:
         with open(os.path.join(script_dir,"yaml","rna-seq.yaml")) as file:
-            rna_seq=yaml.full_load(file)
+            rna_seq = yaml.full_load(file)
     else:
         print("ERROR: rna-seq.yaml not found in yaml folder. Please provide this file for further analysis.")
         sys.exit()
@@ -372,6 +383,7 @@ if __name__ == "__main__":
         rna_seq_genomeList.append(key)
 
     ###loads ChIP-Seq settings
+    
     
     
     main()
