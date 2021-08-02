@@ -1,0 +1,14 @@
+Moffat_TKO3-guides-sequences:
+  clip_seq: ''
+  fasta: /home/niek/Programs/pyseqtools/index/Moffat_TKO3-guides-sequences/Moffat_TKO3-guides-sequences.fasta
+  index_path: ''
+  read_mod: trim
+  sg_length: 20
+  species: human
+dub-only:
+  clip_seq: ''
+  fasta: /home/niek/references/fasta/dub-only/DUBonly.fasta
+  index_path: /home/niek/Programs/pyseqtools/index/dub-only/dub-only-index
+  read_mod: trim
+  sg_length: 20
+  species: human
