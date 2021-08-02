@@ -370,7 +370,7 @@ if __name__ == "__main__":
     work_dir = os.getcwd()
     
     #adds script directory to runtime for importing modules
-    sys.path.append(script_dir)
+    sys.path.append(os.path.join(script_dir,"utils"))
     import utils_crispr as crispr_utils
     import utils_general as utils
     import utils_rna_seq as rnaseq_utils
