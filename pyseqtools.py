@@ -7,7 +7,6 @@ import multiprocessing
 import timeit
 import time
 import yaml
-import pickle
 
 
 def main():
@@ -88,7 +87,6 @@ def main():
                                default = False,
                                help = "Skip MAGeCK/BAGEL2")
      
-    
     # create the parser for RNA-Seq-analysis
     parser_rnaseq = subparsers.add_parser('rna-seq', 
                                           help='RNA-Seq')
@@ -195,44 +193,40 @@ def main():
     #create dictionary with command line arguments
     args = vars(parser.parse_args())
     
-    
-    
+        
     def crispr(args):
-         #csv to fasta conversion
-        csv=args["csv2fasta"]
+        ###check if software requirements are met
+        utils.checkPythonPackages()
+        
+        #csv to fasta conversion
+        csv = args["csv2fasta"]
         if csv is not None:
             if not os.path.isfile(csv):
                 sys.exit("ERROR: invalid file path given")
             else:
-                utils.csv2fasta(csv,script_dir)
+                crispr_utils.csv2fasta(csv,script_dir)
     
-        ###check if software requirements are met
-        try:
-            exe_dict=pickle.load(open(os.path.join(script_dir,".exe_dict.obj"),"rb"))
-            dep_list=("fastqc","bowtie2","mageck","bagel2")
-            for i in dep_list:
-                if not i in exe_dict:
-                    sys.exit("ERROR: %s directory not found\nRun setup.py again\n" % i)
-        except FileNotFoundError:
-            sys.exit("setup.py not run before first analysis")
+        ###check if more software requirements are met
+        crispr_utils.checkDeps(script_dir)
+        utils.checkDeps(script_dir)
     
         ###set thread count for processing
-        threads=utils.set_threads(args)
+        threads = utils.set_threads(args)
         
         ###Check md5 checksums
         utils.checkMd5(work_dir)
         
         ###run modules based on parsed arguments:
         ##rename files
-        rename=args["rename"]
+        rename = args["rename"]
         if rename == True:
             utils.rename(work_dir)
     
         #determine file extension raw data
-        file_extension=utils.get_extension(work_dir)
+        file_extension = utils.get_extension(work_dir)
     
         ##Run FastQC/MultiQC
-        skip_fastqc=args["skip_fastqc"]
+        skip_fastqc = args["skip_fastqc"]
         if not skip_fastqc:
             utils.fastqc(work_dir,threads,file_extension,exe_dict)
         else:
@@ -240,21 +234,26 @@ def main():
     
         ##count reads
         #check if bowtie2 index is build for CRISPR library
-        crispr_library=args["library"]
-        utils.check_index(crispr_libraries,crispr_library,script_dir,exe_dict,work_dir)
+        crispr_library = args["library"]
+        crispr_utils.check_index(crispr_libraries, crispr_library, script_dir, work_dir)
     
         #check if file with just guide names exists
-        utils.guide_names(crispr_libraries,crispr_library)
+        crispr_utils.guide_names(crispr_libraries,crispr_library)
     
         #count sgRNAs
-        mismatch=args["mismatch"]
-        utils.count(crispr_libraries,crispr_library,mismatch,threads,script_dir,work_dir,exe_dict)
+        mismatch = args["mismatch"]
+        crispr_utils.count(crispr_libraries,
+                     crispr_library,
+                     mismatch,
+                     threads,
+                     script_dir,
+                     work_dir)
     
         #plot alignment rates
-        utils.plot_alignment_rate(work_dir)
+        crispr_utils.plot_alignment_rate(work_dir)
     
         #plot sample coverage (read count / library size)
-        utils.plot_coverage(work_dir,crispr_libraries,crispr_library)
+        crispr_utils.plot_coverage(work_dir,crispr_libraries,crispr_library)
     
         #join count files
         if not utils.file_exists(os.path.join(work_dir,
@@ -265,37 +264,42 @@ def main():
         if not utils.file_exists(os.path.join(work_dir,
                                     "count",
                                     "counts-aggregated-normalised.csv")):
-            utils.normalise(work_dir)
+            crispr_utils.normalise(work_dir)
     
         ##run library analysis
-        utils.lib_analysis(work_dir,crispr_libraries,crispr_library,script_dir)
-        utils.gcBias(work_dir,crispr_libraries,crispr_library)
+        crispr_utils.lib_analysis(work_dir,crispr_libraries,crispr_library,script_dir)
+        crispr_utils.gcBias(work_dir,crispr_libraries,crispr_library)
     
         ##run stats on counts
-        analysis=args["analysis"]
-        go=args["go"]
-        fdr=float(args["fdr"])
-        cnv=args["cnv"]
+        analysis = args["analysis"]
+        go = args["go"]
+        fdr = float(args["fdr"])
+        cnv = args["cnv"]
     
-        skip_stats=args["skip_stats"]
+        skip_stats = args["skip_stats"]
         if not skip_stats:
             if analysis == "mageck":
-                utils.mageck(work_dir,script_dir,cnv,fdr)
+                crispr_utils.mageck(work_dir,script_dir,cnv,fdr)
     
                 
             elif analysis == "bagel2":
                 print("Running BAGEL2")
-                utils.remove_duplicates(work_dir)
-                utils.convert4bagel(work_dir,crispr_libraries,crispr_library)
-                utils.bagel2(work_dir,script_dir,exe_dict,fdr)
+                crispr_utils.remove_duplicates(work_dir)
+                crispr_utils.convert4bagel(work_dir,crispr_libraries,crispr_library)
+                crispr_utils.bagel2(work_dir, script_dir, exe_dict, fdr)
         
         #run essential gene list comparison
-        essential_genes=args["essential_genes"]
-        utils.essentialGenes(work_dir,analysis,essential_genes,fdr)
+        essential_genes = args["essential_genes"]
+        crispr_utils.essentialGenes(work_dir, analysis, essential_genes, fdr)
     
         if go == True:
-            gene_sets=args["gene_sets"]
-            utils.goPython(work_dir,fdr,crispr_libraries,crispr_library,analysis,gene_sets)
+            gene_sets = args["gene_sets"]
+            crispr_utils.goPython(work_dir,
+                            fdr,
+                            crispr_libraries,
+                            crispr_library,
+                            analysis,
+                            gene_sets)
     
     def rna_seq(args):
         ####set thread count for processing
@@ -337,6 +341,11 @@ def main():
     
     go = args["go"]
     
+    try:
+        pvalue = args["pvalue"]
+    except KeyError:
+        pass
+	
     if go == True:
         gene_sets=args["gene_sets"]
         utils.geneSetEnrichment(work_dir,pvalue,gene_sets)
@@ -357,34 +366,42 @@ if __name__ == "__main__":
     #start run timer
     start = timeit.default_timer()
     
-    script_dir=os.path.abspath(os.path.dirname(__file__))
-    work_dir=os.getcwd()
+    script_dir = os.path.abspath(os.path.dirname(__file__))
+    work_dir = os.getcwd()
     
     #adds script directory to runtime for importing modules
     sys.path.append(script_dir)
-    import utils_pyseqtools as utils
+    import utils_crispr as crispr_utils
+    import utils_general as utils
+    import utils_rna_seq as rnaseq_utils
+    import utils_chip_seq as chipseq_utils
+    import utils_cutrun as cutrun_utils
+    
+    
     
     ###loads available CRISPR libraries from library.yaml
-    with open(os.path.join(script_dir,"yaml","crispr-libraries.yaml")) as file:
+    with open(os.path.join(script_dir,"yaml","crispr-library.yaml")) as file:
         crispr_libraries=yaml.full_load(file)
     crispr_library_list=list(crispr_libraries.keys())
     
     ###loads RNA-Seq settings
-    if os.path.exists(os.path.join(script_dir,"yaml","rna-seq.yaml")) == True:
-        with open(os.path.join(script_dir,"yaml","rna-seq.yaml")) as file:
+    try:
+        with open(os.path.join(script_dir,
+                               "yaml",
+                               "rna-seq.yaml")) as file:
             rna_seq = yaml.full_load(file)
-    else:
+    except FileNotFoundError:
         print("ERROR: rna-seq.yaml not found in yaml folder. Please provide this file for further analysis.")
         sys.exit()
     
         
-    rna_seq_genomeList=[]
+    rna_seq_genomeList = []
     for key, value in rna_seq["FASTA"].items():
         rna_seq_genomeList.append(key)
 
     ###loads ChIP-Seq settings
     
-    
+   
     
     main()
     
