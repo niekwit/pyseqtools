@@ -1,14 +1,34 @@
 #!/bin/bash
 
-#This script enables autocompletion for the CRISPR library options (-l) in crispr-pipeline.sh
-#Add the following line to your .bashrc file: source /path/to/CRISPR-tools/auto-complete.sh
+#This script enables autocompletion for the module and CRISPR library options (-l/--library) in the pyseqtools command
+#Add the following line to your .bashrc file: source /path/to/pyseqtools/auto-complete.sh
 
 #finds CRISPR libary names
-SCRIPT_DIR=$(find $HOME -type d -name "CRISPR-tools")
-lib_list=$(cat "$SCRIPT_DIR/library.yaml" | shyaml keys | tr "\n" " ")
+SCRIPT_DIR=$(find $HOME -type d -name "pyseqtools")
+lib_list=$(cat "$SCRIPT_DIR/yaml/crispr-library.yaml" | shyaml keys | tr "\n" " ")
 stat_list="mageck bagel2"
+module_list='crispr rna-seq chip-seq cutrun'
 
-#enables autocompletion of `-l` flag
+#enables autocompletion of `-l/--library` flag for CRISPR screen analysis
+
+
+
+_module()
+{
+    local opts
+    opts="crispr rna-seq chip-seq cutrun"
+    case $COMP_CWORD in
+        1)
+            COMPREPLY=( $(compgen -W "${opts}" -- "${COMP_WORDS[COMP_CWORD]}") )
+            ;;
+
+    esac
+    return 0
+}
+
+#Assign the auto-completion function _get for our command get.
+complete -F _module pyseqtools.py 
+
 function crisprLibs()
 {
 case $3 in
@@ -22,9 +42,8 @@ esac
 complete -F crisprLibs pyseqtools.py
 
 
-#write function for autocompletion of modules ($1)
+#enables autocomletion of pyseqtools modules
 
-#function modules()
-#{
-#
-#}
+function get {
+    pyseqtools.py $1
+} 

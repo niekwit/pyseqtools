@@ -259,7 +259,7 @@ def main():
         if not utils.file_exists(os.path.join(work_dir,
                                     "count",
                                     'counts-aggregated.tsv')):
-            utils.join_counts(work_dir,crispr_libraries,crispr_library)
+            crispr_utils.join_counts(work_dir,crispr_libraries,crispr_library)
         #normalise read count table
         if not utils.file_exists(os.path.join(work_dir,
                                     "count",
@@ -286,7 +286,7 @@ def main():
                 print("Running BAGEL2")
                 crispr_utils.remove_duplicates(work_dir)
                 crispr_utils.convert4bagel(work_dir,crispr_libraries,crispr_library)
-                crispr_utils.bagel2(work_dir, script_dir, exe_dict, fdr)
+                crispr_utils.bagel2(work_dir, script_dir, fdr)
         
         #run essential gene list comparison
         essential_genes = args["essential_genes"]

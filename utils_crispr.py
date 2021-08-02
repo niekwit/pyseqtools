@@ -98,10 +98,10 @@ def checkDeps(script_dir):
                        shell = True)
 
 
-def bowtie2Dir(script_dir):
+def bowtie2Dir():
     #get bowtie2 directory
     try:
-        bowtie2_dir = [line[0:] for line in subprocess.check_output("find " + script_dir + " -name bowtie2-build", 
+        bowtie2_dir = [line[0:] for line in subprocess.check_output("find $HOME -name bowtie2-build", 
                                                           shell = True).splitlines()]
     except CalledProcessError:
         print("ERROR: Bowtie2 was not installed properly")
@@ -153,7 +153,7 @@ def csv2fasta(csv,script_dir):
 def check_index(library, crispr_library, script_dir, work_dir):
     
     #get bowtie2 directory
-    bowtie2_dir = bowtie2Dir(script_dir)
+    bowtie2_dir = bowtie2Dir()
         
     try:
         index_path = library[crispr_library]["index_path"]
@@ -241,9 +241,9 @@ def count(library,
 
     #bowtie2 and bash commands (common to both trim and clip)
     
-    bowtie2_dir = bowtie2Dir(script_dir) #get bowtie2 directory
+    bowtie2_dir = bowtie2Dir() #get bowtie2 directory
        
-    bowtie2 = os.path.join(bowtie2dir, "bowtie2") + " --no-hd -p " + threads+" -t -N "+ mismatch + " -x " + index_path + " - 2>> crispr.log | "
+    bowtie2 = os.path.join(bowtie2_dir, "bowtie2") + " --no-hd -p " + threads+" -t -N "+ mismatch + " -x " + index_path + " - 2>> crispr.log | "
     bash = "sed '/XS:/d' | cut -f3 | sort | uniq -c > "
 
     #trim, align and count
@@ -253,7 +253,7 @@ def count(library,
             base_file = os.path.basename(file)
             out_file = os.path.join(work_dir,"count",base_file.replace(file_extension,
                                                                 ".guidecounts.txt"))
-            if not file_exists(out_file):
+            if not utils.file_exists(out_file):
                 tqdm.write("Aligning " + base_file)
                 print(base_file + ":", file = open("crispr.log", "a"))
                 cutadapt = "cutadapt -j " + threads + " --quality-base 33 -l " + sg_length+" -o - " + file + " 2>> crispr.log | "
@@ -271,7 +271,7 @@ def count(library,
             base_file = os.path.basename(file)
             out_file = os.path.join(work_dir,"count",base_file.replace(file_extension,".guidecounts.txt"))
 
-            if not file_exists(out_file):
+            if not utils.file_exists(out_file):
                 print("Aligning "+base_file)
                 print(base_file+":", file=open("crispr.log", "a"))
                 cutadapt = "cutadapt -j "+threads+" --quality-base 33 -a "+clip_seq+" -o - "+file+" 2>> crispr.log | "
@@ -314,7 +314,7 @@ def plot(df,y_label,save_file):
 
 def plot_alignment_rate(work_dir):
     plot_file=os.path.join(work_dir,"count","alignment-rate.pdf")
-    if not file_exists(plot_file):
+    if not utils.file_exists(plot_file):
         open(os.path.join(work_dir,"files.txt"),"w").writelines([ line for line in open(os.path.join(work_dir,"crispr.log")) if ".gz:" in line ])
         open(os.path.join(work_dir,"alignment-rate.txt"),"w").writelines([ line for line in open(os.path.join(work_dir,"crispr.log")) if "overall alignment rate" in line ])
 
@@ -346,7 +346,7 @@ def plot_alignment_rate(work_dir):
 
 def plot_coverage(work_dir,library,crispr_library): #plots coverage per sample after alignment
     plot_file=os.path.join(work_dir,"count","coverage.pdf")
-    if not file_exists(plot_file):
+    if not utils.file_exists(plot_file):
         #get number of sgRNAs in CRISPR library
         fasta=library[crispr_library]["fasta"]
         fasta=pd.read_table(fasta, header=None)
@@ -550,7 +550,7 @@ def mageck(work_dir,script_dir,cnv,fdr):
         control_sample=df.loc[i]["c"]
         mageck_output=test_sample+"_vs_"+control_sample
 
-        if not file_exists(os.path.join(work_dir,"mageck",mageck_output)):
+        if not utils.file_exists(os.path.join(work_dir,"mageck",mageck_output)):
             os.makedirs(os.path.join(work_dir,"mageck",mageck_output),exist_ok=True)
             prefix=os.path.join(work_dir,"mageck",mageck_output,mageck_output)
             input=os.path.join(work_dir,"count","counts-aggregated.tsv")
@@ -590,7 +590,7 @@ def mageck(work_dir,script_dir,cnv,fdr):
 
         if cnv != None:
             cnv_dir=os.path.join(work_dir,"mageck-cnv",mageck_output)
-            if not file_exists(cnv_dir):
+            if not utils.file_exists(cnv_dir):
                 os.makedirs(cnv_dir, exist_ok=True)
                 prefix=os.path.join(work_dir,"mageck-cnv",mageck_output,mageck_output)
                 input=os.path.join(work_dir,"count","counts-aggregated.tsv")
@@ -607,8 +607,8 @@ def mageck(work_dir,script_dir,cnv,fdr):
         save_path=os.path.dirname(file)
         out_put_file=os.path.join(save_path,"logFC-plot.pdf")
 
-        if not file_exists(out_put_file):
-            plot_command="Rscript "+os.path.join(script_dir,"R","plot-hits.R ")+ \
+        if not utils.file_exists(out_put_file):
+            plot_command="Rscript "+os.path.join(script_dir,"R","crispr-plot-hits.R ")+ \
                         work_dir+" "+file+" mageck "+save_path+" "+mageck_output+ \
                         " "+script_dir+" "+str(fdr)
             utils.write2log(work_dir,plot_command,"Plot hits MAGeCK: ")
@@ -627,7 +627,7 @@ def remove_duplicates(work_dir):
 def convert4bagel(work_dir,library,crispr_library): #convert MAGeCK formatted count table to BAGEL2 format
     count_table_bagel2=os.path.join(work_dir,"bagel",'counts-aggregated-bagel2.tsv')
 
-    if not file_exists(count_table_bagel2):
+    if not utils.file_exists(count_table_bagel2):
         #obtain sequences of each guide
         try:
             fasta=library[crispr_library]["fasta"]
@@ -676,10 +676,7 @@ def convert4bagel(work_dir,library,crispr_library): #convert MAGeCK formatted co
         df_merge.to_csv(count_table_bagel2, sep='\t',index=False)
 
 
-def bagel2(work_dir,script_dir,exe_dict,fdr):
-    
-   
-    
+def bagel2(work_dir, script_dir, fdr):
     
     #get BAGEL2 directory
     try:
@@ -735,12 +732,12 @@ def bagel2(work_dir,script_dir,exe_dict,fdr):
         #test_sample_column=column_dict[test_sample]
         control_sample_column=column_dict[control_sample]
 
-        if not file_exists(os.path.join(work_dir,"bagel",bagel2_output)):
+        if not utils.file_exists(os.path.join(work_dir,"bagel",bagel2_output)):
             os.makedirs(os.path.join(work_dir,"bagel",bagel2_output),exist_ok=True)
 
         print("Generatig fold change table for "+bagel2_output)
         fc_file=os.path.join(bagel2_output_base+".foldchange")
-        if not file_exists(fc_file):
+        if not utils.file_exists(fc_file):
             bagel2fc_command="python3 "+bagel2_exe+" fc"+" -i "+ \
                                 count_table+" -o "+bagel2_output_base+ \
                                 " -c "+str(control_sample_column)
@@ -752,7 +749,7 @@ def bagel2(work_dir,script_dir,exe_dict,fdr):
 
         print("Calculating Bayes Factors for "+bagel2_output)
         bf_file=os.path.join(bagel2_output_base+".bf")
-        if not file_exists(bf_file):
+        if not utils.file_exists(bf_file):
             #get sample names from BAGEL2 foldchange table
             header2=subprocess.check_output(["head", "-1",os.path.join(bagel2_output_base+".foldchange")])
             header2=header2.decode("utf-8")
@@ -775,7 +772,7 @@ def bagel2(work_dir,script_dir,exe_dict,fdr):
 
         print("Calculating precision-recall for "+bagel2_output)
         pr_file=os.path.join(bagel2_output_base+".pr")
-        if not file_exists(pr_file):
+        if not utils.file_exists(pr_file):
             bagel2pr_command="python3 "+bagel2_exe+" pr"+" -i "+bf_file+ \
                             " -o "+pr_file+" -e "+essential_genes+" -n "+ \
                             nonessential_genes
@@ -787,8 +784,8 @@ def bagel2(work_dir,script_dir,exe_dict,fdr):
 
         print("Plotting BAGEL2 results for "+bagel2_output)
         plot_file=os.path.join(work_dir,"bagel",bagel2_output,"PR-"+bagel2_output+".pdf")
-        if not file_exists(plot_file):
-            plot_script=os.path.join(script_dir,"R","plot-hits.R")
+        if not utils.file_exists(plot_file):
+            plot_script=os.path.join(script_dir,"R","crispr-plot-hits.R")
             plot_command="Rscript "+plot_script+" "+work_dir+" "+pr_file+ \
                         " bagel2 "+os.path.join(work_dir,"bagel",bagel2_output)+ \
                         " "+bagel2_output
@@ -818,7 +815,7 @@ def bagel2(work_dir,script_dir,exe_dict,fdr):
     for file in file_list:
         #plot histogram BF
         out_file=os.path.join(os.path.dirname(file),"histogram-BF.pdf")
-        if not file_exists(out_file):
+        if not utils.file_exists(out_file):
             df=pd.read_table(file)
             histogramBF(df,out_file)
 
@@ -965,7 +962,7 @@ def gcBias(work_dir,library,crispr_library):
                                 "library-analysis",
                                 "gc-bias.pdf")
 
-        if not file_exists(out_file):
+        if not utils.file_exists(out_file):
             fasta=library[crispr_library]["fasta"]
 
             #get sgRNA counts
@@ -1125,7 +1122,7 @@ def essentialGenes(work_dir,analysis,essential_genes,fdr):
 
         for file in file_list:
             out_file=os.path.join(os.path.dirname(file),"essential_genes_venn.pdf")
-            if not file_exists(out_file):
+            if not utils.file_exists(out_file):
                 df=pd.read_csv(file,sep="\t")
                 df_fdr=df.loc[df["neg|fdr"] < fdr ]
                 if len(df_fdr) != 0:
@@ -1152,7 +1149,7 @@ def essentialGenes(work_dir,analysis,essential_genes,fdr):
         for file in file_list:
             #plot venn
             out_file=os.path.join(os.path.dirname(file),"essential_genes_venn.pdf")
-            if not file_exists(out_file):
+            if not utils.file_exists(out_file):
                 prefix=os.path.basename(os.path.normpath(file))
                 prefix=prefix.replace(".pr","")
                 df=pd.read_table(file)
