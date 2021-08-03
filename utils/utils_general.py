@@ -105,20 +105,20 @@ def write2log(work_dir,command,name):
 
 
 def set_threads(args):
-    max_threads=str(multiprocessing.cpu_count())
-    threads=args["threads"]
+    max_threads = str(multiprocessing.cpu_count())
+    threads = args["threads"]
     if threads == "max":
         threads=max_threads
-    threads=str(threads)
+    threads = str(threads)
     return threads
 
 
 def rename(work_dir):
-    file=open(os.path.join(work_dir,"rename.config"), "r")
-    lines=file.readlines()
-    count=0
+    file = open(os.path.join(work_dir,"rename.config"), "r")
+    lines = file.readlines()
+    count = 0
     for line in lines: #removes newline characters
-        lines[count]=line.replace("\n","")
+        lines[count] = line.replace("\n","")
         count+=1
 
     for line in lines:#rename files
