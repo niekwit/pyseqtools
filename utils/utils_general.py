@@ -4,10 +4,15 @@ import warnings
 import os
 import subprocess
 import multiprocessing
-import yaml
 import sys
-import csv
 import glob
+import hashlib
+import pkg_resources
+import urllib.request
+from zipfile import ZipFile
+import stat
+
+import yaml
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib_venn import venn2
@@ -15,8 +20,6 @@ import pandas as pd
 import seaborn as sns
 from tqdm.auto import tqdm
 import gseapy as gp
-import hashlib
-import pkg_resources
 
 
 ###GENERAL FUNCTIONS
@@ -58,7 +61,7 @@ def checkDeps(script_dir):
         with ZipFile(download_file, 'r') as zip_ref:
             zip_ref.extractall(script_dir)
         #make fastqc file executable by shell
-        fastqc_file = os.path.join(fastqc_dir,"fastqc")
+        fastqc_file = os.path.join(fastqc,"fastqc")
         st = os.stat(fastqc_file)
         os.chmod(fastqc_file, st.st_mode | stat.S_IEXEC)
         #remove download file
@@ -140,8 +143,13 @@ def file_exists(file): #check if file exists/is not size zero
     else:
         return(False)
 
-def fastqc(work_dir,threads,file_extension,exe_dict):
-    fastqc_exe=os.path.join(exe_dict["fastqc"],"fastqc")
+def fastqc(work_dir,threads,file_extension):
+    fastqc_dir = [line[0:] for line in subprocess.check_output("find $HOME -name run_fastqc.bat", 
+                                                           shell = True).splitlines()]
+    fastqc_dir = fastqc_dir[0].decode("utf-8")
+    fastqc_dir = os.path.dirname(fastqc_dir)
+    
+    fastqc_exe = os.path.join(fastqc_dir,"fastqc")
     if not os.path.isdir(os.path.join(work_dir,"fastqc")) or len(os.listdir(os.path.join(work_dir,"fastqc"))) == 0:
         os.makedirs(os.path.join(work_dir,"fastqc"),exist_ok=True)
         fastqc_command=fastqc_exe+" --threads "+str(threads)+" --quiet -o fastqc/ raw-data/*"+file_extension

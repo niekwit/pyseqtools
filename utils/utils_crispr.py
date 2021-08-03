@@ -5,7 +5,7 @@ import os
 import shutil
 import subprocess
 from subprocess import CalledProcessError
-import multiprocessing
+import urllib.request
 import yaml
 import sys
 import csv
@@ -30,7 +30,7 @@ def checkDeps(script_dir):
     
     #Check for MAGeCK
     try:
-        mageck = subprocess.check_output("which mageck", 
+        subprocess.check_output("which mageck", 
                                          shell = True)
     except CalledProcessError:
         print("ERROR: MAGeCK was not found\nInstalling MAGeCK now")
@@ -42,7 +42,6 @@ def checkDeps(script_dir):
         tar_command = "tar -xzf " + download_file
         subprocess.run(tar_command,
                        shell = True)
-        curr_dir = os.getcwd()
         os.chdir(os.path.join(script_dir, "mageck-0.5.9.4"))
         mageck_install_command = "python3 " + os.path.join(script_dir ,
                                                            "mageck-0.5.9.4", 
@@ -82,14 +81,10 @@ def checkDeps(script_dir):
             url="https://sourceforge.net/projects/bowtie-bio/files/bowtie2/2.4.3/bowtie2-2.4.3-linux-x86_64.zip/download"
             download_file = os.path.join(script_dir,
                                          "bowtie2-2.4.3-linux-x86_64.zip")
-            bowtie2_dir = os.path.join(script_dir,
-                                       "bowtie2-2.4.3-linux-x86_64")
         elif sys.platform == "darwin":
             url = "https://sourceforge.net/projects/bowtie-bio/files/bowtie2/2.4.3/bowtie2-2.4.3-macos-x86_64.zip/download"
             download_file = os.path.join(script_dir, 
                                          "bowtie2-2.4.3-macos-x86_64.zip")
-            bowtie2_dir = os.path.join(script_dir, 
-                                       "bowtie2-2.4.3-macos-x86_64")
         print("Installing Bowtie2")
         urllib.request.urlretrieve(url, download_file)
         #unzip Bowtie2 file
@@ -160,7 +155,7 @@ def check_index(library, crispr_library, script_dir, work_dir):
         fasta = library[crispr_library]["fasta"]
         print(crispr_library + " library selected")
 
-        if index_path in ["",None]:
+        if index_path in ["", None]:
             print("No index file found for " + crispr_library)
             if fasta == "":
                 sys.exit("ERROR: No fasta file found for " + crispr_library)
@@ -174,7 +169,8 @@ def check_index(library, crispr_library, script_dir, work_dir):
                                        crispr_library)
                 os.makedirs(index_dir,
                             exist_ok = True)
-                bowtie2_build_command = "bowtie2-build " + fasta + " " + index_base
+                bowtie2_build_command = os.path.join(bowtie2_dir, 
+                                                     "bowtie2-build") + " " + fasta + " " + index_base
                 utils.write2log(work_dir, 
                           bowtie2_build_command, 
                           "Bowtie2-build: ")

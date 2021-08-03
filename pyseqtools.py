@@ -228,7 +228,7 @@ def main():
         ##Run FastQC/MultiQC
         skip_fastqc = args["skip_fastqc"]
         if not skip_fastqc:
-            utils.fastqc(work_dir,threads,file_extension,exe_dict)
+            utils.fastqc(work_dir,threads,file_extension)
         else:
             print("Skipping FastQC/MultiQC analysis")
     
