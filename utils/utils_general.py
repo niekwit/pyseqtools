@@ -51,7 +51,6 @@ def checkDeps(script_dir):
     try:
         fastqc = fastqc[0].decode("utf-8")
         fastqc = os.path.dirname(fastqc)
-        #add fastqc path to hidden yaml file
     except IndexError:
         print("ERROR: FastQC was not found\nInstalling FastQC now")
         url = "https://www.bioinformatics.babraham.ac.uk/projects/fastqc/fastqc_v0.11.9.zip"
@@ -66,7 +65,6 @@ def checkDeps(script_dir):
         os.chmod(fastqc_file, st.st_mode | stat.S_IEXEC)
         #remove download file
         os.remove(download_file)
-
 
 
 def checkMd5(work_dir):
@@ -99,10 +97,12 @@ def checkMd5(work_dir):
                 print("MD5 checksums correct")
                 open(".md5summscorrect", 'a').close()
 
+
 def write2log(work_dir,command,name):
     with open(os.path.join(work_dir,"commands.log"), "a") as file:
         file.write(name)
         print(*command, sep="",file=file)
+
 
 def set_threads(args):
     max_threads=str(multiprocessing.cpu_count())
@@ -111,6 +111,7 @@ def set_threads(args):
         threads=max_threads
     threads=str(threads)
     return threads
+
 
 def rename(work_dir):
     file=open(os.path.join(work_dir,"rename.config"), "r")
@@ -128,12 +129,14 @@ def rename(work_dir):
                                 "raw-data",
                                 new_name))
 
+                                           
 def get_extension(work_dir):
     file_list=glob.glob(os.path.join(work_dir,"raw-data","*.gz"))
     test_file=file_list[0]
     extension_index=test_file.index(".",0)
     file_extension=test_file[extension_index:]
     return file_extension
+
 
 def file_exists(file): #check if file exists/is not size zero
     if os.path.exists(file):
@@ -142,6 +145,7 @@ def file_exists(file): #check if file exists/is not size zero
                 return(True)
     else:
         return(False)
+
 
 def fastqc(work_dir,threads,file_extension):
     fastqc_dir = [line[0:] for line in subprocess.check_output("find $HOME -name run_fastqc.bat", 
