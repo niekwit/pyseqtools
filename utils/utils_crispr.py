@@ -119,7 +119,7 @@ def csv2fasta(csv,script_dir):
                     index = np.arange(line_number_fasta))
 
     #create fasta df
-    df["column"] = df_CSV.stack().reset_index(drop=True)
+    df["column"] = df_CSV.stack().reset_index(drop = True)
     df.iloc[0::2, :] = ">"+df.iloc[0::2, :]
 
     library_name = os.path.basename(csv)
@@ -127,8 +127,9 @@ def csv2fasta(csv,script_dir):
     fasta_base = library_name + ".fasta"
     fasta_file = os.path.join(script_dir,"index",library_name,fasta_base)
     os.makedirs(os.path.join(script_dir,"index",library_name),
-                exist_ok=True)
-    df.to_csv(fasta_file,index=False, header=False)
+                exist_ok = True)
+    df.to_csv(fasta_file,index = False, 
+              header = False)
 
     #add new CRISPR library and fasta file location to library.yaml
     yaml_list = ["clip_seq","fasta","index_path","read_mod","sg_length","species"]

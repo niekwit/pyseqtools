@@ -70,12 +70,14 @@ def main():
     parser_crispr.add_argument("--essential-genes",
                                required = False,
                                metavar = "<Custom essential gene list>",
-                               default = os.path.join(script_dir,"core-essential-genes.csv"), #"path to Hart list"
+                               default = os.path.join(script_dir, "core-essential-genes.csv"), #"path to Hart list"
                                help = "Essential gene list (default is Hart et al 2015 Cell)")
     parser_crispr.add_argument("--csv2fasta",
                                required = False,
-                               metavar = "<CSV file>",
-                               default = None,help = "Convert CSV file with sgRNA names and sequences to fasta format. The first column should contain sgRNA names and the second sgRNA sequences (headers can be anything).")
+                               metavar = "<CSV FILE> <LIBRARY NAME>",
+                               nargs = 2,
+                               default = None,
+                               help = "Convert CSV file with sgRNA names and sequences to fasta format. The first column should contain sgRNA names and the second sgRNA sequences (headers can be anything).")
     parser_crispr.add_argument("--skip-fastqc",
                                required = False,
                                action = 'store_true',
