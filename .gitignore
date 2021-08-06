@@ -127,3 +127,15 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+#temp files
+*~
+
+#hidden files
+.*
+
+bowtie2*/
+FastQC/
+bagel2/
+index/
+Trim*/
