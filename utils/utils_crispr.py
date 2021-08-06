@@ -25,92 +25,7 @@ import utils_general as utils
 
 ###CRISPR SCREEN ANALYSIS SPECIFIC FUNCTIONS
 
-
-def checkDeps(script_dir):
-    
-    #Check for MAGeCK
-    try:
-        subprocess.check_output("which mageck", 
-                                         shell = True)
-    except CalledProcessError:
-        print("ERROR: MAGeCK was not found\nInstalling MAGeCK now")
-        
-        url = "https://sourceforge.net/projects/mageck/files/0.5/mageck-0.5.9.4.tar.gz/download"
-        download_file = os.path.join(script_dir,"mageck-0.5.9.4.tar.gz")
-        urllib.request.urlretrieve(url, download_file)
-        #unpack MAGeCK file
-        tar_command = "tar -xzf " + download_file
-        subprocess.run(tar_command,
-                       shell = True)
-        os.chdir(os.path.join(script_dir, "mageck-0.5.9.4"))
-        mageck_install_command = "python3 " + os.path.join(script_dir ,
-                                                           "mageck-0.5.9.4", 
-                                                           "setup.py" + " install --user")
-        subprocess.run(mageck_install_command,
-                       shell = True)
-                
-        #remove download file and folder
-        os.remove(download_file)
-        shutil.rmtree(os.path.join(script_dir, 
-                                   "mageck-0.5.9.4"))
-        
-    #Check for BAGEL2:
-    bagel2 = [line[0:] for line in subprocess.check_output("find $HOME -name BAGEL.py", 
-                                                           shell = True).splitlines()]
-    try: 
-        bagel2 = bagel2[0].decode("utf-8")
-    except IndexError:
-        print("ERROR: BAGEL2 was not found\nInstalling BAGEL2 now")
-        clone_command = "git " + "clone --quiet " + "https://github.com/hart-lab/bagel.git " + os.path.join(script_dir, "bagel2")
-        subprocess.run(clone_command, 
-                       shell = True)
-        #removes example directory (contains old BAGEL2 script)
-        shutil.rmtree(os.path.join(script_dir, 
-                                   "bagel2", 
-                                   "pipeline-script-example"))
-    
-    #Check for Bowtie2
-    bowtie2 = [line[0:] for line in subprocess.check_output("find $HOME -name bowtie2-build", 
-                                                           shell = True).splitlines()]
-    try:
-        bowtie2 = bowtie2[0].decode("utf-8")
-        bowtie2 = os.path.dirname(bowtie2)
-    except IndexError:
-        print("ERROR: Bowtie2 was not found\nInstalling Bowtie2 now")
-        if sys.platform in ["linux", "linux2"]:
-            url="https://sourceforge.net/projects/bowtie-bio/files/bowtie2/2.4.3/bowtie2-2.4.3-linux-x86_64.zip/download"
-            download_file = os.path.join(script_dir,
-                                         "bowtie2-2.4.3-linux-x86_64.zip")
-        elif sys.platform == "darwin":
-            url = "https://sourceforge.net/projects/bowtie-bio/files/bowtie2/2.4.3/bowtie2-2.4.3-macos-x86_64.zip/download"
-            download_file = os.path.join(script_dir, 
-                                         "bowtie2-2.4.3-macos-x86_64.zip")
-        print("Installing Bowtie2")
-        urllib.request.urlretrieve(url, download_file)
-        #unzip Bowtie2 file
-        unzip_command = "unzip -qq " + download_file+" -d " + script_dir
-        subprocess.run(unzip_command,
-                       shell = True)
-
-
-def bowtie2Dir():
-    #get bowtie2 directory
-    try:
-        bowtie2_dir = [line[0:] for line in subprocess.check_output("find $HOME -name bowtie2-build", 
-                                                          shell = True).splitlines()]
-    except CalledProcessError:
-        print("ERROR: Bowtie2 was not installed properly")
-        return(None)
-            
-    try:
-        bowtie2_dir = bowtie2_dir[0].decode("utf-8")
-        bowtie2_dir = os.path.dirname(bowtie2_dir)
-        return(bowtie2_dir)
-    except IndexError:
-        print("ERROR: Bowtie2 was not installed properly")
-        return(None)
-
-
+   
 def csv2fasta(csv,script_dir):
     df_CSV = pd.read_csv(csv)
     line_number_fasta = len(df_CSV) * 2
@@ -148,9 +63,38 @@ def csv2fasta(csv,script_dir):
 
 def check_index(library, crispr_library, script_dir, work_dir):
     
-    #get bowtie2 directory
-    bowtie2_dir = bowtie2Dir()
-        
+    #Check for Bowtie2 in $PATH
+    path = os.environ["PATH"].lower()
+    
+    if "bowtie2" not in path:
+        #Check for Bowtie2
+        bowtie2 = [line[0:] for line in subprocess.check_output("find $HOME -name bowtie2-build", 
+                                                               shell = True).splitlines()]
+        try:
+            bowtie2 = bowtie2[0].decode("utf-8")
+            bowtie2_dir = os.path.dirname(bowtie2)
+        except IndexError:
+            print("WARNING: Bowtie2 was not found\nInstalling Bowtie2 now")
+            if sys.platform in ["linux", "linux2"]:
+                url="https://sourceforge.net/projects/bowtie-bio/files/bowtie2/2.4.3/bowtie2-2.4.3-linux-x86_64.zip/download"
+                download_file = os.path.join(script_dir,
+                                             "bowtie2-2.4.3-linux-x86_64.zip")
+            elif sys.platform == "darwin":
+                url = "https://sourceforge.net/projects/bowtie-bio/files/bowtie2/2.4.3/bowtie2-2.4.3-macos-x86_64.zip/download"
+                download_file = os.path.join(script_dir, 
+                                             "bowtie2-2.4.3-macos-x86_64.zip")
+            print("Installing Bowtie2")
+            urllib.request.urlretrieve(url, download_file)
+            #unzip Bowtie2 file
+            unzip_command = "unzip -qq " + download_file+" -d " + script_dir
+            subprocess.run(unzip_command,
+                           shell = True)
+            #remove downloaded file
+            os.remove(download_file)
+    else:
+        bowtie2_dir = ""
+
+                         
     try:
         index_path = library[crispr_library]["index_path"]
         fasta = library[crispr_library]["fasta"]
@@ -237,8 +181,12 @@ def count(library,
     print("Aligning reads to reference (mismatches allowed: "+mismatch+")")
 
     #bowtie2 and bash commands (common to both trim and clip)
+    bowtie2 = [line[0:] for line in subprocess.check_output("find $HOME -name bowtie2-build", 
+                                                               shell = True).splitlines()]
+
+    bowtie2 = bowtie2[0].decode("utf-8")
+    bowtie2_dir = os.path.dirname(bowtie2)
     
-    bowtie2_dir = bowtie2Dir() #get bowtie2 directory
        
     bowtie2 = os.path.join(bowtie2_dir, "bowtie2") + " --no-hd -p " + threads+" -t -N "+ mismatch + " -x " + index_path + " - 2>> crispr.log | "
     bash = "sed '/XS:/d' | cut -f3 | sort | uniq -c > "
@@ -392,6 +340,16 @@ def normalise(work_dir):
 
 
 def join_counts(work_dir,library,crispr_library):
+    '''
+    re-write this function to make it more robust and simpler:
+        Strategy:
+        - remove leading white spaces from all .guidecount.txt file
+        - load as pd data frame
+        - left join to reference for all files
+        - write to file
+    '''
+    
+    
     #load sgRNA names, used for merging data2
     fasta=library[crispr_library]["fasta"]
     guide_name_file=fasta.replace(".fasta","-guide_names.csv")
@@ -494,21 +452,50 @@ def join_counts(work_dir,library,crispr_library):
 
 
 def mageck(work_dir,script_dir,cnv,fdr):
-
+    
+    #Check for MAGeCK
+    try:
+        subprocess.check_output("which mageck", 
+                                         shell = True)
+    except CalledProcessError:
+        print("WARNING: MAGeCK was not found\nInstalling MAGeCK now")
+        
+        url = "https://sourceforge.net/projects/mageck/files/0.5/mageck-0.5.9.4.tar.gz/download"
+        download_file = os.path.join(script_dir,"mageck-0.5.9.4.tar.gz")
+        urllib.request.urlretrieve(url, download_file)
+        #unpack MAGeCK file
+        tar_command = "tar -xzf " + download_file
+        subprocess.run(tar_command,
+                       shell = True)
+        os.chdir(os.path.join(script_dir, "mageck-0.5.9.4"))
+        mageck_install_command = "python3 " + os.path.join(script_dir ,
+                                                           "mageck-0.5.9.4", 
+                                                           "setup.py" + " install --user")
+        subprocess.run(mageck_install_command,
+                       shell = True)
+                
+        #remove download file and folder
+        os.remove(download_file)
+        shutil.rmtree(os.path.join(script_dir, 
+                                   "mageck-0.5.9.4"))
+    
+        
     if fdr > 0.25:
         print("WARNING: MAGeCK FDR cut off set higher than default 0.25")
 
     #determine number of samples in count table
-    header=subprocess.check_output(["head", "-1",os.path.join(work_dir,"count","counts-aggregated.tsv")])
-    header=header.decode("utf-8")
-    sample_count=header.count("\t") - 1
+    header = subprocess.check_output(["head", "-1", os.path.join(work_dir,
+                                                                 "count",
+                                                                 "counts-aggregated.tsv")])
+    header = header.decode("utf-8")
+    sample_count = header.count("\t") - 1
     if sample_count == 2:
         if "pre" and "post" in header:
             print("Skipping MAGeCK (only CRISPR library samples present)")
             return(None)
 
     #check for stats.config
-    stats_config=os.path.join(work_dir,"stats.config")
+    stats_config = os.path.join(work_dir,"stats.config")
     if not os.path.exists(stats_config):
         print("ERROR: stats.config not found (MAGeCK comparisons)")
         return(None)
@@ -518,9 +505,9 @@ def mageck(work_dir,script_dir,cnv,fdr):
                 exist_ok = True)
 
     #load MAGeCK comparisons and run MAGeCK
-    df=pd.read_csv(os.path.join(work_dir,"stats.config"),sep=";")
-    sample_number=len(df)
-    sample_range=range(sample_number)
+    df = pd.read_csv(os.path.join(work_dir,"stats.config"),sep=";")
+    sample_number = len(df)
+    sample_range = range(sample_number)
 
     def cnv_com(script_dir,cnv,ccle_ref): #generate MAGeCK command for CNV correction
         #check if specified cell line is in CCLE data list
@@ -675,69 +662,82 @@ def convert4bagel(work_dir,library,crispr_library): #convert MAGeCK formatted co
 
 def bagel2(work_dir, script_dir, fdr):
     
-    #get BAGEL2 directory
-    try:
-        bagel2_dir = [line[0:] for line in subprocess.check_output("find " + script_dir + " -name BAGEL.py", 
-                                                          shell = True).splitlines()]
-    except CalledProcessError:
-        sys.exit("ERROR: Bowtie2 was not installed properly")
-                   
-    try:
-        bagel2_dir = bagel2_dir[0].decode("utf-8")
-        bagel2_dir = os.path.dirname(bagel2_dir)
+    #Check for BAGEL2:
+    bagel2 = [line[0:] for line in subprocess.check_output("find $HOME -name BAGEL.py", 
+                                                           shell = True).splitlines()]
+    try: 
+        bagel2_exe = bagel2[0].decode("utf-8")
+        bagel2_dir = os.path.dirname(bagel2_exe)
+        
     except IndexError:
-        sys.exit("ERROR: Bowtie2 was not installed properly")
-
+        print("WARNING: BAGEL2 was not found\nInstalling BAGEL2 now")
+        clone_command = "git " + "clone --quiet " + "https://github.com/hart-lab/bagel.git " + os.path.join(script_dir, "bagel2")
+        subprocess.run(clone_command, 
+                       shell = True)
+        #removes example directory (contains old BAGEL2 script)
+        shutil.rmtree(os.path.join(script_dir, 
+                                   "bagel2", 
+                                   "pipeline-script-example"))
+        
+        bagel2_dir = os.path.join(script_dir, "bagel2")
+        bagel2_exe = os.path.join(script_dir, "bagel2", "BAGEL.py")
     
-    bagel2_exe=os.path.join(bagel2_dir,"BAGEL.py")
-    
+   
+        
     #get sample names from BAGEL2 count table
-    header=subprocess.check_output(["head", "-1",os.path.join(work_dir,
+    header = subprocess.check_output(["head", "-1",os.path.join(work_dir,
                                                 "bagel",
                                                 "counts-aggregated-bagel2.tsv")])
-    header=header.decode("utf-8")
-    header=header.replace("\n","")
-    header=list(header.split("\t"))# convert string into list
+    header = header.decode("utf-8")
+    header = header.replace("\n","")
+    header = list(header.split("\t"))# convert string into list
 
     #create dictionary that holds column name (key) and column index
-    column_dict={key: i for i, key in enumerate(header)}
-    column_dict={key: column_dict[key] - 1 for key in column_dict} #first sample column should have value 1
+    column_dict = {key: i for i, key in enumerate(header)}
+    column_dict = {key: column_dict[key] - 1 for key in column_dict} #first sample column should have value 1
 
-    count_table=os.path.join(work_dir,"bagel",'counts-aggregated-bagel2.tsv')
+    count_table = os.path.join(work_dir,
+                               "bagel",
+                               'counts-aggregated-bagel2.tsv')
 
     #reference genes files for Bayes Factor calculation
-    essential_genes=os.path.join(bagel2_dir,"CEGv2.txt")
-    nonessential_genes=os.path.join(bagel2_dir,"NEGv1.txt")
+    essential_genes = os.path.join(bagel2_dir,"CEGv2.txt")
+    nonessential_genes = os.path.join(bagel2_dir,"NEGv1.txt")
 
     #load stats.config for sample comparisons
-    df=pd.read_csv(os.path.join(work_dir,"stats.config"),sep=";")
+    df = pd.read_csv(os.path.join(work_dir,"stats.config"),
+                   sep=";")
 
     #remove rows with multiple samples (for MAGeCK) per condition (temp fix)
-    df=df[~df["t"].str.contains(",")]
-    df=df[~df["c"].str.contains(",")]
-    df=df.reset_index()
+    df = df[~df["t"].str.contains(",")]
+    df = df[~df["c"].str.contains(",")]
+    df = df.reset_index()
 
-    sample_number=len(df)
-    sample_range=range(sample_number)
+    sample_number = len(df)
+    sample_range = range(sample_number)
 
     #run BAGEL2 for each comparison in stats.config
     for i in sample_range:
-        test_sample=df.loc[i]["t"]
-        control_sample=df.loc[i]["c"]
-        bagel2_output=test_sample+"_vs_"+control_sample
-        bagel2_output_base=os.path.join(work_dir,"bagel",bagel2_output,bagel2_output)
-        #test_sample_column=column_dict[test_sample]
+        test_sample = df.loc[i]["t"]
+        control_sample = df.loc[i]["c"]
+        bagel2_output = test_sample+"_vs_"+control_sample
+        bagel2_output_base = os.path.join(work_dir,"bagel",bagel2_output,bagel2_output)
         control_sample_column=column_dict[control_sample]
 
-        if not utils.file_exists(os.path.join(work_dir,"bagel",bagel2_output)):
-            os.makedirs(os.path.join(work_dir,"bagel",bagel2_output),exist_ok=True)
+        if not utils.file_exists(os.path.join(work_dir,
+                                              "bagel",
+                                              bagel2_output)):
+            os.makedirs(os.path.join(work_dir,
+                                     "bagel",
+                                     bagel2_output),
+                        exist_ok=True)
 
-        print("Generatig fold change table for "+bagel2_output)
-        fc_file=os.path.join(bagel2_output_base+".foldchange")
+        print("Generatig fold change table for " + bagel2_output)
+        fc_file = os.path.join(bagel2_output_base + ".foldchange")
         if not utils.file_exists(fc_file):
-            bagel2fc_command="python3 "+bagel2_exe+" fc"+" -i "+ \
-                                count_table+" -o "+bagel2_output_base+ \
-                                " -c "+str(control_sample_column)
+            bagel2fc_command = "python3 " + bagel2_exe +" fc" +" -i " + \
+                                count_table + " -o "+bagel2_output_base + \
+                                " -c " + str(control_sample_column)
             utils.write2log(work_dir,bagel2fc_command,"BAGEL2 fc: ")
             try:
                 subprocess.run(bagel2fc_command, shell=True)
@@ -745,48 +745,52 @@ def bagel2(work_dir, script_dir, fdr):
                 sys.exit("ERROR: generation of BAGEL2 fc file failed, check log")
 
         print("Calculating Bayes Factors for "+bagel2_output)
-        bf_file=os.path.join(bagel2_output_base+".bf")
+        bf_file = os.path.join(bagel2_output_base+".bf")
         if not utils.file_exists(bf_file):
             #get sample names from BAGEL2 foldchange table
-            header2=subprocess.check_output(["head", "-1",os.path.join(bagel2_output_base+".foldchange")])
-            header2=header2.decode("utf-8")
-            header2=header2.replace("\n","")
-            header2=list(header2.split("\t"))# convert string into list
+            header2 = subprocess.check_output(["head", "-1",os.path.join(bagel2_output_base+".foldchange")])
+            header2 = header2.decode("utf-8")
+            header2 = header2.replace("\n","")
+            header2 = list(header2.split("\t"))# convert string into list
 
             #create dictionary that holds column name (key) and column index
-            column_dict2={key: i for i, key in enumerate(header2)}
-            column_dict2={key: column_dict2[key] - 1 for key in column_dict2} #first sample column should have value 1
-            test_sample_column2=column_dict2[test_sample]
+            column_dict2 = {key: i for i, key in enumerate(header2)}
+            column_dict2 = {key: column_dict2[key] - 1 for key in column_dict2} #first sample column should have value 1
+            test_sample_column2 = column_dict2[test_sample]
 
-            bagel2bf_command="python3 "+bagel2_exe+" bf"+" -i "+fc_file+ \
-                            " -o "+bf_file+" -e "+essential_genes+" -n "+ \
-                            nonessential_genes+" -c "+str(test_sample_column2)
-            utils.write2log(work_dir,bagel2bf_command,"BAGEL2 bf: ")
+            bagel2bf_command = "python3 " + bagel2_exe+" bf" + " -i " + fc_file + \
+                            " -o " + bf_file + " -e " + essential_genes + " -n " + \
+                            nonessential_genes + " -c " + str(test_sample_column2)
+            utils.write2log(work_dir, bagel2bf_command, "BAGEL2 bf: ")
             try:
-                subprocess.run(bagel2bf_command, shell=True)
+                subprocess.run(bagel2bf_command, 
+                               shell = True)
             except:
                 sys.exit("ERROR: Calculation of Bayes Factors failed, check log")
 
         print("Calculating precision-recall for "+bagel2_output)
-        pr_file=os.path.join(bagel2_output_base+".pr")
+        pr_file = os.path.join(bagel2_output_base + ".pr")
         if not utils.file_exists(pr_file):
-            bagel2pr_command="python3 "+bagel2_exe+" pr"+" -i "+bf_file+ \
-                            " -o "+pr_file+" -e "+essential_genes+" -n "+ \
+            bagel2pr_command = "python3 " + bagel2_exe + " pr" + " -i " + bf_file + \
+                            " -o " + pr_file + " -e " + essential_genes+" -n "+ \
                             nonessential_genes
-            utils.write2log(work_dir,bagel2pr_command,"BAGEL2 pr: ")
+            utils.write2log(work_dir, bagel2pr_command, "BAGEL2 pr: ")
             try:
-                subprocess.run(bagel2pr_command, shell=True)
+                subprocess.run(bagel2pr_command, 
+                               shell = True)
             except:
                 sys.exit("ERROR: Calculation of precision-recall failed, check log")
 
-        print("Plotting BAGEL2 results for "+bagel2_output)
-        plot_file=os.path.join(work_dir,"bagel",bagel2_output,"PR-"+bagel2_output+".pdf")
+        print("Plotting BAGEL2 results for " + bagel2_output)
+        plot_file=  os.path.join(work_dir,"bagel", bagel2_output, "PR-" + bagel2_output + ".pdf")
         if not utils.file_exists(plot_file):
-            plot_script=os.path.join(script_dir,"R","crispr-plot-hits.R")
-            plot_command="Rscript "+plot_script+" "+work_dir+" "+pr_file+ \
-                        " bagel2 "+os.path.join(work_dir,"bagel",bagel2_output)+ \
-                        " "+bagel2_output
-            utils.write2log(work_dir,plot_command,"BAGEL2 plot: ")
+            plot_script = os.path.join(script_dir,
+                                       "R",
+                                       "crispr-plot-hits.R")
+            plot_command = "Rscript "+plot_script + " " + work_dir + " " + pr_file + \
+                        " bagel2 " + os.path.join(work_dir, "bagel", bagel2_output)+ \
+                        " " + bagel2_output
+            utils.write2log(work_dir, plot_command, "BAGEL2 plot: ")
             try:
                 subprocess.run(plot_command, shell=True)
             except:

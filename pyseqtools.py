@@ -74,8 +74,7 @@ def main():
                                help = "Essential gene list (default is Hart et al 2015 Cell)")
     parser_crispr.add_argument("--csv2fasta",
                                required = False,
-                               metavar = "<CSV FILE> <LIBRARY NAME>",
-                               nargs = 2,
+                               metavar = "<CSV FILE>",
                                default = None,
                                help = "Convert CSV file with sgRNA names and sequences to fasta format. The first column should contain sgRNA names and the second sgRNA sequences (headers can be anything).")
     parser_crispr.add_argument("--skip-fastqc",
@@ -115,7 +114,7 @@ def main():
                                required = False,
                                metavar = "<P value>",
                                default = 0.001,
-                               help = "Set P value cut off (default is 0.001")
+                               help = "Set P value cut off (default is 0.001)")
     parser_rnaseq.add_argument("--go",
                                required = False,
                                action = 'store_true',
@@ -185,7 +184,7 @@ def main():
     
     #create subparser for CUT&RUN analysis commands
     parser_cutrun = subparsers.add_parser('cutrun', 
-                                          help='CUT & RUN')
+                                          help = 'CUT & RUN')
     
     parser_cutrun.add_argument("-t", "--threads",
                              required = False,
@@ -197,7 +196,7 @@ def main():
     
         
     def crispr(args):
-        ###check if software requirements are met
+        ###check if required Python packages are available
         utils.checkPythonPackages()
         
         #csv to fasta conversion
@@ -208,10 +207,7 @@ def main():
             else:
                 crispr_utils.csv2fasta(csv,script_dir)
     
-        ###check if more software requirements are met
-        crispr_utils.checkDeps(script_dir)
-        utils.checkDeps(script_dir)
-    
+          
         ###set thread count for processing
         threads = utils.set_threads(args)
         
@@ -230,7 +226,7 @@ def main():
         ##Run FastQC/MultiQC
         skip_fastqc = args["skip_fastqc"]
         if not skip_fastqc:
-            utils.fastqc(work_dir,threads,file_extension)
+            utils.fastqc(script_dir, work_dir,threads,file_extension)
         else:
             print("Skipping FastQC/MultiQC analysis")
     
@@ -304,20 +300,23 @@ def main():
                             gene_sets)
     
     def rna_seq(args):
+        #chec
+        utils.checkPythonPackages()
+        
         ####set thread count for processing
         max_threads = str(multiprocessing.cpu_count())
         threads = args["threads"]
         if threads == "max":
-            threads=max_threads
+            threads = max_threads
     
         ### Check md5sums
         utils.checkMd5(work_dir)
     
         ###Run FastQC/MultiQC
-        file_extension=utils.getExtension(work_dir)
+        file_extension = utils.get_extension(work_dir)
         skip_fastqc = args["skip_fastqc"]
         if not skip_fastqc:
-            utils.fastqc(work_dir,threads,file_extension)
+            utils.fastqc(script_dir, work_dir, threads, file_extension)
         else:
             print("Skipping FastQC/MultiQC analysis")
     
@@ -328,29 +327,33 @@ def main():
         pvalue = args["pvalue"]
         align = args["align"]
         if align.lower() == "salmon":
-            utils.trim(threads,work_dir)
-            salmon_index=rna_seq["salmon_index"]["gencode-v35"]
-            gtf=rna_seq["salmon_gtf"]["gencode-v35"]
-            fasta=rna_seq["FASTA"]["gencode-v35"]
-            utils.salmon(salmon_index,str(threads),work_dir,gtf,fasta,script_dir,rna_seq)
-            utils.plotMappingRate(work_dir)
-            utils.plotPCA(work_dir,script_dir)
-            utils.diff_expr(work_dir,gtf,script_dir,species,pvalue)
-            utils.plotVolcano(work_dir)
+            utils.trim(script_dir, threads, work_dir)
+            salmon_index = rna_seq_settings["salmon_index"]["gencode-v35"]
+            gtf = rna_seq_settings["salmon_gtf"]["gencode-v35"]
+            fasta = rna_seq_settings["FASTA"]["gencode-v35"]
+            rnaseq_utils.salmon(salmon_index, 
+                                str(threads), 
+                                work_dir, 
+                                gtf, 
+                                fasta, 
+                                script_dir, 
+                                rna_seq_settings)
+            rnaseq_utils.plotMappingRate(work_dir)
+            rnaseq_utils.plotPCA(work_dir,script_dir)
+            rnaseq_utils.diff_expr(work_dir,gtf,script_dir,species,pvalue)
+            rnaseq_utils.plotVolcano(work_dir)
         elif align.lower() == "hisat2":
-            utils.trim(threads,work_dir)
+            rnaseq_utils.trim(threads, work_dir)
             #hisat2()
     
-    go = args["go"]
+        go = args["go"]
     
-    try:
         pvalue = args["pvalue"]
-    except KeyError:
-        pass
+    
 	
-    if go == True:
-        gene_sets=args["gene_sets"]
-        utils.geneSetEnrichment(work_dir,pvalue,gene_sets)
+        if go == True:
+            gene_sets=args["gene_sets"]
+            rnaseq_utils.geneSetEnrichment(work_dir,pvalue,gene_sets)
     
     def chip_seq(args):
         pass
@@ -391,14 +394,14 @@ if __name__ == "__main__":
         with open(os.path.join(script_dir,
                                "yaml",
                                "rna-seq.yaml")) as file:
-            rna_seq = yaml.full_load(file)
+            rna_seq_settings = yaml.full_load(file)
     except FileNotFoundError:
         print("ERROR: rna-seq.yaml not found in yaml folder. Please provide this file for further analysis.")
         sys.exit()
     
         
     rna_seq_genomeList = []
-    for key, value in rna_seq["FASTA"].items():
+    for key, value in rna_seq_settings["FASTA"].items():
         rna_seq_genomeList.append(key)
 
     ###loads ChIP-Seq settings

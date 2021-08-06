@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 
-import warnings
 import os
 import subprocess
 import multiprocessing
@@ -11,15 +10,15 @@ import pkg_resources
 import urllib.request
 from zipfile import ZipFile
 import stat
+from  builtins import any as b_any
 
 import yaml
 import numpy as np
 import matplotlib.pyplot as plt
-from matplotlib_venn import venn2
 import pandas as pd
 import seaborn as sns
 from tqdm.auto import tqdm
-import gseapy as gp
+
 
 
 ###GENERAL FUNCTIONS
@@ -42,29 +41,6 @@ def checkPythonPackages(): #check for required python packages; installs if abse
             sys.exit("ERROR: package installation failed, check log")
     else:
         pass
-
-def checkDeps(script_dir):
-    
-    #Check for FastQC
-    fastqc = [line[0:] for line in subprocess.check_output("find $HOME -name run_fastqc.bat", 
-                                                           shell = True).splitlines()]
-    try:
-        fastqc = fastqc[0].decode("utf-8")
-        fastqc = os.path.dirname(fastqc)
-    except IndexError:
-        print("ERROR: FastQC was not found\nInstalling FastQC now")
-        url = "https://www.bioinformatics.babraham.ac.uk/projects/fastqc/fastqc_v0.11.9.zip"
-        download_file = os.path.join(script_dir,"fastqc_v0.11.9.zip")
-        urllib.request.urlretrieve(url,download_file)
-        #unzip FastQC file
-        with ZipFile(download_file, 'r') as zip_ref:
-            zip_ref.extractall(script_dir)
-        #make fastqc file executable by shell
-        fastqc_file = os.path.join(fastqc,"fastqc")
-        st = os.stat(fastqc_file)
-        os.chmod(fastqc_file, st.st_mode | stat.S_IEXEC)
-        #remove download file
-        os.remove(download_file)
 
 
 def checkMd5(work_dir):
@@ -132,6 +108,10 @@ def rename(work_dir):
                                            
 def get_extension(work_dir):
     file_list=glob.glob(os.path.join(work_dir,"raw-data","*.gz"))
+    
+    if len(file_list) == 0:
+        sys.exit("ERROR: no fastq files found")
+    
     test_file=file_list[0]
     extension_index=test_file.index(".",0)
     file_extension=test_file[extension_index:]
@@ -147,17 +127,40 @@ def file_exists(file): #check if file exists/is not size zero
         return(False)
 
 
-def fastqc(work_dir,threads,file_extension):
-    fastqc_dir = [line[0:] for line in subprocess.check_output("find $HOME -name run_fastqc.bat", 
-                                                           shell = True).splitlines()]
-    fastqc_dir = fastqc_dir[0].decode("utf-8")
-    fastqc_dir = os.path.dirname(fastqc_dir)
+def fastqc(script_dir, work_dir, threads, file_extension):
     
-    fastqc_exe = os.path.join(fastqc_dir,"fastqc")
+    #Check for FastQC in $PATH
+    path = os.environ["PATH"].lower()
+    
+    if "fastqc" not in path:
+        #Check for FastQC elsewhere
+        fastqc = [line[0:] for line in subprocess.check_output("find $HOME -name run_fastqc.bat", 
+                                                               shell = True).splitlines()]
+        try:
+            fastqc = fastqc[0].decode("utf-8")
+            fastqc_file = os.path.join(os.path.dirname(fastqc), "fastqc")
+        except:
+            print("WARNING: FastQC was not found\nInstalling FastQC now")
+            url = "https://www.bioinformatics.babraham.ac.uk/projects/fastqc/fastqc_v0.11.9.zip"
+            download_file = os.path.join(script_dir,"fastqc_v0.11.9.zip")
+            urllib.request.urlretrieve(url,download_file)
+            #unzip FastQC file
+            with ZipFile(download_file, 'r') as zip_ref:
+                zip_ref.extractall(script_dir)
+            #make fastqc file executable by shell
+            fastqc_file = os.path.join(script_dir,"FastQC","fastqc")
+            st = os.stat(fastqc_file)
+            os.chmod(fastqc_file, st.st_mode | stat.S_IEXEC)
+            #remove download file
+            os.remove(download_file)
+    else:
+        fastqc_file = "fastqc"
+        
+    #run fastqc/multiqc 
     if not os.path.isdir(os.path.join(work_dir,"fastqc")) or len(os.listdir(os.path.join(work_dir,"fastqc"))) == 0:
         os.makedirs(os.path.join(work_dir,"fastqc"),exist_ok=True)
-        fastqc_command=fastqc_exe+" --threads "+str(threads)+" --quiet -o fastqc/ raw-data/*"+file_extension
-        multiqc_command=["multiqc","-o","fastqc/","fastqc/"]
+        fastqc_command = fastqc_file + " --threads " + str(threads) + " --quiet -o fastqc/ raw-data/*" + file_extension
+        multiqc_command = ["multiqc","-o","fastqc/","fastqc/"]
         #log commands
         with open(os.path.join(work_dir,"commands.log"),"w") as file:
             file.write("FastQC: ")
@@ -174,3 +177,112 @@ def fastqc(work_dir,threads,file_extension):
     else:
         print("Skipping FastQC/MultiQC (already performed)")
 
+def getEND(work_dir):
+    '''
+    Determine whether samples are single-end of paired-end
+    '''    
+    
+    file_list = glob.glob(os.path.join(work_dir,
+                                       "raw-data",
+                                       "*.gz")) 
+    
+    PE_tag = "R2_001.fastq.gz"
+    PE = b_any(PE_tag in x for x in file_list)
+    
+    ##based on Illumina naming convention: https://support.illumina.com/help/BaseSpace_OLH_009008/Content/Source/Informatics/BS/NamingConvention_FASTQ-files-swBS.htm
+    
+    if PE == True:
+        return("PE")
+    else:
+        return("SE")
+    
+def trim(script_dir, threads, work_dir):
+    
+    def check_trimgalore(script_dir):
+        #check for trim_galore
+        path = os.environ["PATH"].lower()
+        
+        if "trimgalore" not in path:
+            #Check for FastQC elsewhere
+            trimgalore = [line[0:] for line in subprocess.check_output("find $HOME -name trim_galore", 
+                                                                   shell = True).splitlines()]
+            try:
+                trimgalore_file = trimgalore[0].decode("utf-8")
+            except:
+                print("WARNING: TrimGalore was not found\nInstalling TrimGalore now")
+                url = "https://github.com/FelixKrueger/TrimGalore/archive/refs/tags/0.6.7.zip"
+                download_file = os.path.join(script_dir,"TrimGalore-0.6.7.zip")
+                urllib.request.urlretrieve(url,download_file)
+                #unzip TrimGalore file
+                with ZipFile(download_file, 'r') as zip_ref:
+                    zip_ref.extractall(script_dir)
+                #make fastqc file executable by shell
+                trimgalore_file = os.path.join(script_dir, 
+                                               "TrimGalore-0.6.7", 
+                                               "trim_galore")
+                st = os.stat(trimgalore_file)
+                os.chmod(trimgalore_file, st.st_mode | stat.S_IEXEC)
+                #remove download file
+                os.remove(download_file)
+        else:
+            trimgalore_file = "trim_galore"
+        return(trimgalore_file)
+    
+    
+    #cap threads at 4 for trim_galore
+    if int(threads) > 4:
+        threads = "4"
+
+      
+    def trimPE(work_dir, threads):
+        print("Trimming paired-end fastq files")
+        trimgalore_file = check_trimgalore(script_dir)
+        fastq_list = glob.glob(os.path.join(work_dir,"raw-data","*R1_001.fastq.gz"))
+        for read1 in fastq_list:
+            out_dir = os.path.dirname(read1)
+            out_dir = out_dir.replace("raw-data","trim")
+            out_file1 = read1.split(".",1)[0] + "_val_1.fq.gz"
+            out_file1 = os.path.basename(out_file1)
+            out_file1 = os.path.join(out_dir, out_file1)
+            if not file_exists(out_file1):
+                read2 = read1.replace("R1","R2")
+                trim_galore_command = [trimgalore_file,"-j", threads, "-o", 
+                                       "./trim", "--paired", read1, read2]
+                #log commands
+                with open(work_dir+"/commands.log", "a") as file:
+                    file.write("Trim Galore: ")
+                    print(*trim_galore_command, sep = " ",file=file)
+                subprocess.run(trim_galore_command)
+                
+    def trimSE(work_dir, threads):
+        print("Trimming single-end fastq files")
+        trimgalore_file = check_trimgalore(script_dir)
+        fastq_list = glob.glob(os.path.join(work_dir,
+                                            "raw-data",
+                                            "*.fastq.gz"))
+        
+        for file in fastq_list:
+            out_file = os.path.join(work_dir,
+                                    "trim_galore",
+                                    file.replace(".fastq.gz", "_trimmed.fq.gz"))
+            if not file_exists(out_file):
+                trim_galore_command = [trimgalore_file, "-j", threads, 
+                                       "-o", "./trim_galore",                                                                                                                                                                                                                                                                                                
+                                       file]
+                #log command
+                with open(os.path.join(work_dir,"commands.log"), "a") as file:
+                    file.write("Trim Galore: ")
+                    print(*trim_galore_command, sep = " ", file=file)
+                try:
+                    subprocess.run(trim_galore_command)
+                except:
+                    sys.exit("ERROR: trimming error. Check commands log.")
+    
+    #Run appropriate trim function
+    if getEND(work_dir) == "PE":
+        trimPE(work_dir, threads)
+    elif getEND(work_dir) == "SE":
+        trimSE(work_dir, threads)
+       
+        
+        
