@@ -8,7 +8,6 @@ from subprocess import CalledProcessError
 import urllib.request
 import yaml
 import sys
-import csv
 import glob
 import numpy as np
 import matplotlib.pyplot as plt
