@@ -137,8 +137,8 @@ plot.mageck <- function(work.dir,df.file,save.path,fdr){
             axis.ticks.x = element_blank()) +
       xlab("Genes") +
       ylab("-log(MAGeCK score)") +
-      guides(color = FALSE,
-             shape =FALSE) +
+      guides(color = "none",
+             shape = "none") +
       ggtitle(title) +
       geom_point(df, 
                  alpha = 0.6,

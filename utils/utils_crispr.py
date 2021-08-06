@@ -207,7 +207,8 @@ def count(library,
                 count_command = cutadapt+bowtie2+bash+out_file
                 utils.write2log(work_dir,count_command,"Count: ")
                 try:
-                    subprocess.run(count_command,shell=True)
+                    subprocess.run(count_command,
+                                   shell = True)
                 except:
                     sys.exit("ERROR: read count failed, check logs")
     elif read_mod == "clip":
@@ -225,7 +226,8 @@ def count(library,
                 count_command = cutadapt+bowtie2+bash+out_file
                 utils.write2log(work_dir,count_command,"Count: ")
                 try:
-                    subprocess.run(count_command, shell=True)
+                    subprocess.run(count_command, 
+                                   shell = True)
                 except:
                     sys.exit("ERROR: read count failed, check logs")
 
@@ -234,7 +236,8 @@ def count(library,
     for file in count_list:
         command = "sed '1d' "+file+" > "+file+".temp "+"&& mv "+file+".temp "+file
         try:
-            subprocess.run(command, shell=True)
+            subprocess.run(command, 
+                           shell = True)
         except:
             sys.exit("ERROR: removal of first line of count file failed")
 
@@ -340,6 +343,62 @@ def normalise(work_dir):
 
 
 def join_counts(work_dir,library,crispr_library):
+    file_list = glob.glob(os.path.join(work_dir,"count","*guidecounts.txt"))
+    
+    #dictionary to store all guide counts
+    counts = {}
+    
+    #remove all leading white spaces from all count files
+    sed = 'sed "s/^[ \t]*//" -i '
+
+    for file in file_list:
+       sed_command = sed + file 
+       subprocess.run(sed_command,
+                       shell = True)
+       #add counts to counts dict
+       df = pd.read_csv(file,
+                        sep=" ",
+                        header = None)
+       key = os.path.basename(file).replace(".guidecounts.txt", "")
+       df.columns = [key, "sgRNA"]
+       df[key].astype(int)
+       counts.update({key:df})
+       
+    #prepare data frame for left join
+    fasta = library[crispr_library]["fasta"]
+    guide_names = fasta.replace(".fasta",
+                                "-guide_names.csv")
+    df = pd.read_csv(guide_names,
+                     header = None)
+    df.columns = ["sgRNA"]
+    df["gene"] = df["sgRNA"].str.split(pat = "_",
+                                       n = 1,
+                                       expand = True)[0]
+    
+    #perform left join
+    for key, value in counts.items():
+        df = pd.merge(df, value, on='sgRNA', how='left')
+        
+    df["sgRNA"] = df["sgRNA"].str.split(pat = "_",
+                                   n = 1,
+                                   expand = True)[1]
+    
+    #replace nan with zero
+    df = df.fillna(0)
+    df = df.sort_values(by = ["sgRNA"])
+    
+    #convert floats back to int after pandas merge (bug in pandas)
+    index_range = range(2, len(df.columns))
+    index_list = []
+    for i in index_range:
+        index_list.append(i)
+        
+    df.iloc[:, index_list] = df.iloc[:, index_list].astype(int)
+    
+    #save data frame to file
+    df.to_csv(os.path.join(work_dir,"count",'counts-aggregated.tsv'), 
+              sep = '\t',
+              index = False)
     '''
     re-write this function to make it more robust and simpler:
         Strategy:
@@ -349,7 +408,7 @@ def join_counts(work_dir,library,crispr_library):
         - write to file
     '''
     
-    
+    '''
     #load sgRNA names, used for merging data2
     fasta=library[crispr_library]["fasta"]
     guide_name_file=fasta.replace(".fasta","-guide_names.csv")
@@ -449,7 +508,7 @@ def join_counts(work_dir,library,crispr_library):
 
     #Writes all data to a single .tsv file, ready for MAGeCK
     dfjoin2.to_csv(os.path.join(work_dir,"count",'counts-aggregated.tsv'), sep='\t',index=False)
-
+    '''
 
 def mageck(work_dir,script_dir,cnv,fdr):
     
