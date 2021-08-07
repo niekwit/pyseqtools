@@ -127,7 +127,7 @@ def file_exists(file): #check if file exists/is not size zero
         return(False)
 
 
-def fastqc(script_dir, work_dir, threads, file_extension):
+def checkFastqc(script_dir):
     
     #Check for FastQC in $PATH
     path = os.environ["PATH"].lower()
@@ -155,6 +155,12 @@ def fastqc(script_dir, work_dir, threads, file_extension):
             os.remove(download_file)
     else:
         fastqc_file = "fastqc"
+    return(fastqc_file)
+
+def fastqc(script_dir, work_dir, threads, file_extension):
+    
+    #check for FastQC
+    checkFastqc(script_dir)
         
     #run fastqc/multiqc 
     if not os.path.isdir(os.path.join(work_dir,"fastqc")) or len(os.listdir(os.path.join(work_dir,"fastqc"))) == 0:
@@ -168,7 +174,7 @@ def fastqc(script_dir, work_dir, threads, file_extension):
             file.write("MultiQC: ")
             print(*multiqc_command, sep=" ", file=file)
         try:
-            print("Running FastQC on raw data")
+            print("Running FastQC on fastq files")
             subprocess.run(fastqc_command, shell=True)
         except:
             sys.exit("ERROR: FastQC failed, check logs")
@@ -198,36 +204,48 @@ def getEND(work_dir):
     
 def trim(script_dir, threads, work_dir):
     
-    def check_trimgalore(script_dir):
-        #check for trim_galore
-        path = os.environ["PATH"].lower()
-        
-        if "trimgalore" not in path:
-            #Check for FastQC elsewhere
-            trimgalore = [line[0:] for line in subprocess.check_output("find $HOME -name trim_galore", 
-                                                                   shell = True).splitlines()]
-            try:
-                trimgalore_file = trimgalore[0].decode("utf-8")
-            except:
-                print("WARNING: TrimGalore was not found\nInstalling TrimGalore now")
-                url = "https://github.com/FelixKrueger/TrimGalore/archive/refs/tags/0.6.7.zip"
-                download_file = os.path.join(script_dir,"TrimGalore-0.6.7.zip")
-                urllib.request.urlretrieve(url,download_file)
-                #unzip TrimGalore file
-                with ZipFile(download_file, 'r') as zip_ref:
-                    zip_ref.extractall(script_dir)
-                #make fastqc file executable by shell
-                trimgalore_file = os.path.join(script_dir, 
-                                               "TrimGalore-0.6.7", 
-                                               "trim_galore")
-                st = os.stat(trimgalore_file)
-                os.chmod(trimgalore_file, st.st_mode | stat.S_IEXEC)
-                #remove download file
-                os.remove(download_file)
-        else:
-            trimgalore_file = "trim_galore"
-        return(trimgalore_file)
+    #check for trim_galore
+    path = os.environ["PATH"].lower()
     
+    if "trimgalore" not in path:
+        #Check for FastQC elsewhere
+        trimgalore = [line[0:] for line in subprocess.check_output("find $HOME -name trim_galore", 
+                                                               shell = True).splitlines()]
+        try:
+            trimgalore_file = trimgalore[0].decode("utf-8")
+        except:
+            print("WARNING: TrimGalore was not found\nInstalling TrimGalore now")
+            url = "https://github.com/FelixKrueger/TrimGalore/archive/refs/tags/0.6.7.zip"
+            download_file = os.path.join(script_dir,"TrimGalore-0.6.7.zip")
+            urllib.request.urlretrieve(url,download_file)
+            #unzip TrimGalore file
+            with ZipFile(download_file, 'r') as zip_ref:
+                zip_ref.extractall(script_dir)
+            #make fastqc file executable by shell
+            trimgalore_file = os.path.join(script_dir, 
+                                           "TrimGalore-0.6.7", 
+                                           "trim_galore")
+            st = os.stat(trimgalore_file)
+            os.chmod(trimgalore_file, st.st_mode | stat.S_IEXEC)
+            #remove download file
+            os.remove(download_file)
+    else:
+        trimgalore_file = "trim_galore"
+    
+    #tell TrimGalore where FastQC is located
+    fastqc_file = checkFastqc(script_dir)
+    trimgalore_file = [line[0:] for line in subprocess.check_output("find $HOME -name trim_galore", 
+                                                               shell = True).splitlines()]
+    trimgalore_file = trimgalore_file[0].decode("utf-8")
+    new_line = '"' + "my $path_to_fastqc = " + "q^" + fastqc_file + "^;" + '"'
+    awk_command = "awk " + "'NR==456 {$0=" + new_line + "} { print }' " + trimgalore_file + " > " + trimgalore_file + "_temp"
+
+    subprocess.run(awk_command,
+                           shell = True)
+    #remove original file and rename temp file to original name
+    os.remove(trimgalore_file)
+    os.rename(trimgalore_file + "_temp", 
+              trimgalore_file)
     
     #cap threads at 4 for trim_galore
     if int(threads) > 4:
