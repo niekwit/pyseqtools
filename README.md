@@ -8,7 +8,13 @@ Available analyses:
 - ChIP-Seq
 - CUT & RUN
 
-## USAGE:
+## Installation
+
+> `git clone https://github.com/niekwit/pyseqtools.git`
+
+When running an analysis, `pyseqtools.py` will check whether all relevant dependencies are available, and if not, it will install them.
+
+## Usage:
 
 ```
 pyseqtools.py [-h] {crispr,rna-seq,chip-seq,cutrun} ...
@@ -115,3 +121,7 @@ optional arguments:
   -n, --ngsplot         Generate metageneplots and heatmaps with ngs.plot
 
 ```
+
+### CUT&RUN analysis
+
+under construction
