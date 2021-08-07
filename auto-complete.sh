@@ -9,12 +9,16 @@ lib_list=$(cat "$SCRIPT_DIR/yaml/crispr-library.yaml" | shyaml keys | tr "\n" " 
 stat_list="mageck bagel2"
 module_list='crispr rna-seq chip-seq cutrun'
 
-#enables autocompletion of `-l/--library` flag for CRISPR screen analysis
 
-
-
-_module()
+function _complete()
 {
+case $3 in
+	-l) COMPREPLY=($(compgen -W "$lib_list" "${COMP_WORDS[$COMP_CWORD]}"));;
+	--library) COMPREPLY=($(compgen -W "$lib_list" "${COMP_WORDS[$COMP_CWORD]}"));;
+	-a) COMPREPLY=($(compgen -W "$stat_list" "${COMP_WORDS[$COMP_CWORD]}"));;
+	--analysis) COMPREPLY=($(compgen -W "$stat_list" "${COMP_WORDS[$COMP_CWORD]}"));;
+esac
+
     local opts
     opts="crispr rna-seq chip-seq cutrun"
     case $COMP_CWORD in
@@ -26,24 +30,7 @@ _module()
     return 0
 }
 
-#Assign the auto-completion function _get for our command get.
-complete -F _module pyseqtools.py 
-
-function crisprLibs()
-{
-case $3 in
-	-l) COMPREPLY=($(compgen -W "$lib_list" "${COMP_WORDS[$COMP_CWORD]}"));;
-	--library) COMPREPLY=($(compgen -W "$lib_list" "${COMP_WORDS[$COMP_CWORD]}"));;
-	-a) COMPREPLY=($(compgen -W "$stat_list" "${COMP_WORDS[$COMP_CWORD]}"));;
-	--analysis) COMPREPLY=($(compgen -W "$stat_list" "${COMP_WORDS[$COMP_CWORD]}"));;
-esac
-}
-
-complete -F crisprLibs pyseqtools.py
+complete -F _complete pyseqtools.py
 
 
-#enables autocomletion of pyseqtools modules
 
-function get {
-    pyseqtools.py $1
-} 
