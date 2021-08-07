@@ -12,8 +12,7 @@ Available analyses:
 
 > `git clone https://github.com/niekwit/pyseqtools.git`
 
-When running an analysis, `pyseqtools.py` will check whether all relevant dependencies are available, and if not, it will install them.
-
+When running an analysis, `pyseqtools.py` will first check whether the relevant dependencies are available in `$PATH`. If not, it will then look for it in any `$HOME` directories, and finally if it does not find them there it will install them.
 ## Usage:
 
 ```
