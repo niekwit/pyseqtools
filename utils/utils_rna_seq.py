@@ -268,7 +268,7 @@ def diff_expr(work_dir,gtf,script_dir,species,pvalue):
 
 
 def geneSetEnrichment(work_dir,pvalue,gene_sets):
-    file_list=glob.glob(os.path.join(work_dir,
+    file_list = glob.glob(os.path.join(work_dir,
                                      "DESeq2",
                                      "*",
                                      "DESeq-output.csv"))
@@ -278,34 +278,34 @@ def geneSetEnrichment(work_dir,pvalue,gene_sets):
             return(None)
     
     
-    def doEnrichr(gene_list,gene_sets,out_dir,output_name):
-        out_dir=os.path.join(out_dir,"Enrichr",output_name)
+    def doEnrichr(gene_list, gene_sets, out_dir, output_name):
+        out_dir = os.path.join(out_dir,"Enrichr",output_name)
         
-        enrichr_results=gp.enrichr(gene_list=gene_list,
-                                   gene_sets=gene_sets,
-                                   outdir=out_dir)
+        enrichr_results = gp.enrichr(gene_list = gene_list,
+                                   gene_sets = gene_sets,
+                                   outdir = out_dir)
     
    
-    def GSEA(df,gene_set,out_dir):#not working properly yet
-        rnk=df.dropna()
-        rnk=rnk[["SYMBOL","log2FoldChange"]]
-        rnk=rnk.dropna()
-        rnk=rnk.drop_duplicates(subset="SYMBOL")
-        pre_res=gp.prerank(rnk=rnk,
-                            gene_sets=gene_set,
-                            processes=4,
-                            permutation_num=100,
-                            format="pdf",
-                            seed=6,
-                            no_plot=True)
+    def GSEA(df,gene_set, out_dir):#not working properly yet
+        rnk = df.dropna()
+        rnk = rnk[["SYMBOL","log2FoldChange"]]
+        rnk = rnk.drop_duplicates(subset="SYMBOL")
+        pre_res = gp.prerank(rnk = rnk,
+                            gene_sets = gene_set,
+                            processes = 4,
+                            permutation_num = 100,
+                            format = "pdf",
+                            seed = 6,
+                            no_plot = True)
         terms=pre_res.res2d.index
         df_out=pre_res.res2d
-        df_out.reset_index(inplace=True)
+        df_out.reset_index(inplace = True)
+        os.makedirs(os.path.join(out_dir,"GSEA"), 
+                    exist_ok = True)
         df_out.to_csv(os.path.join(out_dir,"GSEA",'GSEA.csv'), 
-                      index=False)
+                      index = False)
         
-        os.makedirs(out_dir,"GSEA",
-                        exist_ok=True)
+        
         
         for i in range(10): #plot GSEA plots for top 10 terms
             GSEA_dir=os.path.join(out_dir,"GSEA",gene_set) 
@@ -321,21 +321,23 @@ def geneSetEnrichment(work_dir,pvalue,gene_sets):
             except FileNotFoundError:
                 continue
     
-    logPvalue=-math.log10(pvalue)
+    logPvalue = -math.log10(pvalue)
     
     for file in file_list:
-       df=pd.read_csv(file)
-       df["log.p.value"]=-np.log10(df["padj"])
-       out_dir=os.path.dirname(file)
+       df = pd.read_csv(file)
+       df["log.p.value"] = -np.log10(df["padj"])
+       out_dir = os.path.dirname(file)
               
-       df_up=df[(df["log2FoldChange"] > 0.5) & (df["log.p.value"] > logPvalue)]
-       upregulated_genes=list(df_up["SYMBOL"])
+       df_up = df[(df["log2FoldChange"] > 0.5) & (df["log.p.value"] > logPvalue)]
+       upregulated_genes = list(df_up["SYMBOL"])
        
-       df_down=df[(df["log2FoldChange"] < -0.5) & (df["log.p.value"] > logPvalue)]
-       downregulated_genes=list(df_down["SYMBOL"])
+       df_down = df[(df["log2FoldChange"] < -0.5) & (df["log.p.value"] > logPvalue)]
+       downregulated_genes = list(df_down["SYMBOL"])
        
-       input_list=[upregulated_genes,downregulated_genes]
-       output_names=["upregulated_genes","downregulated_genes"]
+       input_list = [upregulated_genes, 
+                     downregulated_genes]
+       output_names = ["upregulated_genes",
+                       "downregulated_genes"]
        
        #run Enrichr
        for x,y in zip(input_list,output_names):
