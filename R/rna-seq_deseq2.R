@@ -34,7 +34,16 @@ pvalue <- as.numeric(args[5])
 #Create sample files for all comparisons
 samples.master <- read.csv(file.path(work.dir,"samples.csv"), header=TRUE)
 number.exp <- ncol(samples.master)-2
-exp.names <- colnames(samples.master[,3:ncol(samples.master)])
+
+if (number.exp == 1){
+  exp.names <- colnames(samples.master)[3]
+} else if(number.exp == 0) {
+  print("ERROR: No comparisons defined for DEG analysis in samples.csv")
+  exit()
+} else {
+  exp.names <- colnames(samples.master[,3:ncol(samples.master)])
+}
+
 
 df.list <- list()#list for storing comparison dfs
 for (i in 1:length(exp.names)) { #create data frames for each experiment from master sample sheet

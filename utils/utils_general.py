@@ -160,7 +160,7 @@ def checkFastqc(script_dir):
 def fastqc(script_dir, work_dir, threads, file_extension):
     
     #check for FastQC
-    checkFastqc(script_dir)
+    fastqc_file = checkFastqc(script_dir)
         
     #run fastqc/multiqc 
     if not os.path.isdir(os.path.join(work_dir,"fastqc")) or len(os.listdir(os.path.join(work_dir,"fastqc"))) == 0:
@@ -208,7 +208,7 @@ def trim(script_dir, threads, work_dir):
     path = os.environ["PATH"].lower()
     
     if "trimgalore" not in path:
-        #Check for FastQC elsewhere
+        #Check for TrimGalore elsewhere
         trimgalore = [line[0:] for line in subprocess.check_output("find $HOME -name trim_galore", 
                                                                shell = True).splitlines()]
         try:
@@ -221,12 +221,7 @@ def trim(script_dir, threads, work_dir):
             #unzip TrimGalore file
             with ZipFile(download_file, 'r') as zip_ref:
                 zip_ref.extractall(script_dir)
-            #make fastqc file executable by shell
-            trimgalore_file = os.path.join(script_dir, 
-                                           "TrimGalore-0.6.7", 
-                                           "trim_galore")
-            st = os.stat(trimgalore_file)
-            os.chmod(trimgalore_file, st.st_mode | stat.S_IEXEC)
+            
             #remove download file
             os.remove(download_file)
     else:
@@ -247,6 +242,13 @@ def trim(script_dir, threads, work_dir):
     os.rename(trimgalore_file + "_temp", 
               trimgalore_file)
     
+    #make TrimGalore file executable by shell
+    trimgalore_file = os.path.join(script_dir, 
+                                   "TrimGalore-0.6.7", 
+                                   "trim_galore")
+    st = os.stat(trimgalore_file)
+    os.chmod(trimgalore_file, st.st_mode | stat.S_IEXEC)
+    
     #cap threads at 4 for trim_galore
     if int(threads) > 4:
         threads = "4"
@@ -254,7 +256,6 @@ def trim(script_dir, threads, work_dir):
       
     def trimPE(work_dir, threads):
         print("Trimming paired-end fastq files")
-        trimgalore_file = check_trimgalore(script_dir)
         fastq_list = glob.glob(os.path.join(work_dir,"raw-data","*R1_001.fastq.gz"))
         for read1 in fastq_list:
             out_dir = os.path.dirname(read1)
@@ -274,7 +275,6 @@ def trim(script_dir, threads, work_dir):
                 
     def trimSE(work_dir, threads):
         print("Trimming single-end fastq files")
-        trimgalore_file = check_trimgalore(script_dir)
         fastq_list = glob.glob(os.path.join(work_dir,
                                             "raw-data",
                                             "*.fastq.gz"))

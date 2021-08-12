@@ -14,6 +14,7 @@ import matplotlib.pyplot as plt
 import gseapy as gp
 from gseapy.plot import gseaplot
 import math
+import urllib.request
 
 script_dir = os.path.abspath(os.path.dirname(__file__))
 sys.path.append(script_dir)
@@ -26,98 +27,94 @@ def install_packages(): #check for required python packages; installs if absent
     if missing:
         python = sys.executable
         print("Installing missing required Python3 packages")
-        subprocess.check_call([python, '-m', 'pip3', 'install', *missing], stdout=subprocess.DEVNULL)
+        subprocess.check_call([python, '-m', 'pip3', 'install', 
+                               *missing], stdout = subprocess.DEVNULL)
 
 
-     
-
-def fastqc(work_dir, threads, file_extension):
+def salmon(salmon_index, threads, work_dir, gtf, fasta, script_dir, settings):
     
-    if not os.path.isdir(os.path.join(work_dir,"fastqc")) or len(os.listdir(os.path.join(work_dir,"fastqc"))) == 0:
-        os.makedirs(os.path.join(work_dir,"fastqc"),exist_ok=True)
-        fastqc_command="fastqc --threads "+str(threads)+" --quiet -o fastqc/ raw-data/*"+file_extension
-        multiqc_command=["multiqc","-o","fastqc/","fastqc/"]
-        #log commands
-        with open(os.path.join(work_dir,"commands.log"),"w") as file:
-            file.write("FastQC: ")
-            print(fastqc_command, file=file)
-            file.write("MultiQC: ")
-            print(*multiqc_command, sep=" ", file=file)
-        print("Running FastQC on raw data")
-        subprocess.run(fastqc_command, shell=True)
-        print("Running MultiQC")
-        subprocess.run(multiqc_command)
+    #check for salmon
+    path = os.environ["PATH"].lower()
+    
+    if "salmon" not in path:
+        #Check for Salmon elsewhere
+        salmon = [line[0:] for line in subprocess.check_output("find $HOME -name salmon ! -path '*/multiqc*'", 
+                                                               shell = True).splitlines()]
+        
+        salmon_file = None
+        for i in salmon:
+            i = i.decode("utf-8")
+            if "bin/salmon" in i:
+                salmon_file = i
+            
+        if salmon_file == None:
+            print("WARNING: Salmon was not found\nInstalling Salmon now")
+            url = "https://github.com/COMBINE-lab/salmon/releases/download/v1.5.2/salmon-1.5.2_linux_x86_64.tar.gz"
+            download_file = os.path.join(script_dir,"salmon-1.5.2_linux_x86_64.tar.gz")
+            urllib.request.urlretrieve(url, download_file)
+            #untar Salmon download file
+            tar_command = "tar -xzf " + download_file + " --directory " + script_dir
+            subprocess.run(tar_command,
+                           shell = True)
+            
+            #remove download file
+            os.remove(download_file)
+            
+            salmon_file = os.path.join(script_dir, 
+                                       "salmon-1.5.2_linux_x86_64", 
+                                       "bin", 
+                                       "salmon")
     else:
-        print("Skipping FastQC/MultiQC (already performed)")
-
-
-def trim(threads, work_dir):
-    #cap threads at 4 for trim_galore
-    if int(threads) > 4:
-        threads="4"
-
-    print("Trimming fastq.gz files")
-    fastq_list=glob.glob(work_dir+"/raw-data/*R1_001.fastq.gz")
-    for read1 in fastq_list:
-        out_dir=os.path.dirname(read1)
-        out_dir=out_dir.replace("raw-data","trim")
-        out_file1=read1.split(".",1)[0]+"_val_1.fq.gz"
-        out_file1=os.path.basename(out_file1)
-        out_file1=os.path.join(out_dir,out_file1)
-        if not utils.file_exists(out_file1):
-            read2=read1.replace("R1","R2")
-            trim_galore_command=["trim_galore","-j",str(threads),"-o","./trim", "--paired",read1,read2]
-            #log commands
-            with open(work_dir+"/commands.log", "a") as file:
-                file.write("Trim Galore: ")
-                print(*trim_galore_command, sep=" ",file=file)
-            subprocess.run(trim_galore_command)
-
-
-def salmon(salmon_index,threads,work_dir,gtf,fasta,script_dir,settings):
+        salmon_file = "salmon"
+    
+    
     if salmon_index == "": #Salmon index not found, make on the fly
         print("No Salmon index found: generating Salmon index")
         if os.path.isfile(fasta):
-            index_dir=os.path.join(script_dir,"salmon-index")
-            os.mkdir(index_dir)
-            salmon_index_command=["salmon","index","-t",fasta,"-i",index_dir, "--gencode"]
+            index_dir = os.path.join(script_dir,"salmon-index")
+            os.makedirs(index_dir, 
+                        exist_ok = True)
+            salmon_index_command = [salmon_file, "index", "-t", fasta, "-i", index_dir, "--gencode"]
             #log commands
-            with open(os.path.join(work_dir,"commands.log"), "a") as file:
+            with open(os.path.join(work_dir, "commands.log"), "a") as file:
                 file.write("Salmon index: ")
-                print(*salmon_index_command, sep=" ",file=file)
+                print(*salmon_index_command, 
+                      sep = " ", 
+                      file = file)
 
             subprocess.run(salmon_index_command) #run Salmon index
 
-            #Write salmon index file location to settings.yaml
-            with open(os.path.join(script_dir,"settings.yaml")) as f:
+            #Write salmon index file location to rna-seq.yaml
+            with open(os.path.join(script_dir, "yaml", "rna-seq.yaml")) as f:
                 doc=yaml.safe_load(f)
-            doc["salmon_index"]["gencode-v35"]=index_dir
-            with open(os.path.join(script_dir,"settings.yaml"), "w") as f:
+            doc["salmon_index"]["gencode-v35"] = index_dir
+            with open(os.path.join(script_dir,"yaml" ,"rna-seq.yaml"), "w") as f:
                 yaml.dump(doc,f)
         else:
-            print("ERROR: no FASTA file specified in settings.yaml")
+            print("ERROR: no FASTA file specified in rna-seq.yaml")
             sys.exit()
 
     print("Mapping reads with Salmon:")
-    salmon_output_dir=os.path.join(work_dir,"salmon")
-    os.makedirs(salmon_output_dir, exist_ok=True)
+    salmon_output_dir = os.path.join(work_dir,"salmon")
+    os.makedirs(salmon_output_dir, 
+                exist_ok = True)
 
-    trim_list=glob.glob(os.path.join(work_dir,"trim/*_R1_001_val_1.fq.gz"))
+    trim_list = glob.glob(os.path.join(work_dir,"trim/*_R1_001_val_1.fq.gz"))
     for read1 in trim_list:
-        base_read1=os.path.basename(read1).replace("_R1_001_val_1.fq.gz","")+"-quant"
-        salmon_folder_test=os.path.join(salmon_output_dir,base_read1)
+        base_read1 = os.path.basename(read1).replace("_R1_001_val_1.fq.gz", "") + "-quant"
+        salmon_folder_test = os.path.join(salmon_output_dir, base_read1)
         if not utils.file_exists(salmon_folder_test):
             print("Mapping sample " + read1.replace("_R1_001_val_1.fq.gz", ""))
-            read2=read1.replace("R1_001_val_1.fq.gz", "R2_001_val_2.fq.gz")
-            out_file=os.path.basename(read1.replace("_R1_001_val_1.fq.gz",""))
-            salmon_output_file=os.path.join(work_dir,"salmon",out_file)+"-quant"
-            salmon_index=settings["salmon_index"]["gencode-v35"] #reload index
-            salmon_command=["salmon","quant","--index",salmon_index,"-l","A",
+            read2 = read1.replace("R1_001_val_1.fq.gz", "R2_001_val_2.fq.gz")
+            out_file = os.path.basename(read1.replace("_R1_001_val_1.fq.gz",""))
+            salmon_output_file = os.path.join(work_dir,"salmon",out_file)+"-quant"
+            salmon_index = settings["salmon_index"]["gencode-v35"] #reload index
+            salmon_command = [salmon_file,"quant","--index",salmon_index,"-l","A",
             "-g", gtf,"-p",threads,"-1", read1,"-2",read2,"--validateMappings",
             "--gcBias","-o", salmon_output_file]
             with open(os.path.join(work_dir,"commands.log"), "a") as file:
                 file.write("Salmon quant: ")
-                print(*salmon_command, sep=" ",file=file)
+                print(*salmon_command, sep = " ", file = file)
             subprocess.run(salmon_command) #Run Salmon quant
   
             
@@ -133,6 +130,7 @@ def plotBar(df,y_label,save_file):
     plt.ylabel(y_label)
     plt.xticks(rotation = 'vertical')
     plt.xlabel("")
+    plt.ylim(0, 100)
     plt.tight_layout()
     sns.despine()
     plt.savefig(save_file)
@@ -140,39 +138,40 @@ def plotBar(df,y_label,save_file):
 
 
 def plotMappingRate(work_dir):
-    file_list=glob.glob(os.path.join(work_dir,"salmon","*","logs","salmon_quant.log"))
-    save_file=os.path.join(work_dir,"salmon","mapping_rates.pdf")
-    mapping_rate=[]
-    samples=[]
-    df=pd.DataFrame(columns=["sample","Mapping rate (%)"],index=np.arange(len(file_list)))
+    file_list = glob.glob(os.path.join(work_dir, "salmon", "*", "logs", "salmon_quant.log"))
+    save_file = os.path.join(work_dir,"salmon","mapping_rates.pdf")
+    mapping_rate = []
+    samples = []
+    df = pd.DataFrame(columns = ["sample","Mapping rate (%)"],
+                      index = np.arange(len(file_list)))
 
     if not utils.file_exists(save_file): 
         for file in file_list:
-                sample=os.path.dirname(file)
-                sample=sample.replace(os.path.join(work_dir,"salmon"),"")
-                sample=sample.replace("/log","")
-                sample=sample.replace("-quants","")
-                sample=sample.replace("/","")
+                sample = os.path.dirname(file)
+                sample = sample.replace(os.path.join(work_dir, "salmon"),"")
+                sample = sample.replace("/log", "")
+                sample = sample.replace("-quants", "")
+                sample = sample.replace("/", "")
                 samples.append(sample)
                 with open(file,"r") as file:
                     for line in file:
                         if "[info] Mapping rate" in line:
-                            rate=line.rsplit(" ",1)[1]
-                            rate=rate.replace("%","")
+                            rate=line.rsplit(" ", 1)[1]
+                            rate=rate.replace("%", "")
                             mapping_rate.append(rate)
         
         df["sample"]=samples
-        df["Mapping rate (%)"]=mapping_rate
-        df["Mapping rate (%)"]=pd.to_numeric(df["Mapping rate (%)"])
-        df=df.sort_values(by=["sample"],
-                          ascending=True,
-                          inplace=False).reset_index(drop=True)
+        df["Mapping rate (%)"] = mapping_rate
+        df["Mapping rate (%)"] = pd.to_numeric(df["Mapping rate (%)"])
+        df = df.sort_values(by = ["sample"],
+                          ascending = True,
+                          inplace = False).reset_index(drop = True)
         
-        plotBar(df,"Mapping rate (%)",save_file)
+        plotBar(df, "Mapping rate (%)", save_file)
 
 
 def plotVolcano(work_dir):
-    file_list=glob.glob(os.path.join(work_dir,
+    file_list = glob.glob(os.path.join(work_dir,
                                      "DESeq2",
                                      "*",
                                      "DESeq-output.csv"))
@@ -219,10 +218,16 @@ def plotVolcano(work_dir):
 def plotPCA(work_dir,script_dir):
     out_file = os.path.join(work_dir,"salmon","PCAplot.pdf")
     if not utils.file_exists(out_file):
-        PCA_command = ["Rscript",os.path.join(script_dir, "pcaPlot.R"), work_dir]
+        PCA_command = ["Rscript", 
+                       os.path.join(script_dir, 
+                                    "R", 
+                                    "rna-seq-pcaplot.R"), 
+                       work_dir]
         with open(os.path.join(work_dir,"commands.log"), "a") as file:
             file.write("PCA plot (all samples): ")
-            print(*PCA_command, sep=" ",file=file)
+            print(*PCA_command, 
+                  sep = " ", 
+                  file = file)
     
     try:
         subprocess.run(PCA_command)
@@ -242,13 +247,23 @@ def diff_expr(work_dir,gtf,script_dir,species,pvalue):
         sys.exit("ERROR: "+samples_input+" not found")
     
     
-    deseq2_command=["Rscript",os.path.join(script_dir,"deseq2.R"),work_dir,gtf,script_dir,species,str(pvalue)]
+    deseq2_command=["Rscript",os.path.join(script_dir, 
+                                           "R", 
+                                           "rna-seq_deseq2.R"),
+                    work_dir,
+                    gtf,
+                    script_dir,
+                    species,
+                    str(pvalue)]
+    
     with open(os.path.join(work_dir,"commands.log"), "a") as file:
         file.write("DESeq2: ")
-        print(*deseq2_command, sep=" ",file=file)
+        print(*deseq2_command, 
+              sep = " ", 
+              file = file)
     print("Running differential expression analysis with DESeq2")
-    os.makedirs(os.path.join(work_dir,"DESeq2"),
-                exist_ok=True)
+    os.makedirs(os.path.join(work_dir, "DESeq2"),
+                exist_ok = True)
     subprocess.run(deseq2_command)
 
 
