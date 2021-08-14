@@ -144,10 +144,6 @@ def main():
                              required = False, 
                              action = 'store_true', 
                              help = "Rename fq files")
-    parser_chip.add_argument("-f", "--fastqc", 
-                             required = False,
-                             action = 'store_true',
-                             help = "Perform FASTQC")
     parser_chip.add_argument("-g", "--genome", 
                              required = False,
                              default = 'hg19',
@@ -156,7 +152,7 @@ def main():
                              choices = ['hisat2',
                                         'bwa'], 
                              required = False,
-                             help = "Trim and align raw data to index using HISAT2 or BWA")
+                             help = "Create BAM files using HISAT2 or BWA")
     parser_chip.add_argument("-d", "--deduplication", 
                              required = False, 
                              action = 'store_true',
@@ -181,6 +177,7 @@ def main():
                              required = False, 
                              action = 'store_true',
                              help = "Generate metageneplots and heatmaps with ngs.plot")
+
     
     #create subparser for CUT&RUN analysis commands
     parser_cutrun = subparsers.add_parser('cutrun', 
@@ -300,7 +297,7 @@ def main():
                             gene_sets)
     
     def rna_seq(args):
-        #chec
+        #check
         utils.checkPythonPackages()
         
         ####set thread count for processing
@@ -356,7 +353,40 @@ def main():
             rnaseq_utils.geneSetEnrichment(work_dir,pvalue,gene_sets)
     
     def chip_seq(args):
-        pass
+        #check
+        utils.checkPythonPackages()
+        
+        #set thread count for processing
+        max_threads = str(multiprocessing.cpu_count())
+        threads = args["threads"]
+        if threads == "max":
+            threads = max_threads
+    
+        #Check md5sums
+        utils.checkMd5(work_dir)
+    
+        #Run FastQC/MultiQC
+        #file_extension = utils.get_extension(work_dir)
+        #skip_fastqc = args["skip_fastqc"]
+        #if not skip_fastqc:
+       #     utils.fastqc(script_dir, work_dir, threads, file_extension)
+        #else:
+       #     print("Skipping FastQC/MultiQC analysis")
+            
+        #create BAM files
+        align = args["align"]
+        
+        if align.lower() in "hisat2":
+            utils.trim(script_dir, threads, work_dir)
+            genome = args["genome"]
+            chipseq_utils.hisat2(script_dir, work_dir, threads, chip_seq_settings, genome)
+            
+            
+            
+            
+        elif align.lower() == "bwa":
+            rnaseq_utils.trim(threads, work_dir)
+            
     
     #execute selected module
     if args["module"] == "crispr":
@@ -385,9 +415,11 @@ if __name__ == "__main__":
     
     
     ###loads available CRISPR libraries from library.yaml
-    with open(os.path.join(script_dir,"yaml","crispr-library.yaml")) as file:
-        crispr_libraries=yaml.full_load(file)
-    crispr_library_list=list(crispr_libraries.keys())
+    with open(os.path.join(script_dir,
+                           "yaml",
+                           "crispr-library.yaml")) as file:
+        crispr_libraries = yaml.full_load(file)
+    crispr_library_list = list(crispr_libraries.keys())
     
     ###loads RNA-Seq settings
     try:
@@ -396,8 +428,7 @@ if __name__ == "__main__":
                                "rna-seq.yaml")) as file:
             rna_seq_settings = yaml.full_load(file)
     except FileNotFoundError:
-        print("ERROR: rna-seq.yaml not found in yaml folder. Please provide this file for further analysis.")
-        sys.exit()
+        sys.exit("ERROR: rna-seq.yaml not found in yaml folder. Please provide this file for further analysis.")
     
         
     rna_seq_genomeList = []
@@ -405,7 +436,13 @@ if __name__ == "__main__":
         rna_seq_genomeList.append(key)
 
     ###loads ChIP-Seq settings
-    
+    try:
+        with open(os.path.join(script_dir,
+                               "yaml",
+                               "chip-seq.yaml")) as file:
+            chip_seq_settings = yaml.full_load(file)
+    except FileNotFoundError:
+        sys.exit("ERROR: chip-seq.yaml not found in yaml folder. Please provide this file for further analysis.")
    
     
     main()

@@ -71,7 +71,7 @@ def salmon(salmon_index, threads, work_dir, gtf, fasta, script_dir, settings):
     if salmon_index == "": #Salmon index not found, make on the fly
         print("No Salmon index found: generating Salmon index")
         if os.path.isfile(fasta):
-            index_dir = os.path.join(script_dir,"salmon-index")
+            index_dir = os.path.join(script_dir,"index", "salmon")
             os.makedirs(index_dir, 
                         exist_ok = True)
             salmon_index_command = [salmon_file, "index", "-t", fasta, "-i", index_dir, "--gencode"]

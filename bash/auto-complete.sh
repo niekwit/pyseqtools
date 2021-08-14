@@ -1,13 +1,13 @@
 #!/bin/bash
 
-#This script enables autocompletion for the module and CRISPR library options (-l/--library) in the pyseqtools command
+#This script enables autocompletion for the module and CRISPR library options (-l/--library, -a/--analysis and positional argument) in the pyseqtools command
 #Add the following line to your .bashrc file: source /path/to/pyseqtools/auto-complete.sh
 
 #finds CRISPR libary names
 SCRIPT_DIR=$(find $HOME -type d -name "pyseqtools")
 lib_list=$(cat "$SCRIPT_DIR/yaml/crispr-library.yaml" | shyaml keys | tr "\n" " ")
 stat_list="mageck bagel2"
-module_list='crispr rna-seq chip-seq cutrun'
+
 
 
 function _complete()
@@ -19,15 +19,15 @@ case $3 in
 	--analysis) COMPREPLY=($(compgen -W "$stat_list" "${COMP_WORDS[$COMP_CWORD]}"));;
 esac
 
-    local opts
-    opts="crispr rna-seq chip-seq cutrun"
-    case $COMP_CWORD in
-        1)
-            COMPREPLY=( $(compgen -W "${opts}" -- "${COMP_WORDS[COMP_CWORD]}") )
-            ;;
+local opts
+opts="crispr rna-seq chip-seq cutrun"
+case $COMP_CWORD in
+    1)
+        COMPREPLY=( $(compgen -W "${opts}" -- "${COMP_WORDS[COMP_CWORD]}") )
+        ;;
 
-    esac
-    return 0
+esac
+return 0
 }
 
 complete -F _complete pyseqtools.py
