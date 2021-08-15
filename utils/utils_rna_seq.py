@@ -86,7 +86,7 @@ def salmon(salmon_index, threads, work_dir, gtf, fasta, script_dir, settings):
 
             #Write salmon index file location to rna-seq.yaml
             with open(os.path.join(script_dir, "yaml", "rna-seq.yaml")) as f:
-                doc=yaml.safe_load(f)
+                doc = yaml.safe_load(f)
             doc["salmon_index"]["gencode-v35"] = index_dir
             with open(os.path.join(script_dir,"yaml" ,"rna-seq.yaml"), "w") as f:
                 yaml.dump(doc,f)

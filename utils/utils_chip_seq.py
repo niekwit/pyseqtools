@@ -45,36 +45,57 @@ def hisat2(script_dir, work_dir, threads, chip_seq_settings, genome):
     
     if index == "":
         if chip_seq_settings["fasta"][genome] == "":
-            print("WARNING: HISAT2 index was not found")
-            print("WARNING: no " + genome + " fasta file was found")
-            print("Downloading pre-build index for " + genome)
-            
-            if genome == "hg19":
-                url = "https://genome-idx.s3.amazonaws.com/hisat/hg19_genome.tar.gz"
-            elif genome == "hg38":
-                url = "https://genome-idx.s3.amazonaws.com/hisat/hg38_genome.tar.gz"
-            elif genome == "mm9":
-                url = "https://genome-idx.s3.amazonaws.com/hisat/mm10_genome.tar.gz"
-            
-            download_file = os.path.join(script_dir, os.path.basename(url))
-            urllib.request.urlretrieve(url, download_file)
-            
-            index_dir = os.path.join(script_dir, 
-                                     "index", 
-                                     "hisat2")
-            os.makedirs(index_dir, 
-                        exist_ok = True)
-            
-            #untar index file
-            tar_command = "tar -xzf " + download_file + " --directory " + index_dir
-            subprocess.run(tar_command,
-                           shell = True)
-            
-            #write index path to yaml
-            
-            
-            #remove download file
-            os.remove(download_file)
+            try:
+                print("WARNING: HISAT2 index was not found")
+                print("WARNING: no " + genome + " fasta file was found")
+                print("Downloading pre-build index for " + genome)
+                
+                if genome == "hg19":
+                    url = "https://genome-idx.s3.amazonaws.com/hisat/hg19_genome.tar.gz"
+                    index_dir = 
+                elif genome == "hg38":
+                    url = "https://genome-idx.s3.amazonaws.com/hisat/hg38_genome.tar.gz"
+                elif genome == "mm9":
+                    url = "https://genome-idx.s3.amazonaws.com/hisat/mm10_genome.tar.gz"
+                
+                download_file = os.path.join(script_dir, os.path.basename(url))
+                
+                if not utils.file_exists(download_file):
+                    urllib.request.urlretrieve(url, 
+                                               download_file)
+                
+                index_dir = os.path.join(script_dir, 
+                                         "index", 
+                                         "hisat2")
+                os.makedirs(index_dir, 
+                            exist_ok = True)
+                
+                #untar index file
+                tar_command = "tar -xzf " + download_file + " --directory " + index_dir
+                subprocess.run(tar_command,
+                               shell = True)
+                
+                #write index path to yaml
+                index_path = glob.glob(index_dir + "*/*/*.ht2")
+                index_path = index_path[0].split(".", 1)[0]
+                
+                with open(os.path.join(script_dir, "yaml", "chip-seq.yaml")) as f:
+                doc = yaml.safe_load(f)
+                
+                doc["hisat2"][genome] = index_dir
+                with open(os.path.join(script_dir,"yaml" ,"rna-seq.yaml"), "w") as f:
+                    yaml.dump(doc,f)
+                
+                #remove download file
+                os.remove(download_file)
+                
+            except: #backup method in case index files are offline
+                print("WARNING: genome index not available from genome-idx.s3.amazonaws.com")
+                print("Downloading and building fasta file needed for building index")
+                if genome == "hg19":
+                    bash_command = os.path.join(script_dir, 
+                                                "bash", 
+                                                "build-hg19-fasta.sh")
 
 def bwa():
     pass
