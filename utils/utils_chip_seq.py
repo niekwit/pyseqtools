@@ -6,6 +6,12 @@ import subprocess
 import urllib.request
 import sys
 from zipfile import ZipFile
+import stat
+import gzip
+import shutil
+
+from tqdm.auto import tqdm
+import yaml
 
 script_dir = os.path.abspath(os.path.dirname(__file__))
 sys.path.append(script_dir)
@@ -16,32 +22,63 @@ import utils_general as utils
 
 
 def hisat2(script_dir, work_dir, threads, chip_seq_settings, genome):
-    #check for HISAT2
+    ###check for HISAT2###
     path = os.environ["PATH"].lower()
     
     if "hisat2" not in path:
         #Check for HISAT2 elsewhere
-        hisat2 = [line[0:] for line in subprocess.check_output("find $HOME -name hisat2 ! -path '*/multiqc*'", 
-                                                               shell = True).splitlines()]
-        
-        if hisat2 == []:
+        try:
+            hisat2 = [line[0:] for line in subprocess.check_output("find $HOME -name hisat2 ! -path '*/multiqc*'", 
+                                                                   shell = True).splitlines()]
+            hisat2 = hisat2[0].decode("utf-8")
+        except:
             print("WARNING: HISAT2 was not found\nInstalling HISAT2 now")
             url = "https://cloud.biohpc.swmed.edu/index.php/s/hisat2-220-Linux_x86_64/download"
             download_file = os.path.join(script_dir,"hisat2-2.2.0-Linux_x86_64.zip")
             urllib.request.urlretrieve(url,download_file)
-            #unzip FastQC file
-            with ZipFile(download_file, 'r') as zip_ref:
-                zip_ref.extractall(script_dir)
+            
+            #unzip HISAT2 file
+            subprocess.run(["unzip", download_file, "-d", script_dir])
+            
+           
+            
             hisat2 = os.path.join(script_dir, 
-                                  "hisat2-2.2.1", 
+                                  "hisat2-2.2.0", 
                                   "hisat2")
             #remove download file
             os.remove(download_file)
+            
     else:
         hisat2 = "hisat2"
     
-    #check for HISAT2 index
+    ###check for HISAT2 index###
     index = chip_seq_settings["hisat2"][genome]
+    
+    def indexFromFasta(script_dir, hisat2, genome, fasta):
+        #build HISAT2 index from genome fasta
+        index_location = os.path.join(script_dir,
+                                 "index",
+                                 "HISAT2",
+                                 genome,
+                                 "index")
+        os.makedirs(os.path.join(script_dir,
+                                 "index",
+                                 "HISAT2",
+                                 genome), 
+                    exist_ok = True)
+        build_command = "python3 " + hisat2 + "-build " + ucsc_fasta + " " + index_location
+        subprocess.run(build_command,
+                           shell = True)
+        
+        #add index to chip-seq.yaml
+        with open(os.path.join(script_dir, "yaml", "chip-seq.yaml")) as f:
+                doc = yaml.safe_load(f)
+                
+        doc["hisat2"][genome] = index_location
+        with open(os.path.join(script_dir,"yaml" ,"chip-seq.yaml"), "w") as f:
+            yaml.dump(doc,f)
+            
+        return(index_location)
     
     if index == "":
         if chip_seq_settings["fasta"][genome] == "":
@@ -58,7 +95,8 @@ def hisat2(script_dir, work_dir, threads, chip_seq_settings, genome):
                 elif genome == "mm9":
                     url = "https://genome-idx.s3.amazonaws.com/hisat/mm10_genome.tar.gz"
                 
-                download_file = os.path.join(script_dir, os.path.basename(url))
+                download_file = os.path.join(script_dir, 
+                                             os.path.basename(url))
                 
                 if not utils.file_exists(download_file):
                     urllib.request.urlretrieve(url, 
@@ -83,7 +121,7 @@ def hisat2(script_dir, work_dir, threads, chip_seq_settings, genome):
                 doc = yaml.safe_load(f)
                 
                 doc["hisat2"][genome] = index_dir
-                with open(os.path.join(script_dir,"yaml" ,"rna-seq.yaml"), "w") as f:
+                with open(os.path.join(script_dir,"yaml" ,"chip-seq.yaml"), "w") as f:
                     yaml.dump(doc,f)
                 
                 #remove download file
@@ -91,11 +129,194 @@ def hisat2(script_dir, work_dir, threads, chip_seq_settings, genome):
                 
             except: #backup method in case index files are offline
                 print("WARNING: genome index not available from genome-idx.s3.amazonaws.com")
-                print("Downloading and building fasta file needed for building index")
+                                
+                def downloadFasta(script_dir, chromosomes, genome):
+                    number_chromosomes = chromosomes #number of non-x/y chromosome +1
+                    base_path = "ftp://hgdownload.cse.ucsc.edu/goldenPath"
+                    chromosome_dir = "chromosomes"
+                    extension = ".fa.gz"
+                    
+                    #prepare list with urls for each chromosome fasta file
+                    download_file_list = []
+                    for i in range(1, chromosomes):
+                        file = os.path.join(base_path, 
+                                            genome,
+                                            chromosome_dir,
+                                            "chr" + str(i) + extension)
+                        download_file_list.append(file)
+                    download_file_list.append(os.path.join(base_path, 
+                                                  genome,
+                                                  chromosome_dir,
+                                                  "chr" + "X" + extension))
+                    download_file_list.append(os.path.join(base_path, 
+                                                  genome,
+                                                  chromosome_dir,
+                                                  "chr" + "Y" + extension))
+                    
+                    os.makedirs(os.path.join(script_dir, 
+                                             "fasta", 
+                                             genome),
+                                exist_ok = True)
+                    out_put_list = [os.path.join(script_dir, 
+                                                 "fasta", 
+                                                 genome, 
+                                                 os.path.basename(i)) for i in download_file_list]
+                    #download fasta files
+                    print("Downloading fasta files from UCSC needed for building HISAT2 index")
+                  
+                    for i,j in tqdm(zip(download_file_list, out_put_list),position = 0, leave = True):
+                        urllib.request.urlretrieve(i, j)
+                        
+                    #concatenate fasta files to build genome fasta
+                    print("Building whole genome fasta file")
+                    ucsc_fasta = os.path.join(script_dir, "fasta", genome, "ucsc.hg19.fasta")
+                    zcat_command = "zcat " + " ".join(out_put_list) + " > " + ucsc_fasta
+                    subprocess.run(zcat_command,
+                                   shell = True)
+                    
+                    #remove downloaded fasta files
+                    for i in out_put_list:
+                        os.remove(i)
+                    
+                    #add genome fasta file to chip-seq.yaml
+                    with open(os.path.join(script_dir, "yaml", "chip-seq.yaml")) as f:
+                        doc = yaml.safe_load(f)
+                    
+                    doc["fasta"][genome] = ucsc_fasta
+                    
+                    with open(os.path.join(script_dir,"yaml" ,"chip-seq.yaml"), "w") as f:
+                        yaml.dump(doc,f)
+                    
+                    return(ucsc_fasta)
+               
                 if genome == "hg19":
-                    bash_command = os.path.join(script_dir, 
-                                                "bash", 
-                                                "build-hg19-fasta.sh")
+                    ucsc_fasta = downloadFasta(script_dir, 23, "hg19")
+                elif genome == "hg38":
+                    ucsc_fasta = downloadFasta(script_dir, 23, "hg38")
+                elif genome == "mm9":
+                    ucsc_fasta = downloadFasta(script_dir, 19, "hg19")
+                
+                #create index
+                index_location = indexFromFasta(script_dir, hisat2, genome, ucsc_fasta)
+                
+                #add index location to chip-seq.yaml
+                with open(os.path.join(script_dir, "yaml", "chip-seq.yaml")) as f:
+                        doc = yaml.safe_load(f)
+                    
+                    doc["hisat2"][genome] = index_location
+                    
+                    with open(os.path.join(script_dir,"yaml" ,"chip-seq.yaml"), "w") as f:
+                        yaml.dump(doc,f)
+                
+        elif os.path.isfile(chip_seq_settings["fasta"][genome]): 
+                fasta = chip_seq_settings["fasta"][genome]
+                
+                #create index from fasta
+                index_location = indexFromFasta(script_dir, hisat2, genome, fasta)
+                
+                #add index location to chip-seq.yaml
+                with open(os.path.join(script_dir, "yaml", "chip-seq.yaml")) as f:
+                        doc = yaml.safe_load(f)
+                    
+                    doc["hisat2"][genome] = index_location
+                    
+                with open(os.path.join(script_dir,"yaml" ,"chip-seq.yaml"), "w") as f:
+                    yaml.dump(doc,f)
+    
+    ###look for blacklist###
+    with open(os.path.join(script_dir, "yaml", "chip-seq.yaml")) as f:
+        doc = yaml.safe_load(f)
+                    
+    blacklist = doc["blacklist"][genome] 
+    
+    if blacklist == "":
+        print("WARNING: no blacklisted region BED file found")
+        print("Downloading blacklist file for " + genome)
+        
+        def getBlacklist(script_dir, url, genome):
+            os.makedirs(os.path.join(script_dir,
+                                     "blacklist",
+                                     genome),
+                        exist_ok = True)
+            
+            download_file = os.path.join(script_dir,
+                                         "blacklist",
+                                         genome,
+                                         os.path.basename(url))
+            
+            urllib.request.urlretrieve(url,
+                                       download_file)
+            
+            #unzip bed file
+            with gzip.open(download_file, "rb") as f_in:
+                with open(download_file.replace(".gz",""), "wb") as f_out:
+                    shutil.copyfileobj(f_in, f_out)
+            
+                       
+            #remove downloaded file
+            os.remove(download_file)
+            
+            #write black list location to chip-seq.yaml
+            blacklist = download_file.replace(".gz", "")
+            
+            with open(os.path.join(script_dir, "yaml", "chip-seq.yaml")) as f:
+                        doc = yaml.safe_load(f)
+                    
+            doc["blacklist"][genome] = blacklist
+                    
+            with open(os.path.join(script_dir,"yaml" ,"chip-seq.yaml"), "w") as f:
+                yaml.dump(doc,f)
+                
+            return(blacklist)
+        
+        if genome == "hg19":
+            url = "http://hgdownload.soe.ucsc.edu/goldenPath/hg19/encodeDCC/wgEncodeMapability/wgEncodeDukeMapabilityRegionsExcludable.bed.gz"
+            blacklist = getBlacklist(script_dir, url, genome)
+        elif genome == "hg38":
+            url = "https://www.encodeproject.org/files/ENCFF356LFX/@@download/ENCFF356LFX.bed.gz"
+            blacklist = getBlacklist(script_dir, url, genome)
+        elif genome == "mm9":
+            url = "http://mitra.stanford.edu/kundaje/akundaje/release/blacklists/mm9-mouse/mm9-blacklist.bed.gz"
+            blacklist = getBlacklist(script_dir, url, genome)
+    elif os.path.isfile(blacklist):
+        if blacklist.endswith(".bed"):
+            if os.path.getsize(blacklist) > 0:
+                print("BED file with blacklisted regions available")
+    
+    ###perform alignment with HISAT2###
+    os.makedirs(os.path.join(work_dir, "bam"),
+                    exist_ok = True)
+    
+    def alignSE(work_dir, hisat2, blacklist, index_location, threads):
+        file_list = glob.glob(os.path.join(work_dir, "trim","*trimmed.fq.gz"))
+        
+        for file in file_list:
+            hisat2_output = os.path.basename(file).replace("_trimmed.fq.gz",
+                                                           "-sort-bl.bam")
+            hisat2_output = os.path.join(work_dir,
+                                         "bam",
+                                         hisat2_output)
+            
+            if not utils.file_exists(hisat2_output):
+                samtools = utils.checkSamtools(script_dir)
+                bedtools = utils.checkBedtools(script_dir)
+                
+                align_se_command = "zcat " + hisat2_output + " | " + hisat2
+                align_se_command = align_se_command + " p " + threads + " x " + index_location
+                align_se_command = align_se_command + " - 2>> align.log | "
+                
+    
+    #zcat $file | hisat2 -p "$threads" -x "$index_path" - 2>> align.log | samtools view -q 15 -F 260 -bS -@ "$threads" - | bedtools intersect -v -a "stdin" -b "$blacklist_path" -nonamecheck | samtools sort -@ "$threads" - > "$hisat2_output"
+    
+    
+    def alignPE():
+        pass
+    
+    if utils.getEND(work_dir) == "PE":
+        alignPE()
+    elif utils.getEND(work_dir) == "SE":
+        alignSE()
+    
 
 def bwa():
     pass

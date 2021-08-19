@@ -11,6 +11,7 @@ import urllib.request
 from zipfile import ZipFile
 import stat
 from  builtins import any as b_any
+import tarfile
 
 import yaml
 import numpy as np
@@ -18,7 +19,6 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
 from tqdm.auto import tqdm
-
 
 
 ###GENERAL FUNCTIONS
@@ -42,6 +42,63 @@ def checkPythonPackages(): #check for required python packages; installs if abse
     else:
         pass
 
+
+def checkSamtools(script_dir):
+    #Check for FastQC in $PATH
+    path = os.environ["PATH"].lower()
+    
+    if "samtools" not in path:
+        #Check for samtools elsewhere
+        samtools = [line[0:] for line in subprocess.check_output("find $HOME -name samtools", 
+                                                               shell = True).splitlines()]
+        
+        samtools_file = None
+        for i in samtools:
+            i = i.decode("utf-8")
+            if "bin/samtools" in i:
+                samtools_file = i
+                return(samtools_file)
+            
+        if samtools_file == None:
+            print("WARNING: samtools was not found\nInstalling samtools now")
+            
+            url = "https://github.com/samtools/samtools/releases/download/1.13/samtools-1.13.tar.bz2"
+            download_file = os.path.join(script_dir,
+                                         os.path.basename(url))
+            
+            urllib.request.urlretrieve(url,
+                                       download_file)
+            
+            #untar download file
+            tar = tarfile.open(download_file, "r:bz2")  
+            tar.extractall(script_dir)
+            tar.close()
+            
+            os.remove(download_file)
+            
+            #make samtools
+            samtools_dir = os.path.join(script_dir,
+                                     "samtools")
+            os.makedirs(samtools_dir,
+                        exist_ok = True)
+            
+            os.chdir(os.path.join(script_dir,
+                                  os.path.basename(url).replace(".tar.bz2", "")))
+            
+            subprocess.run(["./configure", "--prefix=" + samtools_dir])
+            subprocess.run(["make"])
+            subprocess.run(["make", "install"])
+            
+            samtools_file = os.path.join(script_dir,
+                                         "samtools",
+                                         "bin",
+                                         "samtools")
+            
+            return(samtools_file)
+
+def checkBedtools(script_dir):
+    pass
+    
 
 def checkMd5(work_dir):
     md5sum_file = os.path.join(work_dir,"raw-data", "md5sums.csv")     
@@ -139,6 +196,7 @@ def checkFastqc(script_dir):
         try:
             fastqc = fastqc[0].decode("utf-8")
             fastqc_file = os.path.join(os.path.dirname(fastqc), "fastqc")
+            return(fastqc_file)
         except:
             print("WARNING: FastQC was not found\nInstalling FastQC now")
             url = "https://www.bioinformatics.babraham.ac.uk/projects/fastqc/fastqc_v0.11.9.zip"
@@ -155,7 +213,7 @@ def checkFastqc(script_dir):
             os.remove(download_file)
     else:
         fastqc_file = "fastqc"
-    return(fastqc_file)
+        return(fastqc_file)
 
 def fastqc(script_dir, work_dir, threads, file_extension):
     
