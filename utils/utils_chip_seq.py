@@ -308,9 +308,9 @@ def hisat2(script_dir, work_dir, threads, chip_seq_settings, genome):
                 align_command = "zcat " + file + " | " + hisat2
                 align_command = align_command + " p " + threads + " x " + index_location
                 align_command = align_command + " - 2>> align.log | "
-                align_command = align_command + "samtools view -q 15 -F 260 -bS -@" 
-                align_command = align_command + str(threads) + "- | bedtools intersect -v -a 'stdin' -b "
-                align_command = align_command + blacklist + " -nonamecheck | samtools sort -@ "
+                align_command = align_command + samtools + " view -q 15 -F 260 -bS -@" 
+                align_command = align_command + str(threads) + "- | " + bedtools + " intersect -v -a 'stdin' -b "
+                align_command = align_command + blacklist + " -nonamecheck | " + samtools + " sort -@ "
                 align_command = align_command + str(threads) + " - > " + hisat2_output
                 
                 subprocess.run(align_command,
@@ -341,9 +341,9 @@ def hisat2(script_dir, work_dir, threads, chip_seq_settings, genome):
                 align_command = align_command + " -1 " + read1 + " -2 " + read2
                 align_command = align_command + " 2>> align.log | " + samtools + " view -q 15 -F 260 -bS -@"
                 align_command = align_command + threads + "- | " + bedtools + " intersect -v -a 'stdin' -b "
-                align_command = align_command + blacklist + " -nonamecheck | samtools sort -@ "
+                align_command = align_command + blacklist + " -nonamecheck | " + samtools + " sort -@ "
                 align_command = align_command + threads + " - > " + hisat2_output
-                print(align_command)
+                
                 utils.write2log(work_dir, align_command, "HISAT2 PE: ")
                 
                 subprocess.run(align_command,
