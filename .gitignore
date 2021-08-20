@@ -139,3 +139,11 @@ FastQC/
 bagel2/
 index/
 Trim*/
+salmon*/
+bedtools/
+hisat*/
+index/
+blacklist/
+fasta/
+samtools*/
+bedtools*/
