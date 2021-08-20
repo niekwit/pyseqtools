@@ -44,7 +44,7 @@ def checkPythonPackages(): #check for required python packages; installs if abse
 
 
 def checkSamtools(script_dir):
-    #Check for FastQC in $PATH
+    #Check for samtools in $PATH
     path = os.environ["PATH"].lower()
     
     if "samtools" not in path:
@@ -94,11 +94,55 @@ def checkSamtools(script_dir):
                                          "bin",
                                          "samtools")
             
+            #remove downloaded files
+            samtools_dir = download_file.rsplit(".", 2)[0]
+            
+            subprocess.run(["rm", "-rf", samtools_dir])
+            
             return(samtools_file)
 
 def checkBedtools(script_dir):
-    pass
+    path = os.environ["PATH"].lower()
     
+    if "bedtools" not in path:
+        #Check for bedtools elsewhere
+        bedtools = [line[0:] for line in subprocess.check_output("find $HOME -name bedtools", 
+                                                               shell = True).splitlines()]
+        
+        try:
+            bedtools = bedtools[0].decode("utf-8")
+            return(bedtools)
+        except:
+            print("WARNING: Bedtools was not found\nInstalling Bedtools now")
+           
+            url = "https://github.com/arq5x/bedtools2/releases/download/v2.30.0/bedtools.static.binary"
+            
+            os.makedirs(os.path.join(script_dir,
+                                     "bedtools-2.30"),
+                        exist_ok = True)
+            
+            download_file = os.path.join(script_dir,
+                                         "bedtools-2.30",
+                                         os.path.basename(url))
+            
+            
+            urllib.request.urlretrieve(url,
+                                       download_file)
+            
+            bedtools = download_file.rsplit(".", 2)[0]
+            os.rename(download_file,
+                      bedtools)
+            
+            #make bedtools executable
+            st = os.stat(bedtools)
+            os.chmod(bedtools, st.st_mode | stat.S_IEXEC)
+            
+            return(bedtools)
+    
+
+def checkBwa(script_dir):
+    pass
+
 
 def checkMd5(work_dir):
     md5sum_file = os.path.join(work_dir,"raw-data", "md5sums.csv")     

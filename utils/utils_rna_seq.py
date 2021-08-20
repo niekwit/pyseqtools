@@ -17,7 +17,7 @@ import math
 import urllib.request
 
 script_dir = os.path.abspath(os.path.dirname(__file__))
-sys.path.append(script_dir)
+sys.path.append(os.path.join(script_dir, "utils"))
 import utils_general as utils
 
 def install_packages(): #check for required python packages; installs if absent
