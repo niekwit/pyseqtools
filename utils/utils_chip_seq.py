@@ -283,7 +283,7 @@ def hisat2(script_dir, work_dir, threads, chip_seq_settings, genome):
     elif os.path.isfile(blacklist):
         if blacklist.endswith(".bed"):
             if os.path.getsize(blacklist) > 0:
-                print("BED file with blacklisted regions available")
+                pass
     
     ###perform alignment with HISAT2###
     os.makedirs(os.path.join(work_dir, "bam"),
@@ -355,6 +355,11 @@ def hisat2(script_dir, work_dir, threads, chip_seq_settings, genome):
     elif utils.getEND(work_dir) == "SE":
         alignSE(work_dir, hisat2, blacklist, index_location, threads)
     
-
+    #plot alignment rate
+    
+    
+    #plot number of reads before deduplication
+    
+    
 def bwa():
     pass

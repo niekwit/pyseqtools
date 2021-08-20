@@ -151,6 +151,7 @@ def main():
     parser_chip.add_argument("-a", "--align",
                              choices = ['hisat2',
                                         'bwa'], 
+                             default = "hisat2",
                              required = False,
                              help = "Create BAM files using HISAT2 or BWA")
     parser_chip.add_argument("-d", "--deduplication", 
@@ -380,13 +381,13 @@ def main():
             utils.trim(script_dir, threads, work_dir)
             genome = args["genome"]
             chipseq_utils.hisat2(script_dir, work_dir, threads, chip_seq_settings, genome)
-            
-            
-            
-            
         elif align.lower() == "bwa":
             rnaseq_utils.trim(threads, work_dir)
             
+        dedup = args["deduplication"]
+        
+        if dedup == True:
+            utils.deduplicationBam(script_dir, work_dir)
     
     #execute selected module
     if args["module"] == "crispr":

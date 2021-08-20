@@ -2,6 +2,7 @@
 
 import os
 import subprocess
+from subprocess import DEVNULL
 import multiprocessing
 import sys
 import glob
@@ -22,6 +23,90 @@ from tqdm.auto import tqdm
 
 
 ###GENERAL FUNCTIONS
+
+
+def checkMd5(work_dir):
+    md5sum_file = os.path.join(work_dir,"raw-data", "md5sums.csv")     
+   
+    def md5(file):
+        work_dir = os.getcwd()
+        file = os.path.join(work_dir, "raw-data", file)
+        hash_md5 = hashlib.md5()
+        with open(file, "rb") as f:
+            for chunk in iter(lambda: f.read(4096), b""):
+                hash_md5.update(chunk)
+        return(hash_md5.hexdigest())
+
+    if not os.path.exists(os.path.join(work_dir, ".md5summscorrect")):
+        if os.path.exists(md5sum_file):
+            print("Checking MD5 checksums")
+            df = pd.read_csv(md5sum_file)
+            df["md5sum_new"] = df["file"].apply(md5)
+            
+            #compare original checksums with calculated ones
+            df["md5sumCorrect"] = df["md5sum"] == df["md5sum_new"]
+            
+            check_list = df[~df["md5sumCorrect"]]
+            if len(check_list) > 0:
+                print("Calculated MD5 checksums do not match originals:")
+                print(check_list["file"])
+                sys.exit(1)
+            else:
+                print("MD5 checksums correct")
+                open(".md5summscorrect", 'a').close()
+
+
+def write2log(work_dir,command,name):
+    with open(os.path.join(work_dir,"commands.log"), "a") as file:
+        file.write(name)
+        print(*command, sep="",file=file)
+
+
+def set_threads(args):
+    max_threads = str(multiprocessing.cpu_count())
+    threads = args["threads"]
+    if threads == "max":
+        threads=max_threads
+    threads = str(threads)
+    return threads
+
+
+def rename(work_dir):
+    file = open(os.path.join(work_dir,"rename.config"), "r")
+    lines = file.readlines()
+    count = 0
+    for line in lines: #removes newline characters
+        lines[count] = line.replace("\n","")
+        count+=1
+
+    for line in lines:#rename files
+        old_name,new_name=line.split(";")
+        os.rename(os.path.join(work_dir,
+                    "raw-data",
+                    old_name),os.path.join(work_dir,
+                                "raw-data",
+                                new_name))
+
+                                           
+def get_extension(work_dir):
+    file_list=glob.glob(os.path.join(work_dir,"raw-data","*.gz"))
+    
+    if len(file_list) == 0:
+        sys.exit("ERROR: no fastq files found")
+    
+    test_file=file_list[0]
+    extension_index=test_file.index(".",0)
+    file_extension=test_file[extension_index:]
+    return file_extension
+
+
+def file_exists(file): #check if file exists/is not size zero
+    if os.path.exists(file):
+            if os.path.getsize(file) > 0:
+                print("Skipping "+file+" (already exists/analysed)")
+                return(True)
+    else:
+        return(False)
 
 
 def checkPythonPackages(): #check for required python packages; installs if absent
@@ -144,89 +229,61 @@ def checkBwa(script_dir):
     pass
 
 
-def checkMd5(work_dir):
-    md5sum_file = os.path.join(work_dir,"raw-data", "md5sums.csv")     
-   
-    def md5(file):
-        work_dir = os.getcwd()
-        file = os.path.join(work_dir, "raw-data", file)
-        hash_md5 = hashlib.md5()
-        with open(file, "rb") as f:
-            for chunk in iter(lambda: f.read(4096), b""):
-                hash_md5.update(chunk)
-        return(hash_md5.hexdigest())
-
-    if not os.path.exists(os.path.join(work_dir, ".md5summscorrect")):
-        if os.path.exists(md5sum_file):
-            print("Checking MD5 checksums")
-            df = pd.read_csv(md5sum_file)
-            df["md5sum_new"] = df["file"].apply(md5)
-            
-            #compare original checksums with calculated ones
-            df["md5sumCorrect"] = df["md5sum"] == df["md5sum_new"]
-            
-            check_list = df[~df["md5sumCorrect"]]
-            if len(check_list) > 0:
-                print("Calculated MD5 checksums do not match originals:")
-                print(check_list["file"])
-                sys.exit(1)
-            else:
-                print("MD5 checksums correct")
-                open(".md5summscorrect", 'a').close()
-
-
-def write2log(work_dir,command,name):
-    with open(os.path.join(work_dir,"commands.log"), "a") as file:
-        file.write(name)
-        print(*command, sep="",file=file)
-
-
-def set_threads(args):
-    max_threads = str(multiprocessing.cpu_count())
-    threads = args["threads"]
-    if threads == "max":
-        threads=max_threads
-    threads = str(threads)
-    return threads
-
-
-def rename(work_dir):
-    file = open(os.path.join(work_dir,"rename.config"), "r")
-    lines = file.readlines()
-    count = 0
-    for line in lines: #removes newline characters
-        lines[count] = line.replace("\n","")
-        count+=1
-
-    for line in lines:#rename files
-        old_name,new_name=line.split(";")
-        os.rename(os.path.join(work_dir,
-                    "raw-data",
-                    old_name),os.path.join(work_dir,
-                                "raw-data",
-                                new_name))
-
-                                           
-def get_extension(work_dir):
-    file_list=glob.glob(os.path.join(work_dir,"raw-data","*.gz"))
+def checkPicard(script_dir):
+    #check for Java Runtime Environment
+    try:
+        subprocess.run(["java", "--version",], stdout=DEVNULL)
+    except:
+        sys.exit("ERROR: No Java Runtime Environment available\nUbuntu installation: https://ubuntu.com/tutorials/install-jre#1-overview")
     
-    if len(file_list) == 0:
-        sys.exit("ERROR: no fastq files found")
+    #check for Picard
+    path = os.environ["PATH"].lower()
     
-    test_file=file_list[0]
-    extension_index=test_file.index(".",0)
-    file_extension=test_file[extension_index:]
-    return file_extension
+    if "picard" not in path:
+        #Check for Picard elsewhere
+        picard = [line[0:] for line in subprocess.check_output("find $HOME -name picard.jar ! -path '*/multiqc*'", 
+                                                               shell = True).splitlines()]
+        try:
+            picard = picard[0].decode("utf-8")
+            return(picard)
+        except:
+            print("WARNING: Picard was not found\nInstalling Picard now")
+            url = "https://github.com/broadinstitute/picard/releases/download/2.26.0/picard.jar"
+            os.makedirs(os.path.join(script_dir,
+                                     "picard"),
+                        exist_ok = True)
+            download_file = os.path.join(script_dir,
+                                         "picard",
+                                         os.path.basename(url))
+            urllib.request.urlretrieve(url, download_file)
+            picard = download_file
+            return(picard)
+            
 
-
-def file_exists(file): #check if file exists/is not size zero
-    if os.path.exists(file):
-            if os.path.getsize(file) > 0:
-                print("Skipping "+file+" (already exists/analysed)")
-                return(True)
-    else:
-        return(False)
-
+def deduplicationBam(script_dir, work_dir):
+    #check if Picard is installed
+    picard = checkPicard(script_dir)
+    
+    file_list = glob.glob(os.path.join(work_dir,
+                                       "bam",
+                                       "*-sort-bl.bam"))
+    print("Performing deduplication of BAM files")
+    for bam in file_list:
+        dedup_output = bam.replace("-sort-bl.bam",
+                                   "-sort-bl-dedupl.bam")
+        if not file_exists(dedup_output):
+            
+            picard_command = "java -jar " + picard + " MarkDuplicates INPUT=" + bam + " OUTPUT=" + dedup_output + " REMOVE_DUPLICATES=TRUE METRICS_FILE=picard_metrics.log"
+            
+            write2log(work_dir, picard_command, "Deduplication: ")
+                
+            subprocess.run(picard_command,
+                           shell = True)
+        
+        
+        
+    #plot number of reads after deduplication
+        
 
 def checkFastqc(script_dir):
     
