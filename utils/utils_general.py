@@ -7,7 +7,6 @@ import multiprocessing
 import sys
 import glob
 import hashlib
-import pkg_resources
 import urllib.request
 from zipfile import ZipFile
 import stat
@@ -20,6 +19,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
 from tqdm.auto import tqdm
+import pysam
 
 
 ###GENERAL FUNCTIONS
@@ -107,25 +107,6 @@ def file_exists(file): #check if file exists/is not size zero
                 return(True)
     else:
         return(False)
-
-
-def checkPythonPackages(): #check for required python packages; installs if absent
-    required = {"shyaml", "pyyaml", "pandas", "numpy",
-                "matplotlib", "seaborn", "multiqc",
-                "cutadapt", "tqdm","gseapy",
-                "matplotlib-venn"}
-    installed = {pkg.key for pkg in pkg_resources.working_set}
-    missing = required - installed
-    if missing:
-        python = sys.executable
-        print("Installing missing required Python3 packages")
-        try:
-            install_command = [python, '-m', 'pip', 'install', *missing]
-            subprocess.check_call(install_command, stdout=subprocess.DEVNULL)
-        except:
-            sys.exit("ERROR: package installation failed, check log")
-    else:
-        pass
 
 
 def checkSamtools(script_dir):
@@ -260,7 +241,7 @@ def checkPicard(script_dir):
             return(picard)
             
 
-def deduplicationBam(script_dir, work_dir):
+def deduplicationBam(script_dir, work_dir, threads):
     #check if Picard is installed
     picard = checkPicard(script_dir)
     
@@ -273,6 +254,10 @@ def deduplicationBam(script_dir, work_dir):
                                    "-sort-bl-dedupl.bam")
         if not file_exists(dedup_output):
             
+            log_name = os.path.basename(bam).split("-", 1)[0] + "-dedup_metrics.log"
+            log_name = os.path.join(work_dir,
+                                    "bam",
+                                    log_name)
             picard_command = "java -jar " + picard + " MarkDuplicates INPUT=" + bam + " OUTPUT=" + dedup_output + " REMOVE_DUPLICATES=TRUE METRICS_FILE=picard_metrics.log"
             
             write2log(work_dir, picard_command, "Deduplication: ")
@@ -280,11 +265,102 @@ def deduplicationBam(script_dir, work_dir):
             subprocess.run(picard_command,
                            shell = True)
         
-        
-        
     #plot number of reads after deduplication
-        
+    #get counts from non-deduplicated bam files
+    file_list = glob.glob(os.path.join(work_dir,
+                                       "bam",
+                                       "*-sort-bl.bam"))
+    
+    column_names = [os.path.basename(bam).replace("-sort-bl.bam","") for bam in file_list]
+    df = pd.DataFrame(columns = column_names)
+    
+    for bam in file_list:
+          count = pysam.view("-@", str(threads) ,"-c", "-F" "260", bam)
+          column = os.path.basename(bam).replace("-sort-bl.bam","")
+          df.loc[1, column] = count
+    
+    df["condition"] = "pre-deduplication"
+    
+    #get counts for deduplicated bam files
+    file_list = glob.glob(os.path.join(work_dir,
+                                       "bam",
+                                       "*-sort-bl-dedupl.bam"))
+           
+    for bam in file_list:
+          count = pysam.view("-@", str(threads) ,"-c", "-F" "260", bam)
+          column = os.path.basename(bam).replace("-sort-bl-dedupl.bam","")
+          df.loc[2, column] = count
+    
+    df.loc[2, "condition"] = "deduplicated"
+    
+    #create df for plotting
+    df_melt = pd.melt(df, id_vars = ["condition"], 
+                      value_vars = column_names)
+    df_melt["value"] = pd.to_numeric(df_melt["value"])
+    df_melt["value"] = df_melt["value"] / 1000000
+    
+    #create plot
+    save_file = os.path.join(work_dir,
+                             "bam",
+                             "read-counts-deduplication.pdf")
+    
+    sns.catplot(x = 'variable', y = 'value', 
+               hue = 'condition', 
+               data = df_melt, 
+               kind = 'bar', 
+               legend_out = False,
+               edgecolor = "black",)
+    plt.ylabel("Uniquely mapped read count (millions)")
+    plt.xticks(rotation = 45, ha="right")
+    plt.xlabel("")
+    plt.ylim((0, df_melt["value"].max() * 1.3))
+    plt.legend(title = None,
+               frameon = False)
+    plt.tight_layout()
+    plt.savefig(save_file)
+    
 
+def createBigWig(work_dir, threads):
+    #creates BigWig files for all existing BAM files
+    print("Generating BigWig files")
+    os.makedirs(os.path.join(work_dir,
+                             "bigwig"),
+                exist_ok = True)
+    
+    file_list = glob.glob(os.path.join(work_dir,
+                                       "bam",
+                                       "*.bam"))
+    
+    #index bam files
+    #first check if bam files have been indexed
+    index_file_list = [bam + ".bai" for bam in file_list]
+    
+    for bai, bam in zip(index_file_list, file_list):
+        if not file_exists(bai):
+            pysam.index("-@", str(threads), bam)
+    
+    #create BigWigs with deeptools
+    for bam in file_list:
+        if "-sort-bl.bam" in bam:
+            bigwig_output = bam.replace("-sort-bl.bam", "-norm.bw")
+            bigwig_output = bigwig_output.replace("bam", "bigwig")
+
+            bigwig = "bamCoverage -p " + str(threads) + " --binSize 200 --normalizeUsing RPKM --extendReads 200 --effectiveGenomeSize 2827437033 -b " 
+            bigwig = bigwig + bam +" -o " + bigwig_output
+        
+            subprocess.run(bigwig, 
+                           shell = True)
+        elif "-sort-bl-dedupl.bam" in bam:
+            bigwig_output = bam.replace("-sort-bl-dedupl.bam", "-dedupl-norm.bw")
+            bigwig_output = bigwig_output.replace("bam", "bigwig")
+            
+            bigwig = "bamCoverage -p " + str(threads) + " --binSize 200 --normalizeUsing RPKM --extendReads 200 --effectiveGenomeSize 2827437033 -b " 
+            bigwig = bigwig + bam +" -o " + bigwig_output
+        
+            subprocess.run(bigwig, 
+                           shell = True)
+            
+            
 def checkFastqc(script_dir):
     
     #Check for FastQC in $PATH

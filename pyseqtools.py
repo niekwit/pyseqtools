@@ -6,7 +6,26 @@ import argparse
 import multiprocessing
 import timeit
 import time
-import yaml
+import pkg_resources
+
+
+def checkPythonPackages(): #check for required python packages; installs if absent
+        required = {"shyaml", "pyyaml", "pandas", "numpy",
+                    "matplotlib", "seaborn", "multiqc",
+                    "cutadapt", "tqdm","gseapy",
+                    "matplotlib-venn", "pysam", "deeptools"}
+        installed = {pkg.key for pkg in pkg_resources.working_set}
+        missing = required - installed
+        if missing:
+            python = sys.executable
+            print("Installing missing required Python3 packages")
+            try:
+                install_command = [python, '-m', 'pip', 'install', *missing]
+                subprocess.check_call(install_command, stdout=subprocess.DEVNULL)
+            except:
+                sys.exit("ERROR: package installation failed, check log")
+        else:
+            pass
 
 
 def main():
@@ -188,15 +207,14 @@ def main():
                              required = False,
                              default = 1,
                              help = "<INT> number of CPU threads to use (default is 1). Use max to apply all available CPU threads")
-        
+    
+       
     #create dictionary with command line arguments
     args = vars(parser.parse_args())
     
         
     def crispr(args):
-        ###check if required Python packages are available
-        utils.checkPythonPackages()
-        
+              
         #csv to fasta conversion
         csv = args["csv2fasta"]
         if csv is not None:
@@ -298,8 +316,6 @@ def main():
                             gene_sets)
     
     def rna_seq(args):
-        #check
-        utils.checkPythonPackages()
         
         ####set thread count for processing
         max_threads = str(multiprocessing.cpu_count())
@@ -354,8 +370,6 @@ def main():
             rnaseq_utils.geneSetEnrichment(work_dir,pvalue,gene_sets)
     
     def chip_seq(args):
-        #check
-        utils.checkPythonPackages()
         
         #set thread count for processing
         max_threads = str(multiprocessing.cpu_count())
@@ -385,9 +399,13 @@ def main():
             rnaseq_utils.trim(threads, work_dir)
             
         dedup = args["deduplication"]
-        
         if dedup == True:
-            utils.deduplicationBam(script_dir, work_dir)
+            utils.deduplicationBam(script_dir, work_dir, threads)
+        
+        bigwig = args["bigwig"]
+        if bigwig == True:
+            utils.createBigWig(work_dir, threads)
+            
     
     #execute selected module
     if args["module"] == "crispr":
@@ -413,9 +431,12 @@ if __name__ == "__main__":
     import utils_chip_seq as chipseq_utils
     import utils_cutrun as cutrun_utils
     
-    
+    #check if required Python packages are available
+    checkPythonPackages()
     
     ###loads available CRISPR libraries from library.yaml
+    import yaml
+    
     with open(os.path.join(script_dir,
                            "yaml",
                            "crispr-library.yaml")) as file:
