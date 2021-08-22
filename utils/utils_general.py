@@ -339,6 +339,9 @@ def createBigWig(work_dir, threads):
         if not file_exists(bai):
             pysam.index("-@", str(threads), bam)
     
+    
+    
+    
     #create BigWigs with deeptools
     for bam in file_list:
         if "-sort-bl.bam" in bam:
@@ -359,7 +362,25 @@ def createBigWig(work_dir, threads):
         
             subprocess.run(bigwig, 
                            shell = True)
-            
+
+
+def bigwigQC(work_dir, threads):
+    
+    #generate PCA plot of all BigWig files
+    if os.path.exists(os.path.join(work_dir,
+                                   "bigwig")):
+        file_list = glob.glob(os.path.join(work_dir,
+                                           "bigwig",
+                                           "*.bw"))
+        
+        summary_file = os.path.join(work_dir,
+                                    "bigwig",
+                                    "bigwig-summary.npz")
+        summary = "multiBigwigSummary bins --numberOfProcessors " + str(threads)
+        summary =  summary + " -b " + " ".join(file_list) + " -o " + summary_file
+        
+        subprocess.run(summary, 
+                           shell = True)
             
 def checkFastqc(script_dir):
     

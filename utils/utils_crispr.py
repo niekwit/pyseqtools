@@ -106,10 +106,12 @@ def check_index(library, crispr_library, script_dir, work_dir):
             else:
                 index_base=os.path.join(script_dir,
                                 "index",
+                                "bowtie2",
                                 crispr_library,
                                 crispr_library + "-index")
                 index_dir=os.path.join(script_dir, 
                                        "index", 
+                                       "bowtie2",
                                        crispr_library)
                 os.makedirs(index_dir,
                             exist_ok = True)

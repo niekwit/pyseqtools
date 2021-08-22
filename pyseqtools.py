@@ -23,7 +23,7 @@ def checkPythonPackages(): #check for required python packages; installs if abse
                 install_command = [python, '-m', 'pip', 'install', *missing]
                 subprocess.check_call(install_command, stdout=subprocess.DEVNULL)
             except:
-                sys.exit("ERROR: package installation failed, check log")
+                sys.exit("ERROR: package installation failed")
         else:
             pass
 
@@ -213,7 +213,7 @@ def main():
     args = vars(parser.parse_args())
     
         
-    def crispr(args):
+    def crispr(args, script_dir):
               
         #csv to fasta conversion
         csv = args["csv2fasta"]
@@ -249,14 +249,14 @@ def main():
         ##count reads
         #check if bowtie2 index is build for CRISPR library
         crispr_library = args["library"]
-        crispr_utils.check_index(crispr_libraries, crispr_library, script_dir, work_dir)
+        crispr_utils.check_index(crispr_settings, crispr_library, script_dir, work_dir)
     
         #check if file with just guide names exists
-        crispr_utils.guide_names(crispr_libraries,crispr_library)
+        crispr_utils.guide_names(crispr_settings, crispr_library)
     
         #count sgRNAs
         mismatch = args["mismatch"]
-        crispr_utils.count(crispr_libraries,
+        crispr_utils.count(crispr_settings,
                      crispr_library,
                      mismatch,
                      threads,
@@ -267,13 +267,13 @@ def main():
         crispr_utils.plot_alignment_rate(work_dir)
     
         #plot sample coverage (read count / library size)
-        crispr_utils.plot_coverage(work_dir,crispr_libraries,crispr_library)
+        crispr_utils.plot_coverage(work_dir, crispr_settings, crispr_library)
     
         #join count files
         if not utils.file_exists(os.path.join(work_dir,
                                     "count",
                                     'counts-aggregated.tsv')):
-            crispr_utils.join_counts(work_dir,crispr_libraries,crispr_library)
+            crispr_utils.join_counts(work_dir, crispr_settings, crispr_library)
         #normalise read count table
         if not utils.file_exists(os.path.join(work_dir,
                                     "count",
@@ -281,8 +281,8 @@ def main():
             crispr_utils.normalise(work_dir)
     
         ##run library analysis
-        crispr_utils.lib_analysis(work_dir,crispr_libraries,crispr_library,script_dir)
-        crispr_utils.gcBias(work_dir,crispr_libraries,crispr_library)
+        crispr_utils.lib_analysis(work_dir, crispr_settings, crispr_library, script_dir)
+        crispr_utils.gcBias(work_dir, crispr_settings, crispr_library)
     
         ##run stats on counts
         analysis = args["analysis"]
@@ -299,7 +299,7 @@ def main():
             elif analysis == "bagel2":
                 print("Running BAGEL2")
                 crispr_utils.remove_duplicates(work_dir)
-                crispr_utils.convert4bagel(work_dir,crispr_libraries,crispr_library)
+                crispr_utils.convert4bagel(work_dir, crispr_settings, crispr_library)
                 crispr_utils.bagel2(work_dir, script_dir, fdr)
         
         #run essential gene list comparison
@@ -310,12 +310,12 @@ def main():
             gene_sets = args["gene_sets"]
             crispr_utils.goPython(work_dir,
                             fdr,
-                            crispr_libraries,
+                            crispr_settings,
                             crispr_library,
                             analysis,
                             gene_sets)
     
-    def rna_seq(args):
+    def rna_seq(args, script_dir):
         
         ####set thread count for processing
         max_threads = str(multiprocessing.cpu_count())
@@ -343,8 +343,8 @@ def main():
         if align.lower() == "salmon":
             utils.trim(script_dir, threads, work_dir)
             salmon_index = rna_seq_settings["salmon_index"]["gencode-v35"]
-            gtf = rna_seq_settings["salmon_gtf"]["gencode-v35"]
-            fasta = rna_seq_settings["FASTA"]["gencode-v35"]
+            gtf = settings["salmon_gtf"]["gencode-v35"]
+            fasta = settings["FASTA"]["gencode-v35"]
             rnaseq_utils.salmon(salmon_index, 
                                 str(threads), 
                                 work_dir, 
@@ -353,8 +353,8 @@ def main():
                                 script_dir, 
                                 rna_seq_settings)
             rnaseq_utils.plotMappingRate(work_dir)
-            rnaseq_utils.plotPCA(work_dir,script_dir)
-            rnaseq_utils.diff_expr(work_dir,gtf,script_dir,species,pvalue)
+            rnaseq_utils.plotPCA(work_dir, script_dir)
+            rnaseq_utils.diff_expr(work_dir, gtf, script_dir, species, pvalue)
             rnaseq_utils.plotVolcano(work_dir)
         elif align.lower() == "hisat2":
             rnaseq_utils.trim(threads, work_dir)
@@ -367,9 +367,9 @@ def main():
 	
         if go == True:
             gene_sets=args["gene_sets"]
-            rnaseq_utils.geneSetEnrichment(work_dir,pvalue,gene_sets)
+            rnaseq_utils.geneSetEnrichment(work_dir, pvalue, gene_sets)
     
-    def chip_seq(args):
+    def chip_seq(args, script_dir):
         
         #set thread count for processing
         max_threads = str(multiprocessing.cpu_count())
@@ -405,15 +405,19 @@ def main():
         bigwig = args["bigwig"]
         if bigwig == True:
             utils.createBigWig(work_dir, threads)
-            
+    
+    def cutrun(args, script_dir):
+        pass
     
     #execute selected module
     if args["module"] == "crispr":
-        crispr(args)
+        crispr(args, script_dir)
     elif args["module"] == "rna-seq":
-        rna_seq(args)
+        rna_seq(args, script_dir)
     elif args["module"] == "chip-seq":
-        chip_seq(args)
+        chip_seq(args, script_dir)
+    elif args["module"] == "cutrun":
+        chip_seq(args, script_dir)
     
     
 if __name__ == "__main__":
@@ -440,8 +444,8 @@ if __name__ == "__main__":
     with open(os.path.join(script_dir,
                            "yaml",
                            "crispr-library.yaml")) as file:
-        crispr_libraries = yaml.full_load(file)
-    crispr_library_list = list(crispr_libraries.keys())
+        crispr_settings = yaml.full_load(file)
+    crispr_library_list = list(crispr_settings.keys())
     
     ###loads RNA-Seq settings
     try:
@@ -466,6 +470,8 @@ if __name__ == "__main__":
     except FileNotFoundError:
         sys.exit("ERROR: chip-seq.yaml not found in yaml folder. Please provide this file for further analysis.")
    
+
+    
     
     main()
     
