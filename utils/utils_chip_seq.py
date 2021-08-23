@@ -5,8 +5,6 @@ import os
 import subprocess
 import urllib.request
 import sys
-from zipfile import ZipFile
-import stat
 import gzip
 import shutil
 
@@ -19,7 +17,6 @@ import utils_general as utils
 
 
 ###CHIP-SEQ ANALYSIS SPECIFIC FUNCTIONS
-
  
 
 def hisat2(script_dir, work_dir, threads, chip_seq_settings, genome):
@@ -132,7 +129,7 @@ def hisat2(script_dir, work_dir, threads, chip_seq_settings, genome):
                 print("WARNING: genome index not available from genome-idx.s3.amazonaws.com")
                                 
                 def downloadFasta(script_dir, chromosomes, genome):
-                    number_chromosomes = chromosomes #number of non-x/y chromosome +1
+                    
                     base_path = "ftp://hgdownload.cse.ucsc.edu/goldenPath"
                     chromosome_dir = "chromosomes"
                     extension = ".fa.gz"
@@ -170,7 +167,7 @@ def hisat2(script_dir, work_dir, threads, chip_seq_settings, genome):
                         
                     #concatenate fasta files to build genome fasta
                     print("Building whole genome fasta file")
-                    ucsc_fasta = os.path.join(script_dir, "fasta", genome, "ucsc.hg19.fasta")
+                    ucsc_fasta = os.path.join(script_dir, "fasta", genome, "ucsc." + genome + ".fasta")
                     zcat_command = "zcat " + " ".join(out_put_list) + " > " + ucsc_fasta
                     subprocess.run(zcat_command,
                                    shell = True)
@@ -195,7 +192,7 @@ def hisat2(script_dir, work_dir, threads, chip_seq_settings, genome):
                 elif genome == "hg38":
                     ucsc_fasta = downloadFasta(script_dir, 23, "hg38")
                 elif genome == "mm9":
-                    ucsc_fasta = downloadFasta(script_dir, 19, "hg19")
+                    ucsc_fasta = downloadFasta(script_dir, 19, "mm9")
                 
                 #create index
                 index_location = indexFromFasta(script_dir, hisat2, genome, ucsc_fasta)
@@ -291,11 +288,11 @@ def hisat2(script_dir, work_dir, threads, chip_seq_settings, genome):
                     exist_ok = True)
     
     def alignSE(work_dir, hisat2, blacklist, index_location, threads):
-        file_list = glob.glob(os.path.join(work_dir, "trim","*trimmed.fq.gz"))
+        file_list = glob.glob(os.path.join(work_dir, "trim_galore","*trimmed.fq.gz"))
         
         print("Generating BAM files with HISAT2 (single-end mode)")
         
-        for file in tqdm(file_list, position = 0, leave = True):
+        for file in file_list:
             hisat2_output = os.path.basename(file).replace("_trimmed.fq.gz",
                                                            "-sort-bl.bam")
             hisat2_output = os.path.join(work_dir,
@@ -306,20 +303,18 @@ def hisat2(script_dir, work_dir, threads, chip_seq_settings, genome):
                 samtools = utils.checkSamtools(script_dir)
                 bedtools = utils.checkBedtools(script_dir)
                 
-                align_command = "zcat " + file + " | " + hisat2
-                align_command = align_command + " p " + threads + " x " + index_location
-                align_command = align_command + " - 2>> align.log | "
-                align_command = align_command + samtools + " view -q 15 -F 260 -bS -@" 
-                align_command = align_command + str(threads) + "- | " + bedtools + " intersect -v -a 'stdin' -b "
-                align_command = align_command + blacklist + " -nonamecheck | " + samtools + " sort -@ "
-                align_command = align_command + str(threads) + " - > " + hisat2_output
+                
+                align_command = "zcat " + file + " | " + hisat2 + " -p " + str(threads) + " -x " + index_location + " - 2>> align.log | " + samtools + " view -q 15 -F 260 -bS -@ " + str(threads) + " - | " + bedtools + " intersect -v -a 'stdin' -b " + blacklist + " -nonamecheck | " + samtools + " sort -@ " + str(threads) + " - > " + hisat2_output
+                
+                
+                utils.write2log(work_dir, align_command, "HISAT2: ")
                 
                 subprocess.run(align_command,
                            shell = True)
 
 
     def alignPE(work_dir, hisat2, blacklist, index_location, threads):
-        file_list = glob.glob(os.path.join(work_dir, "trim","*1_val_1.fq.gz"))
+        file_list = glob.glob(os.path.join(work_dir, "trim_galore","*1_val_1.fq.gz"))
         
         print("Generating BAM files with HISAT2 (paired-end mode)")
         
@@ -341,7 +336,7 @@ def hisat2(script_dir, work_dir, threads, chip_seq_settings, genome):
                 align_command = hisat2 + " -p " + str(threads) + " -x " + index_location
                 align_command = align_command + " -1 " + read1 + " -2 " + read2
                 align_command = align_command + " 2>> align.log | " + samtools + " view -q 15 -F 260 -bS -@"
-                align_command = align_command + threads + "- | " + bedtools + " intersect -v -a 'stdin' -b "
+                align_command = align_command + threads + " - | " + bedtools + " intersect -v -a 'stdin' -b "
                 align_command = align_command + blacklist + " -nonamecheck | " + samtools + " sort -@ "
                 align_command = align_command + threads + " - > " + hisat2_output
                 
@@ -364,3 +359,4 @@ def hisat2(script_dir, work_dir, threads, chip_seq_settings, genome):
     
 def bwa():
     pass
+

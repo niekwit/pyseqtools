@@ -197,6 +197,11 @@ def main():
                              required = False, 
                              action = 'store_true',
                              help = "Generate metageneplots and heatmaps with ngs.plot")
+    parser_chip.add_argument("--skip-fastqc",
+                               required = False,
+                               action = 'store_true',
+                               default = False,
+                               help = "Skip FastQC/MultiQC")
 
     
     #create subparser for CUT&RUN analysis commands
@@ -343,8 +348,8 @@ def main():
         if align.lower() == "salmon":
             utils.trim(script_dir, threads, work_dir)
             salmon_index = rna_seq_settings["salmon_index"]["gencode-v35"]
-            gtf = settings["salmon_gtf"]["gencode-v35"]
-            fasta = settings["FASTA"]["gencode-v35"]
+            gtf = rna_seq_settings["salmon_gtf"]["gencode-v35"]
+            fasta = rna_seq_settings["FASTA"]["gencode-v35"]
             rnaseq_utils.salmon(salmon_index, 
                                 str(threads), 
                                 work_dir, 
@@ -380,13 +385,13 @@ def main():
         #Check md5sums
         utils.checkMd5(work_dir)
     
-        #Run FastQC/MultiQC
-        #file_extension = utils.get_extension(work_dir)
-        #skip_fastqc = args["skip_fastqc"]
-        #if not skip_fastqc:
-       #     utils.fastqc(script_dir, work_dir, threads, file_extension)
-        #else:
-       #     print("Skipping FastQC/MultiQC analysis")
+        ##Run FastQC/MultiQC
+        skip_fastqc = args["skip_fastqc"]
+        file_extension = utils.get_extension(work_dir)
+        if not skip_fastqc:
+            utils.fastqc(script_dir, work_dir,threads, file_extension)
+        else:
+            print("Skipping FastQC/MultiQC analysis")
             
         #create BAM files
         align = args["align"]
@@ -433,7 +438,7 @@ if __name__ == "__main__":
     import utils_general as utils
     import utils_rna_seq as rnaseq_utils
     import utils_chip_seq as chipseq_utils
-    import utils_cutrun as cutrun_utils
+    #import utils_cutrun as cutrun_utils
     
     #check if required Python packages are available
     checkPythonPackages()

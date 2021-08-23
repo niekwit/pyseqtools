@@ -95,9 +95,8 @@ def get_extension(work_dir):
         sys.exit("ERROR: no fastq files found")
     
     test_file=file_list[0]
-    extension_index=test_file.index(".",0)
-    file_extension=test_file[extension_index:]
-    return file_extension
+    file_extension = ".".join(test_file.rsplit(".",2)[-2:])
+    return(file_extension)
 
 
 def file_exists(file): #check if file exists/is not size zero
@@ -112,15 +111,16 @@ def file_exists(file): #check if file exists/is not size zero
 def checkSamtools(script_dir):
     #Check for samtools in $PATH
     path = os.environ["PATH"].lower()
-    
+        
     if "samtools" not in path:
+        
         #Check for samtools elsewhere
-        samtools = [line[0:] for line in subprocess.check_output("find $HOME -name samtools", 
-                                                               shell = True).splitlines()]
+        samtools = [line[0:] for line in subprocess.check_output("find $HOME -name samtools", shell = True).splitlines()]
         
         samtools_file = None
         for i in samtools:
             i = i.decode("utf-8")
+            
             if "bin/samtools" in i:
                 samtools_file = i
                 return(samtools_file)
@@ -167,12 +167,15 @@ def checkSamtools(script_dir):
             
             return(samtools_file)
 
+    else:
+        return("samtools")
+
 def checkBedtools(script_dir):
     path = os.environ["PATH"].lower()
     
     if "bedtools" not in path:
         #Check for bedtools elsewhere
-        bedtools = [line[0:] for line in subprocess.check_output("find $HOME -name bedtools", 
+        bedtools = [line[0:] for line in subprocess.check_output("find $HOME -name bedtools",
                                                                shell = True).splitlines()]
         
         try:
@@ -204,6 +207,8 @@ def checkBedtools(script_dir):
             os.chmod(bedtools, st.st_mode | stat.S_IEXEC)
             
             return(bedtools)
+    else:
+        return("bedtools")
     
 
 def checkBwa(script_dir):
@@ -222,7 +227,7 @@ def checkPicard(script_dir):
     
     if "picard" not in path:
         #Check for Picard elsewhere
-        picard = [line[0:] for line in subprocess.check_output("find $HOME -name picard.jar ! -path '*/multiqc*'", 
+        picard = [line[0:] for line in subprocess.check_output("find $HOME -name picard.jar", 
                                                                shell = True).splitlines()]
         try:
             picard = picard[0].decode("utf-8")
@@ -239,8 +244,8 @@ def checkPicard(script_dir):
             urllib.request.urlretrieve(url, download_file)
             picard = download_file
             return(picard)
+ 
             
-
 def deduplicationBam(script_dir, work_dir, threads):
     #check if Picard is installed
     picard = checkPicard(script_dir)
@@ -512,7 +517,8 @@ def trim(script_dir, threads, work_dir):
       
     def trimPE(work_dir, threads):
         print("Trimming paired-end fastq files")
-        fastq_list = glob.glob(os.path.join(work_dir,"raw-data","*R1_001.fastq.gz"))
+        extension = get_extension(work_dir)
+        fastq_list = glob.glob(os.path.join(work_dir,"raw-data","*R1_001." + extension))
         for read1 in fastq_list:
             out_dir = os.path.dirname(read1)
             out_dir = out_dir.replace("raw-data","trim")
@@ -531,14 +537,16 @@ def trim(script_dir, threads, work_dir):
                 
     def trimSE(work_dir, threads):
         print("Trimming single-end fastq files")
+        extension = get_extension(work_dir)
         fastq_list = glob.glob(os.path.join(work_dir,
                                             "raw-data",
-                                            "*.fastq.gz"))
+                                            "*." + extension))
         
         for file in fastq_list:
             out_file = os.path.join(work_dir,
                                     "trim_galore",
-                                    file.replace(".fastq.gz", "_trimmed.fq.gz"))
+                                    file.replace("." + extension, "_trimmed.fq.gz"))
+            out_file = out_file.replace("raw-data", "trim_galore")
             if not file_exists(out_file):
                 trim_galore_command = [trimgalore_file, "-j", threads, 
                                        "-o", "./trim_galore",                                                                                                                                                                                                                                                                                                
