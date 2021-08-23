@@ -198,7 +198,7 @@ def count(library,
         for file in tqdm(file_list, position = 0, leave = True):
             base_file = os.path.basename(file)
             out_file = os.path.join(work_dir,"count",base_file.replace(file_extension,
-                                                                ".guidecounts.txt"))
+                                                                "guidecounts.txt"))
             if not utils.file_exists(out_file):
                 tqdm.write("Aligning " + base_file)
                 print(base_file + ":", file = open("crispr.log", "a"))
