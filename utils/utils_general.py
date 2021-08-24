@@ -37,7 +37,7 @@ def checkMd5(work_dir):
                 hash_md5.update(chunk)
         return(hash_md5.hexdigest())
 
-    if not os.path.exists(os.path.join(work_dir, ".md5summscorrect")):
+    if not os.path.exists(os.path.join(work_dir, "md5sums_checked.csv")):
         if os.path.exists(md5sum_file):
             print("Checking MD5 checksums")
             df = pd.read_csv(md5sum_file)
@@ -53,7 +53,8 @@ def checkMd5(work_dir):
                 sys.exit(1)
             else:
                 print("MD5 checksums correct")
-                open(".md5summscorrect", 'a').close()
+                df.to_csv("md5sums_checked.csv", 
+                          index=False)
 
 
 def write2log(work_dir,command,name):
@@ -244,12 +245,14 @@ def checkPicard(script_dir):
             urllib.request.urlretrieve(url, download_file)
             picard = download_file
             return(picard)
+    else:
+        return("picard.jar")
  
             
 def deduplicationBam(script_dir, work_dir, threads):
     #check if Picard is installed
     picard = checkPicard(script_dir)
-    
+    print(picard)
     file_list = glob.glob(os.path.join(work_dir,
                                        "bam",
                                        "*-sort-bl.bam"))
@@ -263,7 +266,7 @@ def deduplicationBam(script_dir, work_dir, threads):
             log_name = os.path.join(work_dir,
                                     "bam",
                                     log_name)
-            picard_command = "java -jar " + picard + " MarkDuplicates INPUT=" + bam + " OUTPUT=" + dedup_output + " REMOVE_DUPLICATES=TRUE METRICS_FILE=picard_metrics.log"
+            picard_command = "java -jar " + picard + " MarkDuplicates INPUT=" + bam + " OUTPUT=" + dedup_output + " REMOVE_DUPLICATES=TRUE METRICS_FILE=" + log_name
             
             write2log(work_dir, picard_command, "Deduplication: ")
                 

@@ -57,7 +57,7 @@ def csv2fasta(csv,script_dir):
             yaml.dump(doc,f)
 
     #exit message
-    sys.exit("Fasta file created and added to library.yaml\nPlease provid more CRISPR library information in this file before first run.")
+    sys.exit("Fasta file created and added to library.yaml\nPlease provide more CRISPR library information in this file before first run.")
 
 
 def check_index(library, crispr_library, script_dir, work_dir):

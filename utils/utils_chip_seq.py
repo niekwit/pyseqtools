@@ -360,3 +360,41 @@ def hisat2(script_dir, work_dir, threads, chip_seq_settings, genome):
 def bwa():
     pass
 
+
+def ngsplot(work_dir, genome, feature, window):
+    
+    file_list = glob.glob(os.path.join(work_dir, "bam", "*.bam"))
+    
+    os.makedirs(os.path.join(work_dir, "ngsplot"),
+                exist_ok = True)
+    
+    
+    def ngsplotFunction(work_dir, genome, feature, window, extension):
+        base_name = os.path.basename(bam).replace(extension, "")
+        ngsplot_dir = os.path.join(os.path.dirname(bam).replace("bam",""), "ngsplot" , base_name)
+        os.makedirs(ngsplot_dir,
+            exist_ok = True)
+        ngsplot_output = os.path.join(ngsplot_dir, base_name) + "_" + feature
+        
+        ngsplot = "ngs.plot.r -G " + genome + " -R " + feature + " -C " + bam + " -O " + ngsplot_output + "_"+ feature + " -T " + base_name + " -L " + window
+
+        subprocess.run(ngsplot,
+                       shell = True)
+        
+    
+    for bam in file_list:
+        if "-sort-bl-dedupl.bam" in bam:
+            ngsplotFunction(work_dir, genome, feature, window, "-sort-bl-dedupl.bam")
+            
+        elif "-sort-bl.bam" in bam:
+            ngsplotFunction(work_dir, genome, feature, window, "-sort-bl.bam")
+     
+    
+    
+    url= "https://drive.google.com/file/d/0B5ldivL0Hd2JN05MOEFuZ0FRQTA/view?usp=sharing&resourcekey=0-Y6Sq22xOYTAb9Yng8ZlmJg"
+    
+    
+    
+    
+    
+    
