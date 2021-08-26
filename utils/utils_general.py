@@ -328,6 +328,21 @@ def deduplicationBam(script_dir, work_dir, threads):
     plt.savefig(save_file)
     
 
+def indexBam(work_dir, threads):
+    print("Indexing BAM files")
+    file_list = glob.glob(os.path.join(work_dir,
+                                       "bam",
+                                       "*.bam"))
+    
+    #index bam files
+    #also check if bam files have been indexed
+    index_file_list = [bam + ".bai" for bam in file_list]
+    
+    for bai, bam in zip(index_file_list, file_list):
+        if not file_exists(bai):
+            pysam.index("-@", str(threads), bam)
+
+
 def createBigWig(work_dir, threads):
     #creates BigWig files for all existing BAM files
     print("Generating BigWig files")
@@ -339,17 +354,7 @@ def createBigWig(work_dir, threads):
                                        "bam",
                                        "*.bam"))
     
-    #index bam files
-    #first check if bam files have been indexed
-    index_file_list = [bam + ".bai" for bam in file_list]
-    
-    for bai, bam in zip(index_file_list, file_list):
-        if not file_exists(bai):
-            pysam.index("-@", str(threads), bam)
-    
-    
-    
-    
+           
     #create BigWigs with deeptools
     for bam in file_list:
         if "-sort-bl.bam" in bam:

@@ -394,7 +394,18 @@ def ngsplot(work_dir, genome, feature, window):
     url= "https://drive.google.com/file/d/0B5ldivL0Hd2JN05MOEFuZ0FRQTA/view?usp=sharing&resourcekey=0-Y6Sq22xOYTAb9Yng8ZlmJg"
     
     
+def peak(work_dir, threads, genome):
     
+    if "hg" in genome:
+        genome_size = "2.7e9"
+    elif "mm" in genome:
+        genome_size = "1.87e9"
+    elif "ce" in genome:
+        genome_size = "1.87e9"
+    elif "ce" in genome:
+        genome_size = "9e7"
+    elif "dm" in genome:
+        genome_size = "1.2e8"
     
     
     
