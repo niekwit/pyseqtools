@@ -303,9 +303,9 @@ def main():
                 
             elif analysis == "bagel2":
                 print("Running BAGEL2")
-                crispr_utils.remove_duplicates(work_dir)
                 crispr_utils.convert4bagel(work_dir, crispr_settings, crispr_library)
-                crispr_utils.bagel2(work_dir, script_dir, fdr)
+                crispr_utils.remove_duplicates(work_dir)
+                crispr_utils.bagel2(work_dir, script_dir, fdr, crispr_settings, crispr_library)
         
         #run essential gene list comparison
         essential_genes = args["essential_genes"]
@@ -400,8 +400,9 @@ def main():
             utils.trim(script_dir, threads, work_dir)
             genome = args["genome"]
             chipseq_utils.hisat2(script_dir, work_dir, threads, chip_seq_settings, genome)
+            utils.indexBam(work_dir, threads)
         elif align.lower() == "bwa":
-            rnaseq_utils.trim(threads, work_dir)
+            utils.trim(threads, work_dir)
             
         dedup = args["deduplication"]
         if dedup == True:

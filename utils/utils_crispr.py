@@ -294,41 +294,41 @@ def plot_alignment_rate(work_dir):
 
 
 def plot_coverage(work_dir,library,crispr_library): #plots coverage per sample after alignment
-    plot_file=os.path.join(work_dir,"count","coverage.pdf")
+    plot_file = os.path.join(work_dir,"count","coverage.pdf")
     if not utils.file_exists(plot_file):
         #get number of sgRNAs in CRISPR library
-        fasta=library[crispr_library]["fasta"]
-        fasta=pd.read_table(fasta, header=None)
-        lib_size=len(fasta) / 2
+        fasta = library[crispr_library]["fasta"]
+        fasta = pd.read_table(fasta, header = None)
+        lib_size = len(fasta) / 2
 
-        #extract number of single mapped aligned reads from crispr.log
-        open(os.path.join(work_dir,"files.txt"),"w").writelines([ line for line in open(os.path.join(work_dir,"crispr.log")) if ".gz:" in line ])
-        open(os.path.join(work_dir,"read-count.txt"),"w").writelines([ line for line in open(os.path.join(work_dir,"crispr.log")) if "aligned exactly 1 time" in line ])
-
-        line_number=len(open(os.path.join(work_dir,"files.txt")).readlines())
-        df=pd.DataFrame(columns=["sample","coverage"],index=np.arange(line_number))
-
-        counter=0
-        for line in open(os.path.join(work_dir,"files.txt")):
-            line=line.replace(":","")
-            line=line.replace("\n","")
-            df.iloc[counter,0]=line
-            counter+=1
-
-        counter=0
-        for line in open(os.path.join(work_dir,"read-count.txt")):
-            line=line.split("(")[0]
-            line=line.replace(" ","")
-            line=int(line)
-            df.iloc[counter,1]=line
-            counter+=1
-
-        #calculate coverage per sample
-        df["coverage"]=df["coverage"] / lib_size
-
-        os.remove(os.path.join(work_dir,"files.txt"))
-        os.remove(os.path.join(work_dir,"read-count.txt"))
-
+        #extract number of single mapped aligned reads from counts-aggregated.tsv
+        df = pd.read_table(os.path.join(work_dir,"count","counts-aggregated.tsv")
+                           , sep = "\t")
+        
+        column_names = list(df.columns)
+        del column_names[0:2] #delete sgRNA and gene columns
+        
+        counts = {}
+        
+        for i in column_names:
+            count_sum = []
+            count_sum.append(df[i].sum())
+            counts[i] = count_sum
+        
+        #convert counts to sequence coverage
+        df = pd.DataFrame(counts)
+        df = df / lib_size
+        
+        #order columns alphabetically
+        df = df.reindex(sorted(df.columns), axis=1)
+        
+        #transpose data frame
+        df = df.transpose()
+        
+        names = ["coverage", "samples"]
+        df.columns = names
+        df = df[["samples","coverage"]]
+        
         #plot coverage per sample
         plot(df,"Fold sequence coverage per sample",plot_file)
 
@@ -456,7 +456,12 @@ def mageck(work_dir,script_dir,cnv,fdr):
                 exist_ok = True)
 
     #load MAGeCK comparisons and run MAGeCK
-    df = pd.read_csv(os.path.join(work_dir,"stats.config"),sep=";")
+    try:
+        df = pd.read_csv(os.path.join(work_dir,"stats.config"), 
+                         sep = ";")
+    except pd.errors.ParserError:
+        print("ERROR: multiple semi-colons per line detected in stats.config")
+        return(None)
     sample_number = len(df)
     sample_range = range(sample_number)
 
@@ -553,12 +558,6 @@ def mageck(work_dir,script_dir,cnv,fdr):
                 sys.exit("ERROR: plotting hits failed, check log")
 
 
-def remove_duplicates(work_dir):
-    df=pd.read_table(os.path.join(work_dir,"count","counts-aggregated.tsv"))
-    df.drop_duplicates(subset="sgRNA", keep="first", inplace=True)
-    df.to_csv(os.path.join(work_dir,"count","counts-aggregated.tsv"),index=False,header=True,sep="\t")
-
-
 def convert4bagel(work_dir,library,crispr_library): #convert MAGeCK formatted count table to BAGEL2 format
     count_table_bagel2=os.path.join(work_dir,"bagel",'counts-aggregated-bagel2.tsv')
 
@@ -611,7 +610,18 @@ def convert4bagel(work_dir,library,crispr_library): #convert MAGeCK formatted co
         df_merge.to_csv(count_table_bagel2, sep='\t',index=False)
 
 
-def bagel2(work_dir, script_dir, fdr):
+def remove_duplicates(work_dir):
+    df = pd.read_table(os.path.join(work_dir,"bagel","counts-aggregated-bagel2.tsv"))
+    df.drop_duplicates(subset = "SEQUENCE", 
+                       keep = "first", 
+                       inplace = True)
+    df.to_csv(os.path.join(work_dir, "bagel","counts-aggregated-bagel2.tsv"),
+              index = False,
+              header = True,
+              sep = "\t")
+
+
+def bagel2(work_dir, script_dir, fdr, crispr_settings, crispr_library):
     
     #Check for BAGEL2:
     bagel2 = [line[0:] for line in subprocess.check_output("find $HOME -name BAGEL.py", 
@@ -652,9 +662,15 @@ def bagel2(work_dir, script_dir, fdr):
                                'counts-aggregated-bagel2.tsv')
 
     #reference genes files for Bayes Factor calculation
-    essential_genes = os.path.join(bagel2_dir,"CEGv2.txt")
-    nonessential_genes = os.path.join(bagel2_dir,"NEGv1.txt")
-
+    species = crispr_settings[crispr_library]["species"]
+    
+    if species.lower() == "human": 
+        essential_genes = os.path.join(bagel2_dir,"CEGv2.txt")
+        nonessential_genes = os.path.join(bagel2_dir,"NEGv1.txt")
+    elif species.lower() == "mouse":
+        essential_genes = os.path.join(bagel2_dir,"CEG_mouse.txt")
+        nonessential_genes = os.path.join(bagel2_dir,"NEG_mouse.txt")
+        
     #load stats.config for sample comparisons
     df = pd.read_csv(os.path.join(work_dir,"stats.config"),
                    sep=";")
@@ -1035,7 +1051,7 @@ def essentialGenes(work_dir,analysis,essential_genes,fdr):
     plots a Venn diagram and returns a list of genes that contains overlapping
     and non-overlapping genes.
     '''
-    essential_genes={line.strip() for line in open(essential_genes)}
+    essential_genes = {line.strip() for line in open(essential_genes)}
 
 
     def plotVenn(test_genes_only,essential_genes_only,overlapping_genes,title,out_file):
@@ -1137,7 +1153,7 @@ def goPython(work_dir,fdr,library,crispr_library,analysis,gene_sets):
 
     if analysis == "mageck":
         #get list og MAGeCK gene summary file_exists
-        file_list=glob.glob(os.path.join(work_dir,
+        file_list = glob.glob(os.path.join(work_dir,
                                 "mageck*",
                                 "*",
                                 "*gene_summary.txt"))
@@ -1148,19 +1164,19 @@ def goPython(work_dir,fdr,library,crispr_library,analysis,gene_sets):
         input_list=[["neg|fdr","depletion"],["pos|fdr","enrichment"]]
         def enrichrMAGeCK(file_list,fdr,i):
             for file in file_list:
-                prefix=os.path.basename(os.path.normpath(file))
-                prefix=prefix.replace(".gene_summary.txt","")
+                prefix = os.path.basename(os.path.normpath(file))
+                prefix = prefix.replace(".gene_summary.txt","")
                 print("Performing gene set enrichment analysis with enrichR for "+prefix+": "+i[1])
                 for set in gene_sets:
-                    save_path=os.path.dirname(file)
-                    df=pd.read_table(file)
-                    df_fdr=df[(df[i[0]] < fdr)]
-                    geneList=df_fdr["id"].to_list()
-                    enrichr_results=gp.enrichr(gene_list=geneList,
-                        gene_sets=set,
-                        organism=species,
-                        no_plot=False,
-                        outdir=os.path.join(save_path,"enrichR",i[1]))
+                    save_path = os.path.dirname(file)
+                    df = pd.read_table(file)
+                    df_fdr = df[(df[i[0]] < fdr)]
+                    geneList = df_fdr["id"].to_list()
+                    enrichr_results = gp.enrichr(gene_list=geneList,
+                        gene_sets = set,
+                        organism = species,
+                        no_plot = False,
+                        outdir = os.path.join(save_path,"enrichR",i[1]))
 
         for i in input_list:
             enrichrMAGeCK(file_list,fdr,i)
