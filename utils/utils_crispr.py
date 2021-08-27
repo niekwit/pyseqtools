@@ -18,7 +18,7 @@ from tqdm.auto import tqdm
 import gseapy as gp
 
 script_dir = os.path.abspath(os.path.dirname(__file__))
-sys.path.append(script_dir)
+sys.path.append(os.path.join(script_dir,"utils"))
 import utils_general as utils
 
 
@@ -324,6 +324,8 @@ def plot_coverage(work_dir,library,crispr_library): #plots coverage per sample a
         
         #transpose data frame
         df = df.transpose()
+        
+        df["samples"] = df.index
         
         names = ["coverage", "samples"]
         df.columns = names
@@ -676,92 +678,196 @@ def bagel2(work_dir, script_dir, fdr, crispr_settings, crispr_library):
                    sep=";")
 
     #remove rows with multiple samples (for MAGeCK) per condition (temp fix)
-    df = df[~df["t"].str.contains(",")]
-    df = df[~df["c"].str.contains(",")]
-    df = df.reset_index()
+    #df = df[~df["t"].str.contains(",")]
+    #df = df[~df["c"].str.contains(",")]
+    #df = df.reset_index()
 
     sample_number = len(df)
     sample_range = range(sample_number)
 
     #run BAGEL2 for each comparison in stats.config
     for i in sample_range:
+        
         test_sample = df.loc[i]["t"]
         control_sample = df.loc[i]["c"]
-        bagel2_output = test_sample+"_vs_"+control_sample
-        bagel2_output_base = os.path.join(work_dir,"bagel",bagel2_output,bagel2_output)
-        control_sample_column=column_dict[control_sample]
-
-        if not utils.file_exists(os.path.join(work_dir,
-                                              "bagel",
-                                              bagel2_output)):
-            os.makedirs(os.path.join(work_dir,
-                                     "bagel",
-                                     bagel2_output),
-                        exist_ok=True)
-
-        print("Generatig fold change table for " + bagel2_output)
-        fc_file = os.path.join(bagel2_output_base + ".foldchange")
-        if not utils.file_exists(fc_file):
-            bagel2fc_command = "python3 " + bagel2_exe +" fc" +" -i " + \
-                                count_table + " -o "+bagel2_output_base + \
-                                " -c " + str(control_sample_column)
-            utils.write2log(work_dir,bagel2fc_command,"BAGEL2 fc: ")
-            try:
-                subprocess.run(bagel2fc_command, shell=True)
-            except:
-                sys.exit("ERROR: generation of BAGEL2 fc file failed, check log")
-
-        print("Calculating Bayes Factors for "+bagel2_output)
-        bf_file = os.path.join(bagel2_output_base+".bf")
-        if not utils.file_exists(bf_file):
-            #get sample names from BAGEL2 foldchange table
-            header2 = subprocess.check_output(["head", "-1",os.path.join(bagel2_output_base+".foldchange")])
-            header2 = header2.decode("utf-8")
-            header2 = header2.replace("\n","")
-            header2 = list(header2.split("\t"))# convert string into list
-
-            #create dictionary that holds column name (key) and column index
-            column_dict2 = {key: i for i, key in enumerate(header2)}
-            column_dict2 = {key: column_dict2[key] - 1 for key in column_dict2} #first sample column should have value 1
-            test_sample_column2 = column_dict2[test_sample]
-
-            bagel2bf_command = "python3 " + bagel2_exe+" bf" + " -i " + fc_file + \
-                            " -o " + bf_file + " -e " + essential_genes + " -n " + \
-                            nonessential_genes + " -c " + str(test_sample_column2)
-            utils.write2log(work_dir, bagel2bf_command, "BAGEL2 bf: ")
-            try:
-                subprocess.run(bagel2bf_command, 
-                               shell = True)
-            except:
-                sys.exit("ERROR: Calculation of Bayes Factors failed, check log")
-
-        print("Calculating precision-recall for "+bagel2_output)
-        pr_file = os.path.join(bagel2_output_base + ".pr")
-        if not utils.file_exists(pr_file):
-            bagel2pr_command = "python3 " + bagel2_exe + " pr" + " -i " + bf_file + \
-                            " -o " + pr_file + " -e " + essential_genes+" -n "+ \
-                            nonessential_genes
-            utils.write2log(work_dir, bagel2pr_command, "BAGEL2 pr: ")
-            try:
-                subprocess.run(bagel2pr_command, 
-                               shell = True)
-            except:
-                sys.exit("ERROR: Calculation of precision-recall failed, check log")
-
-        print("Plotting BAGEL2 results for " + bagel2_output)
-        plot_file=  os.path.join(work_dir,"bagel", bagel2_output, "PR-" + bagel2_output + ".pdf")
-        if not utils.file_exists(plot_file):
-            plot_script = os.path.join(script_dir,
-                                       "R",
-                                       "crispr-plot-hits.R")
-            plot_command = "Rscript "+plot_script + " " + work_dir + " " + pr_file + \
-                        " bagel2 " + os.path.join(work_dir, "bagel", bagel2_output)+ \
-                        " " + bagel2_output
-            utils.write2log(work_dir, plot_command, "BAGEL2 plot: ")
-            try:
-                subprocess.run(plot_command, shell=True)
-            except:
-                sys.exit("ERROR: Calculation of precision-recall failed, check log")
+        
+        #generate fold change table
+        if "," not in test_sample and "," not in control_sample: #check for replicate comparisons
+            bagel2_output = test_sample+"_vs_"+control_sample
+            bagel2_output_base = os.path.join(work_dir,"bagel",bagel2_output,bagel2_output)
+            control_sample_column = column_dict[control_sample]
+    
+            if not utils.file_exists(os.path.join(work_dir,
+                                                  "bagel",
+                                                  bagel2_output)):
+                os.makedirs(os.path.join(work_dir,
+                                         "bagel",
+                                         bagel2_output),
+                            exist_ok = True)
+    
+            print("Generatig fold change table for " + bagel2_output)
+            fc_file = os.path.join(bagel2_output_base + ".foldchange")
+            if not utils.file_exists(fc_file):
+                bagel2fc_command = "python3 " + bagel2_exe +" fc" +" -i " + \
+                                    count_table + " -o "+bagel2_output_base + \
+                                    " -c " + str(control_sample_column)
+                utils.write2log(work_dir,bagel2fc_command,"BAGEL2 fc: ")
+                try:
+                    subprocess.run(bagel2fc_command, shell = True)
+                except:
+                    sys.exit("ERROR: generation of BAGEL2 fc file failed, check log")
+        
+            #calculate Bayes factors
+            print("Calculating Bayes Factors for "+bagel2_output)
+            bf_file = os.path.join(bagel2_output_base+".bf")
+            if not utils.file_exists(bf_file):
+                #get sample names from BAGEL2 foldchange table
+                header2 = subprocess.check_output(["head", "-1",os.path.join(bagel2_output_base+".foldchange")])
+                header2 = header2.decode("utf-8")
+                header2 = header2.replace("\n","")
+                header2 = list(header2.split("\t"))# convert string into list
+    
+                #create dictionary that holds column name (key) and column index
+                column_dict2 = {key: i for i, key in enumerate(header2)}
+                column_dict2 = {key: column_dict2[key] - 1 for key in column_dict2} #first sample column should have value 1
+                test_sample_column2 = column_dict2[test_sample]
+    
+                bagel2bf_command = "python3 " + bagel2_exe+" bf" + " -i " + fc_file + \
+                                " -o " + bf_file + " -e " + essential_genes + " -n " + \
+                                nonessential_genes + " -c " + str(test_sample_column2)
+                utils.write2log(work_dir, bagel2bf_command, "BAGEL2 bf: ")
+                try:
+                    subprocess.run(bagel2bf_command, 
+                                   shell = True)
+                except:
+                    sys.exit("ERROR: Calculation of Bayes Factors failed, check log")
+            
+            #calculate precision-recall
+            print("Calculating precision-recall for " + bagel2_output)
+            pr_file = os.path.join(bagel2_output_base + ".pr")
+            if not utils.file_exists(pr_file):
+                bagel2pr_command = "python3 " + bagel2_exe + " pr" + " -i " + bf_file + \
+                                " -o " + pr_file + " -e " + essential_genes +" -n " + \
+                                nonessential_genes
+                utils.write2log(work_dir, bagel2pr_command, "BAGEL2 pr: ")
+                try:
+                    subprocess.run(bagel2pr_command, 
+                                   shell = True)
+                except:
+                    sys.exit("ERROR: Calculation of precision-recall failed, check log")
+        
+            #plot results                    
+            print("Plotting BAGEL2 results for " + bagel2_output)
+            plot_file =  os.path.join(work_dir,"bagel", bagel2_output, "PR-" + bagel2_output + ".pdf")
+            if not utils.file_exists(plot_file):
+                plot_script = os.path.join(script_dir,
+                                           "R",
+                                           "crispr-plot-hits.R")
+                plot_command = "Rscript "+plot_script + " " + work_dir + " " + pr_file + \
+                            " bagel2 " + os.path.join(work_dir, "bagel", bagel2_output)+ \
+                            " " + bagel2_output
+                utils.write2log(work_dir, plot_command, "BAGEL2 plot: ")
+                try:
+                    subprocess.run(plot_command, shell=True)
+                except:
+                    sys.exit("ERROR: Calculation of precision-recall failed, check log")
+                
+        else: # perform BAGEL2 with replicates
+            test_samples = test_sample.split(",")
+            control_samples = control_sample.split(",")
+            
+            bagel2_output = test_sample+"_vs_"+control_sample
+            bagel2_output_base = os.path.join(work_dir,"bagel",bagel2_output,bagel2_output)
+            
+            control_sample_columns = []
+            for i in control_samples:
+                control_sample_column = column_dict[i]
+                control_sample_columns.append(str(control_sample_column))
+            
+            control_sample_columns = ",".join(control_sample_columns)
+                
+            if not utils.file_exists(os.path.join(work_dir,
+                                                  "bagel",
+                                                  bagel2_output)):
+                os.makedirs(os.path.join(work_dir,
+                                         "bagel",
+                                         bagel2_output),
+                            exist_ok = True)
+                
+            print("Generatig fold change table for " + bagel2_output)
+            fc_file = os.path.join(bagel2_output_base + ".foldchange")
+            if not utils.file_exists(fc_file):
+                bagel2fc_command = "python3 " + bagel2_exe +" fc" +" -i " + \
+                                    count_table + " -o "+bagel2_output_base + \
+                                    " -c " + str(control_sample_columns)
+                utils.write2log(work_dir,bagel2fc_command,"BAGEL2 fc: ")
+                try:
+                    subprocess.run(bagel2fc_command, shell = True)
+                except:
+                    sys.exit("ERROR: generation of BAGEL2 fc file failed, check log")
+            
+            #calculate Bayes factors
+            print("Calculating Bayes Factors for "+bagel2_output)
+            bf_file = os.path.join(bagel2_output_base+".bf")
+            if not utils.file_exists(bf_file):
+                #get sample names from BAGEL2 foldchange table
+                header2 = subprocess.check_output(["head", "-1",os.path.join(bagel2_output_base+".foldchange")])
+                header2 = header2.decode("utf-8")
+                header2 = header2.replace("\n","")
+                header2 = list(header2.split("\t"))# convert string into list
+    
+                #create dictionary that holds column name (key) and column index
+                column_dict2 = {key: i for i, key in enumerate(header2)}
+                column_dict2 = {key: column_dict2[key] - 1 for key in column_dict2} #first sample column should have value 1
+                
+                #get column numbers of test samples
+                test_sample_columns = []
+                for i in test_samples:
+                    test_sample_column = column_dict[i]
+                    test_sample_columns.append(str(test_sample_column))
+                
+                test_sample_columns = ",".join(test_sample_columns)
+                
+                #perform Bayes factor calculation
+                bagel2bf_command = "python3 " + bagel2_exe+" bf" + " -i " + fc_file + \
+                                " -o " + bf_file + " -e " + essential_genes + " -n " + \
+                                nonessential_genes + " -c " + test_sample_columns
+                utils.write2log(work_dir, bagel2bf_command, "BAGEL2 bf: ")
+                try:
+                    subprocess.run(bagel2bf_command, 
+                                   shell = True)
+                except:
+                    sys.exit("ERROR: Calculation of Bayes Factors failed, check log")
+            
+            #calculate precision-recall
+            print("Calculating precision-recall for " + bagel2_output)
+            pr_file = os.path.join(bagel2_output_base + ".pr")
+            if not utils.file_exists(pr_file):
+                bagel2pr_command = "python3 " + bagel2_exe + " pr" + " -i " + bf_file + \
+                                " -o " + pr_file + " -e " + essential_genes +" -n " + \
+                                nonessential_genes
+                utils.write2log(work_dir, bagel2pr_command, "BAGEL2 pr: ")
+                try:
+                    subprocess.run(bagel2pr_command, 
+                                   shell = True)
+                except:
+                    sys.exit("ERROR: Calculation of precision-recall failed, check log")
+            
+            #plot results                    
+            print("Plotting BAGEL2 results for " + bagel2_output)
+            plot_file =  os.path.join(work_dir,"bagel", bagel2_output, "PR-" + bagel2_output + ".pdf")
+            if not utils.file_exists(plot_file):
+                plot_script = os.path.join(script_dir,
+                                           "R",
+                                           "crispr-plot-hits.R")
+                plot_command = "Rscript "+plot_script + " " + work_dir + " " + pr_file + \
+                            " bagel2 " + os.path.join(work_dir, "bagel", bagel2_output)+ \
+                            " " + bagel2_output
+                utils.write2log(work_dir, plot_command, "BAGEL2 plot: ")
+                try:
+                    subprocess.run(plot_command, shell=True)
+                except:
+                    sys.exit("ERROR: Calculation of precision-recall failed, check log")
 
     def histogramBF(df,out_file):
         sns.set_style("white")
@@ -782,10 +888,10 @@ def bagel2(work_dir, script_dir, fdr, crispr_settings, crispr_library):
 
     for file in file_list:
         #plot histogram BF
-        out_file=os.path.join(os.path.dirname(file),"histogram-BF.pdf")
+        out_file = os.path.join(os.path.dirname(file), "histogram-BF.pdf")
         if not utils.file_exists(out_file):
-            df=pd.read_table(file)
-            histogramBF(df,out_file)
+            df = pd.read_table(file)
+            histogramBF(df, out_file)
 
 
 def lib_analysis(work_dir,library,crispr_library,script_dir):
