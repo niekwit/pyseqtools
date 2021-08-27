@@ -13,12 +13,10 @@ import stat
 from  builtins import any as b_any
 import tarfile
 
-import yaml
-import numpy as np
+
 import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
-from tqdm.auto import tqdm
 import pysam
 
 

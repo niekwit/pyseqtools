@@ -306,9 +306,9 @@ def hisat2(script_dir, work_dir, threads, chip_seq_settings, genome):
                 
                 align_command = "zcat " + file + " | " + hisat2 + " -p " + str(threads) + " -x " + index_location + " - 2>> align.log | " + samtools + " view -q 15 -F 260 -bS -@ " + str(threads) + " - | " + bedtools + " intersect -v -a 'stdin' -b " + blacklist + " -nonamecheck | " + samtools + " sort -@ " + str(threads) + " - > " + hisat2_output
                 
-                
                 utils.write2log(work_dir, align_command, "HISAT2: ")
                 
+                print(os.path.basename(file) + ":", file = open("align.log", "a"))
                 subprocess.run(align_command,
                            shell = True)
 

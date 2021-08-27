@@ -2,6 +2,7 @@
 
 import os
 import sys
+import subprocess
 import argparse
 import multiprocessing
 import timeit
@@ -157,7 +158,8 @@ def main():
     
     parser_chip.add_argument("-t", "--threads",
                              required = False,
-                             default = 1,
+                             default = "1",
+                             type = str,
                              help = "<INT> number of CPU threads to use (default is 1). Use max to apply all available CPU threads")
     parser_chip.add_argument("-r", "--rename", 
                              required = False, 
@@ -177,7 +179,7 @@ def main():
                              required = False, 
                              action = 'store_true',
                              help = "Perform deduplication of BAM files")
-    parser_chip.add_argument("-s", "--downsample", 
+    parser_chip.add_argument("--downsample", 
                              required = False, 
                              action = 'store_true',
                              help = "Perform downsampling of BAM files")
@@ -185,17 +187,20 @@ def main():
                              required = False,
                              action = 'store_true',
                              help = "Create BigWig files")
-    parser_chip.add_argument("-q", "--qc", 
+    parser_chip.add_argument("--qc", 
                              required = False, 
                              action = 'store_true',
                              help = "Perform QC analysis of BAM files")
     parser_chip.add_argument("-p", "--peaks", 
                              required = False, 
-                             action = 'store_true',
-                             help = "Call and annotate peaks")
+                             const = "0.05",
+                             nargs = "?",
+                             metavar = "q value",
+                             type = str,
+                             help = "Call and annotate peaks. \nDefault q value for MACS2 is 0.05")
     parser_chip.add_argument("-n", "--ngsplot", 
                              required = False, 
-                             action = 'store_true',
+                             action = 'store_true', 
                              help = "Generate metageneplots and heatmaps with ngs.plot")
     parser_chip.add_argument("--skip-fastqc",
                                required = False,
