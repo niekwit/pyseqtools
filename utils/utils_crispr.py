@@ -356,8 +356,7 @@ def join_counts(work_dir,library,crispr_library):
 
     for file in file_list:
        sed_command = sed + file 
-       subprocess.run(sed_command,
-                       shell = True)
+       subprocess.run(sed_command, shell = True)
        #add counts to counts dict
        df = pd.read_csv(file,
                         sep=" ",
@@ -369,11 +368,14 @@ def join_counts(work_dir,library,crispr_library):
        
     #prepare data frame for left join
     fasta = library[crispr_library]["fasta"]
-    guide_names = fasta.replace(".fasta",
-                                "-guide_names.csv")
-    df = pd.read_csv(guide_names,
-                     header = None)
+
+    df = pd.read_csv(fasta, header = None)
     df.columns = ["sgRNA"]
+    
+    df = df[df["sgRNA"].str.contains(">")]
+    df = df.reset_index(drop = True)
+    df["sgRNA"] = df["sgRNA"].str.replace(">", "")
+    
     df["gene"] = df["sgRNA"].str.split(pat = "_",
                                        n = 1,
                                        expand = True)[0]
@@ -408,8 +410,7 @@ def mageck(work_dir,script_dir,cnv,fdr):
     
     #Check for MAGeCK
     try:
-        subprocess.check_output("which mageck", 
-                                         shell = True)
+        subprocess.check_output("which mageck", shell = True)
     except CalledProcessError:
         print("WARNING: MAGeCK was not found\nInstalling MAGeCK now")
         
@@ -418,19 +419,16 @@ def mageck(work_dir,script_dir,cnv,fdr):
         urllib.request.urlretrieve(url, download_file)
         #unpack MAGeCK file
         tar_command = "tar -xzf " + download_file
-        subprocess.run(tar_command,
-                       shell = True)
+        subprocess.run(tar_command, shell = True)
         os.chdir(os.path.join(script_dir, "mageck-0.5.9.4"))
         mageck_install_command = "python3 " + os.path.join(script_dir ,
                                                            "mageck-0.5.9.4", 
                                                            "setup.py" + " install --user")
-        subprocess.run(mageck_install_command,
-                       shell = True)
+        subprocess.run(mageck_install_command, shell = True)
                 
         #remove download file and folder
         os.remove(download_file)
-        shutil.rmtree(os.path.join(script_dir, 
-                                   "mageck-0.5.9.4"))
+        shutil.rmtree(os.path.join(script_dir, "mageck-0.5.9.4"))
     
         
     if fdr > 0.25:
@@ -1151,7 +1149,7 @@ def gcBias(work_dir,library,crispr_library):
             plt.close()
 
 
-def essentialGenes(work_dir,analysis,essential_genes,fdr):
+def essentialGenes(work_dir, analysis, essential_genes, fdr):
     '''
     Determines overlap with core essential genes from MAGeCK/BAGEL2gene lists,
     plots a Venn diagram and returns a list of genes that contains overlapping
