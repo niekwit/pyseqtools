@@ -276,9 +276,6 @@ def main():
         #plot alignment rates
         crispr_utils.plot_alignment_rate(work_dir)
     
-        #plot sample coverage (read count / library size)
-        crispr_utils.plot_coverage(work_dir, crispr_settings, crispr_library)
-    
         #join count files
         if not utils.file_exists(os.path.join(work_dir,
                                     "count",
@@ -289,6 +286,9 @@ def main():
                                     "count",
                                     "counts-aggregated-normalised.csv")):
             crispr_utils.normalise(work_dir)
+    
+        #plot sample coverage (read count / library size)
+        crispr_utils.plot_coverage(work_dir, crispr_settings, crispr_library)    
     
         ##run library analysis
         crispr_utils.lib_analysis(work_dir, crispr_settings, crispr_library, script_dir)
@@ -445,6 +445,9 @@ if __name__ == "__main__":
     import utils_rna_seq as rnaseq_utils
     import utils_chip_seq as chipseq_utils
     #import utils_cutrun as cutrun_utils
+    
+    #log all command line arguments to commands.log
+    utils.logCommandLineArgs(work_dir)
     
     #check if required Python packages are available
     checkPythonPackages()

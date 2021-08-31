@@ -55,6 +55,15 @@ def checkMd5(work_dir):
                           index=False)
 
 
+def logCommandLineArgs(work_dir):
+    args = sys.argv
+    args = " ".join(args)
+        
+    if "-h" not in args:
+            if "--help" not in args:
+                print("Command line arguments: " + args, 
+                      file = open(os.path.join(work_dir,"commands.log"), "a"))
+
 def write2log(work_dir,command,name):
     with open(os.path.join(work_dir,"commands.log"), "a") as file:
         file.write(name)
@@ -431,18 +440,18 @@ def fastqc(script_dir, work_dir, threads, file_extension):
         
     #run fastqc/multiqc 
     if not os.path.isdir(os.path.join(work_dir,"fastqc")) or len(os.listdir(os.path.join(work_dir,"fastqc"))) == 0:
-        os.makedirs(os.path.join(work_dir,"fastqc"),exist_ok=True)
+        os.makedirs(os.path.join(work_dir,"fastqc"),exist_ok = True)
         fastqc_command = fastqc_file + " --threads " + str(threads) + " --quiet -o fastqc/ raw-data/*" + file_extension
         multiqc_command = ["multiqc","-o","fastqc/","fastqc/"]
         #log commands
-        with open(os.path.join(work_dir,"commands.log"),"w") as file:
+        with open(os.path.join(work_dir,"commands.log"),"a") as file:
             file.write("FastQC: ")
             print(fastqc_command, file=file)
             file.write("MultiQC: ")
             print(*multiqc_command, sep=" ", file=file)
         try:
             print("Running FastQC on fastq files")
-            subprocess.run(fastqc_command, shell=True)
+            subprocess.run(fastqc_command, shell = True)
         except:
             sys.exit("ERROR: FastQC failed, check logs")
         print("Running MultiQC")
