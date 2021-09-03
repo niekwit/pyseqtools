@@ -121,10 +121,6 @@ def main():
                                required = False,
                                choices = rna_seq_genomeList,
                                help = "Reference genome")
-    parser_rnaseq.add_argument("-s", "--species",
-                               required = True,
-                               choices = ["mouse","human"],
-                               help = "Set species.")
     parser_rnaseq.add_argument("-a", "--align",
                                required = False,
                                choices = ["salmon","hisat2"],
@@ -198,7 +194,7 @@ def main():
                              metavar = "q value",
                              type = str,
                              help = "Call and annotate peaks. \nDefault q value for MACS2 is 0.05")
-    parser_chip.add_argument("-n", "--ngsplot", 
+    parser_chip.add_argument("--metagene", 
                              required = False, 
                              action = 'store_true', 
                              help = "Generate metageneplots and heatmaps with ngs.plot")
@@ -345,7 +341,12 @@ def main():
             print("Skipping FastQC/MultiQC analysis")
     
         ###Set species variable
-        species = args["species"]
+        reference = args["reference"]
+        if "hg" in reference or reference == "gencode-v35":
+            species = "human"
+        elif "mm" in reference:
+            species = "human"
+
         
         ###trim and align
         pvalue = args["pvalue"]
@@ -416,6 +417,10 @@ def main():
         bigwig = args["bigwig"]
         if bigwig == True:
             utils.createBigWig(work_dir, threads)
+        
+        metagene = args["metagene"]
+        if metagene == True:
+            chipseq_utils.plotProfile(work_dir, chip_seq_settings, genome, threads)
     
     def cutrun(args, script_dir):
         pass
@@ -496,3 +501,4 @@ if __name__ == "__main__":
     ty_res = time.gmtime(total_time)
     res = time.strftime("%H:%M:%S",ty_res)
     print('Total run time: ', res)
+

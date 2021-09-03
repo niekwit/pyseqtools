@@ -7,11 +7,13 @@ import urllib.request
 import sys
 import gzip
 import shutil
+from  builtins import any as b_any
 
-from tqdm.auto import tqdm
 import yaml
 
+
 script_dir = os.path.abspath(os.path.dirname(__file__))
+script_dir = os.path.dirname(script_dir)
 sys.path.append(os.path.join(script_dir, "utils"))
 import utils_general as utils
 
@@ -56,17 +58,31 @@ def hisat2(script_dir, work_dir, threads, chip_seq_settings, genome):
         #build HISAT2 index from genome fasta
         index_location = os.path.join(script_dir,
                                  "index",
-                                 "HISAT2",
+                                 "hisat2",
                                  genome,
                                  "index")
         os.makedirs(os.path.join(script_dir,
                                  "index",
-                                 "HISAT2",
+                                 "hisat2",
                                  genome), 
                     exist_ok = True)
-        build_command = "python3 " + hisat2 + "-build " + ucsc_fasta + " " + index_location
-        subprocess.run(build_command,
-                           shell = True)
+        
+        #get full location of hisat2 to make hisat2-build command
+        if hisat2 == "hisat2":
+            path = os.environ["PATH"]
+            path = path.split(":")
+            for i in path:
+                if "hisat2" in i:
+                    hisat2_dir = i
+        
+            hisat2_build = os.path.join(hisat2_dir,"hisat2-build")
+        else:
+            hisat2_build = hisat2 + "-build"
+            
+        build_command = "python3 " + hisat2_build + " " + fasta + " " + index_location
+                    
+        utils.write2log(work_dir, build_command, "HISAT2 build index: ")
+        subprocess.run(build_command, shell = True)
         
         #add index to chip-seq.yaml
         with open(os.path.join(script_dir, "yaml", "chip-seq.yaml")) as f:
@@ -89,8 +105,10 @@ def hisat2(script_dir, work_dir, threads, chip_seq_settings, genome):
                     url = "https://genome-idx.s3.amazonaws.com/hisat/hg19_genome.tar.gz"
                 elif genome == "hg38":
                     url = "https://genome-idx.s3.amazonaws.com/hisat/hg38_genome.tar.gz"
-                elif genome == "mm9":
+                elif genome == "mm10":
                     url = "https://genome-idx.s3.amazonaws.com/hisat/mm10_genome.tar.gz"
+                else:
+                    pass
                 
                 download_file = os.path.join(script_dir, 
                                              os.path.basename(url))
@@ -153,8 +171,7 @@ def hisat2(script_dir, work_dir, threads, chip_seq_settings, genome):
                     
                     os.makedirs(os.path.join(script_dir, 
                                              "fasta", 
-                                             genome),
-                                exist_ok = True)
+                                             genome), exist_ok = True)
                     out_put_list = [os.path.join(script_dir, 
                                                  "fasta", 
                                                  genome, 
@@ -162,15 +179,15 @@ def hisat2(script_dir, work_dir, threads, chip_seq_settings, genome):
                     #download fasta files
                     print("Downloading fasta files from UCSC needed for building HISAT2 index")
                   
-                    for i,j in tqdm(zip(download_file_list, out_put_list),position = 0, leave = True):
+                    for i,j in zip(download_file_list, out_put_list):
                         urllib.request.urlretrieve(i, j)
                         
                     #concatenate fasta files to build genome fasta
                     print("Building whole genome fasta file")
                     ucsc_fasta = os.path.join(script_dir, "fasta", genome, "ucsc." + genome + ".fasta")
                     zcat_command = "zcat " + " ".join(out_put_list) + " > " + ucsc_fasta
-                    subprocess.run(zcat_command,
-                                   shell = True)
+                    utils.write2log(work_dir,zcat_command,"Build fasta: ")
+                    subprocess.run(zcat_command, shell = True)
                     
                     #remove downloaded fasta files
                     for i in out_put_list:
@@ -376,8 +393,11 @@ def ngsplot(work_dir, genome, feature, window):
             exist_ok = True)
         ngsplot_output = os.path.join(ngsplot_dir, base_name) + "_" + feature
         
-        ngsplot = "ngs.plot.r -G " + genome + " -R " + feature + " -C " + bam + " -O " + ngsplot_output + "_"+ feature + " -T " + base_name + " -L " + window
-
+        ngsplot = "ngs.plot.r -G " + genome + " -R " + feature + " -C " + bam + \
+            " -O " + ngsplot_output + "_"+ feature + " -T " + base_name + " -L " + window
+        
+        utils.write2log(work_dir, ngsplot, "ngsplot: ")
+         
         subprocess.run(ngsplot,
                        shell = True)
         
@@ -408,4 +428,189 @@ def peak(work_dir, threads, genome):
         genome_size = "1.2e8"
     
     
+def bam_bwQC(work_dir, threads):
+    bam_list = sorted(glob.glob(os.path.join(work_dir, "bam", "*.bam")))
+    bw_list = sorted(glob.glob(os.path.join(work_dir, "bigwig", "*.bw")))
     
+    if len(bw_list) == 0:
+        bam_list = " ".join(bam_list)
+        os.makedirs(os.path.join(work_dir, "chip-qc"), exist_ok= True)
+        
+        #create multiBamSummary:
+        sum_file = os.path.join(work_dir, "chip-qc", "multibamsummary.npz")
+        
+        if not utils.file_exists(sum_file):
+            
+            bam_sum = "multiBamSummary bins --numberOfProcessors " + threads + " -b " + \
+                bam_list + " -o " + sum_file
+                
+            utils.write2log(work_dir, bam_sum, "multiBamSummary: ")
+             
+            subprocess.run(bam_sum, shell = True)
+        
+        #create PCA plot
+        pca_file = os.path.join(work_dir, "chip-qc", "PCA_bam.pdf")
+        
+        if not utils.file_exists(pca_file):
+            
+            pca = "plotPCA -in " + sum_file + " -o " + pca_file + " -T 'Principle component analysis'"
+            
+            utils.write2log(work_dir, pca, "PCA BAM files: ")
+            
+            subprocess.run(pca, shell = True)
+        
+        #create Peasrson correlation plot
+        pearson_file = os.path.join(work_dir, "chip-qc", "scatterplot_PearsonCorr_bam-Scores.pdf")
+        
+        if not utils.file_exists(pearson_file):
+            pearson = "plotCorrelation -in " + sum_file + " --corMethod pearson --skipZeros --plotTitle 'Pearson Correlation of Average Scores Per Read' --whatToPlot scatterplot -o " \
+                + pearson_file + " --outFileCorMatrix PearsonCorr_bam-Scores.tab"
+            utils.write2log(work_dir, bam_sum, "Pearson correlation BAM files: ")
+            subprocess.run(pearson, shell = True)
+            
+        #create Spearman correlation heatmap
+        spearman_file = os.path.join(work_dir, "chip-qc", "heatmap_SpearmanCorr_readCounts_bam.pdf")
+        if not utils.file_exists(pearson_file):
+            spearman = "plotCorrelation -in " + sum_file + " --corMethod spearman --skipZeros --plotTitle 'Spearman Correlation of Read Counts' --whatToPlot scatterplot --colorMap viridis --whatToPlot heatmap -o " + spearman_file \
+             + " --outFileCorMatrix SpearmanCorr_readCounts_bam.tab"   
+             
+            utils.write2log(work_dir, spearman, "Spearman correlation BAM files: ")
+            subprocess.run(pearson, shell = True)
+    
+    else:
+        #create multiBigwigSummary:
+        bw_list = " ".join(bw_list)
+        os.makedirs(os.path.join(work_dir, "chip-qc"), exist_ok= True)
+        
+        sum_file = os.path.join(work_dir, "chip-qc", "multibigwigsummary.npz")
+
+        if not utils.file_exists(sum_file):
+            
+            bw_sum = "multiBigwigSummary bins --numberOfProcessors " + threads + " -b " + \
+                bw_list + " -o " + sum_file
+                
+            utils.write2log(work_dir, pca, "multiBigwigSummary: ")
+            
+            subprocess.run(bw_sum, shell = True)   
+        
+        #create PCA plot
+        pca_file = os.path.join(work_dir, "chip-qc", "PCA_bigwig.pdf")
+        
+        if not utils.file_exists(pca_file):
+            
+            pca = "plotPCA -in " + sum_file + " -o " + pca_file + " -T 'Principle component analysis'"
+            
+            utils.write2log(work_dir, pca, "PCA BigWig files: ")
+            
+            subprocess.run(pca, shell = True)
+    
+        #create Peasrson correlation plot
+        pearson_file = os.path.join(work_dir, "chip-qc", "scatterplot_PearsonCorr_bigwig-Scores.pdf")
+        
+        if not utils.file_exists(pearson_file):
+            pearson = "plotCorrelation -in " + sum_file + " --corMethod pearson --skipZeros --plotTitle 'Pearson Correlation of Average Scores Per Read' --whatToPlot scatterplot -o " \
+                + pearson_file + " --outFileCorMatrix PearsonCorr_bigwig-Scores.tab"
+            utils.write2log(work_dir, bam_sum, "Pearson correlation BigWig files: ")
+            subprocess.run(pearson, shell = True)
+            
+        #create Spearman correlation heatmap
+        spearman_file = os.path.join(work_dir, "chip-qc", "heatmap_SpearmanCorr_readCounts_bigwig.pdf")
+        if not utils.file_exists(pearson_file):
+            spearman = "plotCorrelation -in " + sum_file + " --corMethod spearman --skipZeros --plotTitle 'Spearman Correlation of Read Counts' --whatToPlot heatmap --colorMap viridis -o " + spearman_file \
+             + " --outFileCorMatrix SpearmanCorr_readCounts_bigwig.tab"   
+             
+            utils.write2log(work_dir, spearman, "Spearman correlation BAM files: ")
+            subprocess.run(spearman, shell = True)
+    
+   
+    
+def plotProfile(work_dir, chip_seq_settings, genome, threads):
+    #check for gtf file
+    gtf = chip_seq_settings["gtf"][genome]
+    
+       
+    #download gtf file if not available
+    if gtf == "":
+        if genome == "hg19":
+            url = "http://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_19/gencode.v19.annotation.gtf.gz"
+        elif genome == "hg38":
+            url = "http://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_38/gencode.v38.annotation.gtf.gz"
+        elif genome == "mm10":
+            url = "http://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_mouse/release_M27/gencode.vM27.annotation.gtf.gz"
+        elif genome == "mm9":
+            url= "http://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_mouse/release_M1/gencode.vM1.annotation.gtf.gz"
+    
+        print("WARNING: gtf file not found for " + genome + ", downloading now")    
+        os.makedirs(os.path.join(script_dir, "gtf", genome), exist_ok = True)
+        download_file = os.path.join(script_dir, "gtf", genome, os.path.basename(url))
+    
+        urllib.request.urlretrieve(url, download_file)
+        
+        with gzip.open(download_file, "rb") as f_in:
+                    with open(download_file.replace(".gz",""), "wb") as f_out:
+                        shutil.copyfileobj(f_in, f_out)
+                        
+        os.remove(download_file)
+        
+        #write gtf file location to chip-seq.yaml
+        gtf = download_file.replace(".gz", "")
+        
+        with open(os.path.join(script_dir, "yaml", "chip-seq.yaml")) as f:
+                    doc = yaml.safe_load(f)
+                
+        doc["gtf"][genome] = gtf
+                
+        with open(os.path.join(script_dir,"yaml" ,"chip-seq.yaml"), "w") as f:
+            yaml.dump(doc,f)
+        
+    
+    #check if deduplicated BigWig files are present
+    file_list = glob.glob(os.path.join(work_dir, "bigwig", "*bw"))
+    dedup = b_any("dedupl" in x for x in file_list)
+    
+    if dedup == True:
+        file_list = glob.glob(os.path.join(work_dir, "bigwig", "*dedupl-norm.bw"))
+        samples_label = [i.replace("-dedupl-norm.bw", "") for i in file_list]
+        samples_label = [os.path.basename(i) for i in samples_label]
+        samples_label = " ".join(samples_label)
+        file_list = " ".join(file_list)
+        
+    else:
+        file_list = " ".join(file_list)
+        samples_label = [i.replace("-norm.bw", "") for i in file_list]
+        samples_label = [os.path.basename(i) for i in samples_label]
+        samples_label = " ".join(samples_label)
+        if len(file_list) == 0:
+            print("ERROR: no BigWig files found for metagene plot creation")
+            return None
+    
+    #generate compute matrix needed for metagene plot generation
+    print("Generating compute matrix for metagene plots")
+    os.makedirs(os.path.join(work_dir, "metagene_plots"), exist_ok = True)
+    matrix = os.path.join(work_dir, "metagene_plots", "compute_matrix.mar.gz")
+    
+    if not utils.file_exists(matrix):
+        cm = "computeMatrix scale-regions -S " + file_list + " -R " + gtf +\
+            " --beforeRegionStartLength 3000 --regionBodyLength 5000 --afterRegionStartLength 3000 -p " + \
+                threads + " -o " + matrix + " --plotType=se --numPlotsPerRow 4" + \
+                " --samplesLabel " + samples_label
+        utils.write2log(work_dir, cm, "Compute matrix generation: ")
+        subprocess.run(cm, shell = True)
+
+    #generate metagene plots
+    print("Generating metagene plots")
+    metagene_file = os.path.join(work_dir, "metagene_plots","metagene_plot_separate.pdf")
+    
+    if not utils.file_exists(metagene_file):
+        pp = "plotProfile -m " + matrix + " -out " + metagene_file 
+        utils.write2log(work_dir, pp, "Generate metagene plot (overview): ")
+        subprocess.run(pp, shell = True)
+    
+    metagene_file = os.path.join(work_dir, "metagene_plots","metagene_plot_overlay.pdf")
+    
+    if not utils.file_exists(metagene_file):
+        pp = "plotProfile -m " + matrix + " -out " + metagene_file + \
+            " --perGroup --plotType=se --legendLocation upper-left" + \
+                " --samplesLabel " + samples_label
+        utils.write2log(work_dir, pp, "Generate metagene plot (overlay): ")
+        subprocess.run(pp, shell = True)
