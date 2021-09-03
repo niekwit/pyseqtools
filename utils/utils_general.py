@@ -22,7 +22,6 @@ import pysam
 
 ###GENERAL FUNCTIONS
 
-
 def checkMd5(work_dir):
     md5sum_file = os.path.join(work_dir,"raw-data", "md5sums.csv")     
    
@@ -67,7 +66,7 @@ def logCommandLineArgs(work_dir):
 def write2log(work_dir,command,name):
     with open(os.path.join(work_dir,"commands.log"), "a") as file:
         file.write(name)
-        print(*command, sep="",file=file)
+        print(*command, sep = "", file = file)
 
 
 def set_threads(args):

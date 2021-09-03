@@ -336,13 +336,15 @@ def plot_coverage(work_dir,library,crispr_library): #plots coverage per sample a
 
 
 def normalise(work_dir):
-    df=pd.read_table(os.path.join(work_dir,"count","counts-aggregated.tsv"))
-    column_range=range(2,len(df.columns))
+    df = pd.read_table(os.path.join(work_dir,"count","counts-aggregated.tsv"))
+    column_range = range(2,len(df.columns))
     for i in column_range:
-        column_sum=df.iloc[:,i].sum()
-        df.iloc[:,i]=df.iloc[:,i] / column_sum * 1E8
-        df.iloc[:,i]=df.iloc[:,i].astype(int)
-    df.to_csv(os.path.join(work_dir,"count","counts-aggregated-normalised.csv"),index=False,header=True)
+        column_sum = df.iloc[:,i].sum()
+        df.iloc[:,i] = df.iloc[:,i] / column_sum * 1E8
+        df.iloc[:,i] = df.iloc[:,i].astype(int)
+    df.to_csv(os.path.join(work_dir,"count","counts-aggregated-normalised.csv"),
+              index = False,
+              header = True)
 
 
 def join_counts(work_dir,library,crispr_library):
