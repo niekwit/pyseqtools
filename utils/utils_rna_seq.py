@@ -31,7 +31,7 @@ def install_packages(): #check for required python packages; installs if absent
                                *missing], stdout = subprocess.DEVNULL)
 
 
-def salmon(salmon_index, threads, work_dir, gtf, fasta, script_dir, settings):
+def salmon(salmon_index, threads, work_dir, gtf, fasta, script_dir, settings, reference):
     
     #check for salmon
     path = os.environ["PATH"].lower()
@@ -68,10 +68,10 @@ def salmon(salmon_index, threads, work_dir, gtf, fasta, script_dir, settings):
         salmon_file = "salmon"
     
     
-    if salmon_index == "": #Salmon index not found, make on the fly
+    if salmon_index == "": #Salmon index not found, make it
         print("No Salmon index found: generating Salmon index")
         if os.path.isfile(fasta):
-            index_dir = os.path.join(script_dir,"index", "salmon")
+            index_dir = os.path.join(script_dir,"index", "salmon", reference)
             os.makedirs(index_dir, 
                         exist_ok = True)
             salmon_index_command = [salmon_file, "index", "-t", fasta, "-i", index_dir, "--gencode"]
@@ -87,35 +87,67 @@ def salmon(salmon_index, threads, work_dir, gtf, fasta, script_dir, settings):
             #Write salmon index file location to rna-seq.yaml
             with open(os.path.join(script_dir, "yaml", "rna-seq.yaml")) as f:
                 doc = yaml.safe_load(f)
-            doc["salmon_index"]["gencode-v35"] = index_dir
+            doc["salmon_index"][reference] = index_dir
             with open(os.path.join(script_dir,"yaml" ,"rna-seq.yaml"), "w") as f:
                 yaml.dump(doc,f)
         else:
             print("ERROR: no FASTA file specified in rna-seq.yaml")
             sys.exit()
 
-    print("Mapping reads with Salmon:")
-    salmon_output_dir = os.path.join(work_dir,"salmon")
-    os.makedirs(salmon_output_dir, 
+    
+    
+    
+    def salmonSE(work_dir, threads, gtf, salmon_index, reference):
+        salmon_output_dir = os.path.join(work_dir,"salmon")
+        os.makedirs(salmon_output_dir, 
                 exist_ok = True)
-
-    trim_list = glob.glob(os.path.join(work_dir,"trim/*_R1_001_val_1.fq.gz"))
-    for read1 in trim_list:
-        base_read1 = os.path.basename(read1).replace("_R1_001_val_1.fq.gz", "") + "-quant"
-        salmon_folder_test = os.path.join(salmon_output_dir, base_read1)
-        if not utils.file_exists(salmon_folder_test):
-            print("Mapping sample " + read1.replace("_R1_001_val_1.fq.gz", ""))
-            read2 = read1.replace("R1_001_val_1.fq.gz", "R2_001_val_2.fq.gz")
-            out_file = os.path.basename(read1.replace("_R1_001_val_1.fq.gz",""))
-            salmon_output_file = os.path.join(work_dir,"salmon",out_file)+"-quant"
-            salmon_index = settings["salmon_index"]["gencode-v35"] #reload index
-            salmon_command = [salmon_file,"quant","--index",salmon_index,"-l","A",
-            "-g", gtf,"-p",threads,"-1", read1,"-2",read2,"--validateMappings",
-            "--gcBias","-o", salmon_output_file]
-            with open(os.path.join(work_dir,"commands.log"), "a") as file:
-                file.write("Salmon quant: ")
-                print(*salmon_command, sep = " ", file = file)
-            subprocess.run(salmon_command) #Run Salmon quant
+        trim_list = glob.glob(os.path.join(work_dir,"trim_galore/*_trimmed.fq.gz"))
+        for read1 in trim_list:
+            base_read1 = os.path.basename(read1).replace("_trimmed.fq.gz", "") + "-quant"
+            salmon_folder_test = os.path.join(salmon_output_dir, base_read1)
+            if not utils.file_exists(salmon_folder_test):
+                print("Mapping sample " + read1.replace("_trimmed.fq.gz", ""))
+                
+                out_file = os.path.basename(read1.replace("_trimmed.fq.gz",""))
+                salmon_output_file = os.path.join(work_dir, "salmon", out_file)+"-quant"
+                salmon_index = settings["salmon_index"][reference] #reload index
+                salmon_command = [salmon_file, "quant", "--index", salmon_index, "-l", "A",
+                "-g", gtf, "-p", threads, "-r", read1, "--validateMappings",
+                "--gcBias", "-o", salmon_output_file]
+                with open(os.path.join(work_dir,"commands.log"), "a") as file:
+                    file.write("Salmon quant: ")
+                    print(*salmon_command, sep = " ", file = file)
+                subprocess.run(salmon_command) #Run Salmon quant
+    
+    def salmonPE(work_dir, threads, gtf, salmon_index, reference):
+        salmon_output_dir = os.path.join(work_dir,"salmon")
+        os.makedirs(salmon_output_dir, 
+                exist_ok = True)
+        trim_list = glob.glob(os.path.join(work_dir,"trim/*_R1_001_val_1.fq.gz"))
+        for read1 in trim_list:
+            base_read1 = os.path.basename(read1).replace("_R1_001_val_1.fq.gz", "") + "-quant"
+            salmon_folder_test = os.path.join(salmon_output_dir, base_read1)
+            if not utils.file_exists(salmon_folder_test):
+                print("Mapping sample " + read1.replace("_R1_001_val_1.fq.gz", ""))
+                read2 = read1.replace("R1_001_val_1.fq.gz", "R2_001_val_2.fq.gz")
+                out_file = os.path.basename(read1.replace("_R1_001_val_1.fq.gz",""))
+                salmon_output_file = os.path.join(work_dir,"salmon",out_file)+"-quant"
+                salmon_index = settings["salmon_index"][reference] #reload index
+                salmon_command = [salmon_file,"quant","--index",salmon_index,"-l","A",
+                "-g", gtf,"-p",threads,"-1", read1,"-2",read2,"--validateMappings",
+                "--gcBias","-o", salmon_output_file]
+                with open(os.path.join(work_dir,"commands.log"), "a") as file:
+                    file.write("Salmon quant: ")
+                    print(*salmon_command, sep = " ", file = file)
+                subprocess.run(salmon_command) #Run Salmon quant
+            
+    
+    if utils.getEND(work_dir) == "PE":
+        print("Mapping reads with Salmon:")
+        salmonPE(work_dir, threads, gtf, salmon_index, reference)
+    elif utils.getEND(work_dir) == "SE":
+        print("Mapping reads with Salmon:")
+        salmonSE(work_dir, threads, gtf, salmon_index, reference)
   
             
 def plotBar(df,y_label,save_file):
