@@ -344,8 +344,8 @@ def main():
         reference = args["reference"]
         if "hg" in reference or reference == "gencode-v35":
             species = "human"
-        elif "mm" in reference:
-            species = "human"
+        elif "mm" in reference or reference == "gencode.vM1.pc_transcripts":
+            species = "mouse"
 
         
         ###trim and align
@@ -353,16 +353,17 @@ def main():
         align = args["align"]
         if align.lower() == "salmon":
             utils.trim(script_dir, threads, work_dir)
-            salmon_index = rna_seq_settings["salmon_index"]["gencode-v35"]
-            gtf = rna_seq_settings["salmon_gtf"]["gencode-v35"]
-            fasta = rna_seq_settings["FASTA"]["gencode-v35"]
+            salmon_index = rna_seq_settings["salmon_index"][reference]
+            gtf = rna_seq_settings["salmon_gtf"][reference]
+            fasta = rna_seq_settings["FASTA"][reference]
             rnaseq_utils.salmon(salmon_index, 
                                 str(threads), 
                                 work_dir, 
                                 gtf, 
                                 fasta, 
                                 script_dir, 
-                                rna_seq_settings)
+                                rna_seq_settings,
+                                reference)
             rnaseq_utils.plotMappingRate(work_dir)
             rnaseq_utils.plotPCA(work_dir, script_dir)
             rnaseq_utils.diff_expr(work_dir, gtf, script_dir, species, pvalue)

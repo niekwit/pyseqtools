@@ -535,7 +535,7 @@ def trim(script_dir, threads, work_dir):
         fastq_list = glob.glob(os.path.join(work_dir,"raw-data","*R1_001." + extension))
         for read1 in fastq_list:
             out_dir = os.path.dirname(read1)
-            out_dir = out_dir.replace("raw-data","trim")
+            out_dir = out_dir.replace("raw-data","trim_galore")
             out_file1 = read1.split(".",1)[0] + "_val_1.fq.gz"
             out_file1 = os.path.basename(out_file1)
             out_file1 = os.path.join(out_dir, out_file1)
