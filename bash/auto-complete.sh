@@ -20,7 +20,7 @@ case $3 in
 esac
 
 local opts
-opts="crispr rna-seq chip-seq cutrun"
+opts="crispr rna-seq chip-seq cutrun genesymconv"
 case $COMP_CWORD in
     1)
         COMPREPLY=( $(compgen -W "${opts}" -- "${COMP_WORDS[COMP_CWORD]}") )

@@ -33,15 +33,15 @@ def main():
     
     #create top-level parser
     parser = argparse.ArgumentParser(prog = 'pyseqtools.py',
-                                     description = "Analysis of a variety of NGS data")
-    subparsers = parser.add_subparsers(help ='Available analyses:',
+                                     description = "Analysis of a variety of NGS data and related tools")
+    subparsers = parser.add_subparsers(help ='Available analyses/tools:',
                                        dest ='module')
     
     #create subparsers for each module, i.e. functionality
     
     #create subparser for crispr screen analysis commands
     parser_crispr = subparsers.add_parser('crispr', 
-                                          help = 'CRISPR screens')
+                                          help = 'CRISPR screen analysis')
 
     parser_crispr.add_argument("-l", "--library",
                                required = "--csv2fasta" not in sys.argv,
@@ -110,7 +110,7 @@ def main():
      
     # create the parser for RNA-Seq-analysis
     parser_rnaseq = subparsers.add_parser('rna-seq', 
-                                          help='RNA-Seq')
+                                          help='RNA-Seq analysis')
             
     parser_rnaseq.add_argument("-t", "--threads",
                                required = False,
@@ -150,7 +150,7 @@ def main():
     
     #create subparser for ChIP-Seq analysis commands
     parser_chip = subparsers.add_parser('chip-seq', 
-                                          help='ChIP-Seq')
+                                          help='ChIP-Seq analysis')
     
     parser_chip.add_argument("-t", "--threads",
                              required = False,
@@ -207,12 +207,28 @@ def main():
     
     #create subparser for CUT&RUN analysis commands
     parser_cutrun = subparsers.add_parser('cutrun', 
-                                          help = 'CUT & RUN')
+                                          help = 'CUT & RUN analysis')
     
     parser_cutrun.add_argument("-t", "--threads",
                              required = False,
                              default = 1,
                              help = "<INT> number of CPU threads to use (default is 1). Use max to apply all available CPU threads")
+    
+    #create subparser for gene symbol conversion
+    parser_conversion = subparsers.add_parser('genesymconv', 
+                                          help = 'Gene symbol conversion')
+    
+    parser_conversion.add_argument("-c", "--conversion",
+                             choices = ['hm',
+                                        'mh'],
+                             required = True,
+                             help = "Conversion type: human to mouse (hm) or mouse to human (mh)")
+    parser_conversion.add_argument("-i", "--input",
+                             required = True,
+                             help = "Input gene list file. Each gene symbol should be on a new line")
+    parser_conversion.add_argument("-o", "--output",
+                             required = True,
+                             help = "Output file name")
     
        
     #create dictionary with command line arguments
@@ -423,8 +439,21 @@ def main():
         if metagene == True:
             chipseq_utils.plotProfile(work_dir, chip_seq_settings, genome, threads)
     
+    
     def cutrun(args, script_dir):
         pass
+    
+    
+    def geneSymConv(args, script_dir):
+        conversion = args["conversion"]
+        gene_list = args["input"]
+        out_file = args["output"]
+        
+        subprocess.call(["Rscript", 
+                         os.path.join(script_dir, "R", "convert_genesymbols.R"),
+                         conversion,
+                         gene_list,
+                         out_file])
     
     #execute selected module
     if args["module"] == "crispr":
@@ -434,8 +463,9 @@ def main():
     elif args["module"] == "chip-seq":
         chip_seq(args, script_dir)
     elif args["module"] == "cutrun":
-        chip_seq(args, script_dir)
-    
+        cutrun(args, script_dir)
+    elif args["module"] == "genesymconv":
+        geneSymConv(args, script_dir)
     
 if __name__ == "__main__":
     #start run timer
