@@ -33,8 +33,8 @@ def main():
     
     #create top-level parser
     parser = argparse.ArgumentParser(prog = 'pyseqtools.py',
-                                     description = "Analysis of a variety of NGS data and related tools")
-    subparsers = parser.add_subparsers(help ='Available analyses/tools:',
+                                     description = "Analysis pipelines for a variety of NGS data, and related tools")
+    subparsers = parser.add_subparsers(help ='Available pipelines/tools:',
                                        dest ='module')
     
     #create subparsers for each module, i.e. functionality
@@ -208,7 +208,6 @@ def main():
     #create subparser for CUT&RUN analysis commands
     parser_cutrun = subparsers.add_parser('cutrun', 
                                           help = 'CUT & RUN analysis')
-    
     parser_cutrun.add_argument("-t", "--threads",
                              required = False,
                              default = 1,
@@ -216,10 +215,10 @@ def main():
     
     #create subparser for gene symbol conversion
     parser_conversion = subparsers.add_parser('genesymconv', 
-                                          help = 'Gene symbol conversion')
-    
+                                          description = 'Convert human gene symbols to mouse gene symbols, or vice versa',
+                                          help = "Gene symbol conversion")
     parser_conversion.add_argument("-c", "--conversion",
-                             choices = ['hm',
+                                   choices = ['hm',
                                         'mh'],
                              required = True,
                              help = "Conversion type: human to mouse (hm) or mouse to human (mh)")
@@ -230,7 +229,22 @@ def main():
                              required = True,
                              help = "Output file name")
     
-       
+    #create subparser for subsetting GTF files
+    parser_subsetgtf = subparsers.add_parser('subsetgtf', 
+                                          help = 'Subset GTF files for selected genes')
+    
+    parser_subsetgtf.add_argument("-l", "--list",
+                             required = True,
+                             help = "Input gene list file. Each gene symbol should be on a new line")
+    parser_subsetgtf.add_argument("-i", "--input",
+                             required = True,
+                             help = "GTF file to be subsetted (must be specified with genome name, loaded from chip-seq.yaml)")
+    parser_subsetgtf.add_argument("-o", "--output",
+                             required = True,
+                             help = "Output file name")
+    
+    
+    
     #create dictionary with command line arguments
     args = vars(parser.parse_args())
     
@@ -454,7 +468,17 @@ def main():
                          conversion,
                          gene_list,
                          out_file])
-    
+        
+        
+    def subsetGTF(args, chip_seq_settings):
+        genome = args["input"]
+        gene_list = args["list"]
+        gtf = chip_seq_settings["gtf"][genome]
+        output = os.path.join(os.path.dirname(gtf) + args["output"])
+        subprocess.call(["grep", "-w", "-f", gene_list, gtf, ">", output])
+        
+
+
     #execute selected module
     if args["module"] == "crispr":
         crispr(args, script_dir)
@@ -466,6 +490,8 @@ def main():
         cutrun(args, script_dir)
     elif args["module"] == "genesymconv":
         geneSymConv(args, script_dir)
+    elif args["module"] == "subsetgtf":
+        subsetGTF(args, chip_seq_settings)
     
 if __name__ == "__main__":
     #start run timer
