@@ -147,3 +147,4 @@ blacklist/
 fasta/
 samtools*/
 bedtools*/
+picard/
