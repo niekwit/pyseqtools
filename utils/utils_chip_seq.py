@@ -8,6 +8,8 @@ import sys
 import gzip
 import shutil
 from  builtins import any as b_any
+import itertools
+from fuzzywuzzy import fuzz
 
 import yaml
 
@@ -427,6 +429,29 @@ def peak(work_dir, threads, genome):
     elif "dm" in genome:
         genome_size = "1.2e8"
     
+    #check if there are any deduplicated bam files
+    bam_list = glob.glob(os.path.join(work_dir, "bam", "*.bam"))
+    dedup = b_any("dedupl" in x for x in bam_list)
+    if dedup == True:
+        bam_list = glob.glob(os.path.join(work_dir, "bam", "*sort-bl-dedupl.bam"))
+        
+    #detect replicates
+    combinations = list(itertools.combinations(bam_list, 2))
+    
+    fuzz_ratios = {}
+    for i in combinations:
+        fuzz_ratios.update({i:fuzz.ratio(*i)})
+    max_value = fuzz_ratios.get(max(fuzz_ratios, key = fuzz_ratios.get))
+    replicates = {key:value for key, value in fuzz_ratios.items() if value == max_value}
+    
+    #detect input samples
+    input_replicates = {key:value for key, value in replicates.items() if any("input" in i.lower() for i in key)}
+    
+    #couple sample replicates with input replicates
+    macs2_sample_pairs = {}
+    for i in [*replicates]:
+        print(i[0])
+        
     
 def bam_bwQC(work_dir, threads):
     bam_list = sorted(glob.glob(os.path.join(work_dir, "bam", "*.bam")))

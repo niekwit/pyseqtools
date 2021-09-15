@@ -216,7 +216,7 @@ def main():
     #create subparser for gene symbol conversion
     parser_conversion = subparsers.add_parser('genesymconv', 
                                           description = 'Convert human gene symbols to mouse gene symbols, or vice versa',
-                                          help = "Gene symbol conversion")
+                                          help = "Inter-species gene symbol conversion")
     parser_conversion.add_argument("-c", "--conversion",
                                    choices = ['hm',
                                         'mh'],
@@ -444,6 +444,7 @@ def main():
         dedup = args["deduplication"]
         if dedup == True:
             utils.deduplicationBam(script_dir, work_dir, threads)
+            utils.indexBam(work_dir, threads)
         
         bigwig = args["bigwig"]
         if bigwig == True:
