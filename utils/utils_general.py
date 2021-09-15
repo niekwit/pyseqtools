@@ -480,11 +480,11 @@ def getEND(work_dir):
 def trim(script_dir, threads, work_dir):
     
     #check for trim_galore
-    path = os.environ["PATH"].lower()
+    path = os.environ["PATH"]
     
-    if "trimgalore" not in path:
+    if "TrimGalore" not in path:
         #Check for TrimGalore elsewhere
-        trimgalore = [line[0:] for line in subprocess.check_output("find $HOME -name trim_galore", 
+        trimgalore = [line[0:] for line in subprocess.check_output("find $HOME -wholename *TrimGalore-*/trim_galore", 
                                                                shell = True).splitlines()]
         try:
             trimgalore_file = trimgalore[0].decode("utf-8")
@@ -499,31 +499,32 @@ def trim(script_dir, threads, work_dir):
             
             #remove download file
             os.remove(download_file)
+            
+            #tell TrimGalore where FastQC is located
+            fastqc_file = checkFastqc(script_dir)
+            trimgalore_file = [line[0:] for line in subprocess.check_output("find $HOME -name trim_galore", 
+                                                                       shell = True).splitlines()]
+            trimgalore_file = trimgalore_file[0].decode("utf-8")
+            new_line = '"' + "my $path_to_fastqc = " + "q^" + fastqc_file + "^;" + '"'
+            awk_command = "awk " + "'NR==456 {$0=" + new_line + "} { print }' " + trimgalore_file + " > " + trimgalore_file + "_temp"
+        
+            subprocess.run(awk_command,
+                                   shell = True)
+            #remove original file and rename temp file to original name
+            os.remove(trimgalore_file)
+            os.rename(trimgalore_file + "_temp", 
+                      trimgalore_file)
+            
+            #make TrimGalore file executable by shell
+            trimgalore_file = os.path.join(script_dir, 
+                                           "TrimGalore-0.6.7", 
+                                           "trim_galore")
+            st = os.stat(trimgalore_file)
+            os.chmod(trimgalore_file, st.st_mode | stat.S_IEXEC)
     else:
         trimgalore_file = "trim_galore"
     
-    #tell TrimGalore where FastQC is located
-    fastqc_file = checkFastqc(script_dir)
-    trimgalore_file = [line[0:] for line in subprocess.check_output("find $HOME -name trim_galore", 
-                                                               shell = True).splitlines()]
-    trimgalore_file = trimgalore_file[0].decode("utf-8")
-    new_line = '"' + "my $path_to_fastqc = " + "q^" + fastqc_file + "^;" + '"'
-    awk_command = "awk " + "'NR==456 {$0=" + new_line + "} { print }' " + trimgalore_file + " > " + trimgalore_file + "_temp"
-
-    subprocess.run(awk_command,
-                           shell = True)
-    #remove original file and rename temp file to original name
-    os.remove(trimgalore_file)
-    os.rename(trimgalore_file + "_temp", 
-              trimgalore_file)
-    
-    #make TrimGalore file executable by shell
-    trimgalore_file = os.path.join(script_dir, 
-                                   "TrimGalore-0.6.7", 
-                                   "trim_galore")
-    st = os.stat(trimgalore_file)
-    os.chmod(trimgalore_file, st.st_mode | stat.S_IEXEC)
-    
+        
     #cap threads at 4 for trim_galore
     if int(threads) > 4:
         threads = "4"
@@ -541,7 +542,7 @@ def trim(script_dir, threads, work_dir):
             out_file1 = os.path.join(out_dir, out_file1)
             if not file_exists(out_file1):
                 read2 = read1.replace("R1","R2")
-                trim_galore_command = [trimgalore_file,"-j", threads, "-o", 
+                trim_galore_command = [trimgalore_file,"-j", str(threads), "-o", 
                                        "./trim", "--paired", read1, read2]
                 #log commands
                 with open(work_dir+"/commands.log", "a") as file:
