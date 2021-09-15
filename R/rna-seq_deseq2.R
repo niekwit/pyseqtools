@@ -88,6 +88,13 @@ for (i in 1:length(df.list)){
   files <- file.path(work.dir,"salmon",paste0(samples$sample,"-quant"), "quant.sf")
   names(files) <- samples$sample
   
+  #check if files in samples.csv match with files present:
+  files.found <- length(list.files(path=work.dir,pattern="quant.sf", recursive = TRUE))
+  if (length(files) != files.found){
+    print("ERROR (DESeq2): number of samples in samples.csv does not match with actual samples in salmon directory")
+    quit(save = "no")
+  }
+  
   txi <- tximport(files,
                   type="salmon",
                   tx2gene=tx2gene,
