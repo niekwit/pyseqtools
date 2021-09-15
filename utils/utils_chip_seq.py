@@ -617,8 +617,7 @@ def plotProfile(work_dir, chip_seq_settings, genome, threads):
     if not utils.file_exists(matrix):
         cm = "computeMatrix scale-regions -S " + file_list + " -R " + gtf +\
             " --beforeRegionStartLength 3000 --regionBodyLength 5000 --afterRegionStartLength 3000 -p " + \
-                threads + " -o " + matrix + " --plotType=se --numPlotsPerRow 4" + \
-                " --samplesLabel " + samples_label
+                threads + " -o " + matrix + " --samplesLabel " + samples_label
         utils.write2log(work_dir, cm, "Compute matrix generation: ")
         subprocess.run(cm, shell = True)
 
@@ -627,15 +626,17 @@ def plotProfile(work_dir, chip_seq_settings, genome, threads):
     metagene_file = os.path.join(work_dir, "metagene_plots","metagene_plot_separate.pdf")
     
     if not utils.file_exists(metagene_file):
-        pp = "plotProfile -m " + matrix + " -out " + metagene_file 
-        utils.write2log(work_dir, pp, "Generate metagene plot (overview): ")
-        subprocess.run(pp, shell = True)
+        if os.path.exists(matrix):
+            pp = "plotProfile -m " + matrix + " -out " + metagene_file 
+            utils.write2log(work_dir, pp, "Generate metagene plot (overview): ")
+            subprocess.run(pp, shell = True)
     
     metagene_file = os.path.join(work_dir, "metagene_plots","metagene_plot_overlay.pdf")
     
     if not utils.file_exists(metagene_file):
-        pp = "plotProfile -m " + matrix + " -out " + metagene_file + \
-            " --perGroup --plotType=se --legendLocation upper-left" + \
-                " --samplesLabel " + samples_label
-        utils.write2log(work_dir, pp, "Generate metagene plot (overlay): ")
-        subprocess.run(pp, shell = True)
+        if os.path.exists(matrix):
+            pp = "plotProfile -m " + matrix + " -out " + metagene_file + \
+                " --perGroup --plotType=se --legendLocation upper-left" + \
+                    " --samplesLabel " + samples_label
+            utils.write2log(work_dir, pp, "Generate metagene plot (overlay): ")
+            subprocess.run(pp, shell = True)
