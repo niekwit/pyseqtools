@@ -366,21 +366,23 @@ def createBigWig(work_dir, threads):
         if "-sort-bl.bam" in bam:
             bigwig_output = bam.replace("-sort-bl.bam", "-norm.bw")
             bigwig_output = bigwig_output.replace("bam", "bigwig")
-
-            bigwig = "bamCoverage -p " + str(threads) + " --binSize 200 --normalizeUsing RPKM --extendReads 200 --effectiveGenomeSize 2827437033 -b " 
-            bigwig = bigwig + bam +" -o " + bigwig_output
+            
+            if not file_exists(bigwig_output):
+                bigwig = "bamCoverage -p " + str(threads) + " --binSize 200 --normalizeUsing RPKM --extendReads 200 --effectiveGenomeSize 2827437033 -b " 
+                bigwig = bigwig + bam +" -o " + bigwig_output
         
-            subprocess.run(bigwig, 
-                           shell = True)
+                subprocess.run(bigwig, 
+                               shell = True)
         elif "-sort-bl-dedupl.bam" in bam:
             bigwig_output = bam.replace("-sort-bl-dedupl.bam", "-dedupl-norm.bw")
             bigwig_output = bigwig_output.replace("bam", "bigwig")
             
-            bigwig = "bamCoverage -p " + str(threads) + " --binSize 200 --normalizeUsing RPKM --extendReads 200 --effectiveGenomeSize 2827437033 -b " 
-            bigwig = bigwig + bam +" -o " + bigwig_output
-        
-            subprocess.run(bigwig, 
-                           shell = True)
+            if not file_exists(bigwig_output):
+                bigwig = "bamCoverage -p " + str(threads) + " --binSize 200 --normalizeUsing RPKM --extendReads 200 --effectiveGenomeSize 2827437033 -b " 
+                bigwig = bigwig + bam +" -o " + bigwig_output
+            
+                subprocess.run(bigwig, 
+                               shell = True)
 
 
 def bigwigQC(work_dir, threads):
@@ -388,7 +390,14 @@ def bigwigQC(work_dir, threads):
     #generate PCA plot of all BigWig files
     if os.path.exists(os.path.join(work_dir,
                                    "bigwig")):
+        
+        
         file_list = glob.glob(os.path.join(work_dir,
+                                           "bigwig",
+                                           "*-dedupl-norm.bw"))
+        
+        if len(file_list) == 0:
+            file_list = glob.glob(os.path.join(work_dir,
                                            "bigwig",
                                            "*.bw"))
         
@@ -398,8 +407,14 @@ def bigwigQC(work_dir, threads):
         summary = "multiBigwigSummary bins --numberOfProcessors " + str(threads)
         summary =  summary + " -b " + " ".join(file_list) + " -o " + summary_file
         
-        subprocess.run(summary, 
-                           shell = True)
+        if not file_exists(summary_file):
+            subprocess.run(summary, shell = True)
+            
+        pca_output = os.path.join(work_dir, "bigwig", "PCA-bigwig.pdf")
+        
+        if not file_exists(pca_output):
+            pca = "plotPCA -in " + summary_file + "-o " + pca_output + " -T PCA of BigWig files"
+            subprocess.run(pca, shell = True)
             
 def checkFastqc(script_dir):
     
