@@ -546,9 +546,25 @@ def bam_bwQC(work_dir, threads):
              
             utils.write2log(work_dir, spearman, "Spearman correlation BAM files: ")
             subprocess.run(spearman, shell = True)
+            
+    #create bam Fingerprint
+    #check if deduplicated BAM files are present
+    dedup = b_any("dedupl" in x for x in bam_list) 
     
-   
+    if dedup == True:
+        bam_list = sorted(glob.glob(os.path.join(work_dir, "bam", "*dedupl.bam")))
     
+    out_file = os.path.join(work_dir,"chip-qc", "chip_fingerprints.pdf")
+    
+    if not utils.file_exists(out_file):
+        labels = [os.path.basename(i.replace("-sort-bl-dedupl.bam","")) for i in bam_list]
+        labels = " ".join(labels)
+        bam_list = " ".join(bam_list)
+        
+        command = "plotCoverage -b " + bam_list + " --labels " + labels \
+            + " --skipZeros -p " + threads + " --plotFile " + out_file
+        subprocess.run(command, shell = True)
+        
 def plotProfile(work_dir, chip_seq_settings, genome, threads):
     #check for gtf file
     gtf = chip_seq_settings["gtf"][genome]
@@ -640,3 +656,4 @@ def plotProfile(work_dir, chip_seq_settings, genome, threads):
                     " --samplesLabel " + samples_label
             utils.write2log(work_dir, pp, "Generate metagene plot (overlay): ")
             subprocess.run(pp, shell = True)
+
