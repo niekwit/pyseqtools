@@ -148,3 +148,6 @@ fasta/
 samtools*/
 bedtools*/
 picard/
+bed/
+gtf/
+
