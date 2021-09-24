@@ -432,14 +432,15 @@ def main():
             
         #create BAM files
         align = args["align"]
+        genome = args["genome"]
         
         if align.lower() in "hisat2":
             utils.trim(script_dir, threads, work_dir)
-            genome = args["genome"]
             chipseq_utils.hisat2(script_dir, work_dir, threads, chip_seq_settings, genome)
             utils.indexBam(work_dir, threads)
         elif align.lower() == "bwa":
-            utils.trim(threads, work_dir)
+            #utils.trim(threads, work_dir)
+            utils.bwa(work_dir, script_dir, threads, chip_seq_settings, genome)
             
         dedup = args["deduplication"]
         if dedup == True:

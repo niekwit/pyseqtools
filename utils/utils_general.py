@@ -12,15 +12,18 @@ from zipfile import ZipFile
 import stat
 from  builtins import any as b_any
 import tarfile
+from shutil import copy
 
 
 import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
 import pysam
+import git
 
 
 ###GENERAL FUNCTIONS
+
 
 def checkMd5(work_dir):
     md5sum_file = os.path.join(work_dir,"raw-data", "md5sums.csv")     
@@ -218,8 +221,8 @@ def checkBedtools(script_dir):
         return("bedtools")
     
 
-def checkBwa(script_dir):
-    pass
+
+
 
 
 def checkPicard(script_dir):
@@ -523,8 +526,7 @@ def trim(script_dir, threads, work_dir):
             new_line = '"' + "my $path_to_fastqc = " + "q^" + fastqc_file + "^;" + '"'
             awk_command = "awk " + "'NR==456 {$0=" + new_line + "} { print }' " + trimgalore_file + " > " + trimgalore_file + "_temp"
         
-            subprocess.run(awk_command,
-                                   shell = True)
+            subprocess.run(awk_command, shell = True)
             #remove original file and rename temp file to original name
             os.remove(trimgalore_file)
             os.rename(trimgalore_file + "_temp", 
@@ -597,4 +599,54 @@ def trim(script_dir, threads, work_dir):
         trimSE(work_dir, threads)
        
         
+def bwa(work_dir, script_dir, threads, chip_seq_settings, genome):
+
+    #get $PATH
+    path = os.environ["PATH"].lower()
+    
+    #check for bwa in $PATH
+    if "bwa" not in path:
+        #check for bwa in $HOME
+        bwa = [line[0:] for line in subprocess.check_output("find $HOME -wholename *bwa/bwa", 
+                                                            shell = True).splitlines()]
+        try:
+            bwa = bwa[0].decode("utf-8")
+            if len(bwa) > 1:
+                print("ERROR: multiple copies of BWA found:")
+                sys.exit(bwa)
+        except:
+            #install bwa from Github
+            bwa_dir = os.path.join(script_dir, "bwa")
+            url = "https://github.com/lh3/bwa.git"
+            git.Git(script_dir).clone(url)
+            os.chdir(bwa_dir)
+            subprocess.run("make")
+            os.chdir(work_dir)
+            bwa = os.path.join(script_dir,"bwa","bwa")
+    else:
+        bwa = "bwa"
+            
+    #check for bwa index
+    bwa_index = chip_seq_settings["bwa"][genome]
+    if bwa_index == "":
+        print("WARNING: BWA index not found for " + genome)
+        print("Generating BWA index") 
+        index_dir = os.path.join(script_dir, "index", "bwa", genome)
+        index_file = os.path.join(index_dir, genome)      
+        os.makedirs(index_dir, exist_ok = True) 
+                
+        fasta = chip_seq_settings["fasta"][genome]
         
+        copy(fasta, index_dir)
+        fasta_index = os.path.join(index_dir,os.path.basename(fasta))
+        os.rename(fasta_index, 
+                  os.path.join(os.path.dirname(fasta_index), genome + ".fasta"))
+        
+        #print([bwa, "index", "-p", index_file, fasta])
+        subprocess.run([bwa, "index", os.path.join(os.path.dirname(fasta_index), genome + ".fasta")])
+        os.remove(os.path.join(os.path.dirname(fasta_index), genome + ".fasta"))
+        
+        
+        
+        
+            

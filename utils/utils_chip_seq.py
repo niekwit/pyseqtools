@@ -561,7 +561,7 @@ def bam_bwQC(work_dir, threads):
         labels = " ".join(labels)
         bam_list = " ".join(bam_list)
         
-        command = "plotCoverage -b " + bam_list + " --labels " + labels \
+        command = "plotFingerprint -b " + bam_list + " --labels " + labels \
             + " --skipZeros -p " + threads + " --plotFile " + out_file
         subprocess.run(command, shell = True)
         
