@@ -631,8 +631,7 @@ def bwa(work_dir, script_dir, threads, chip_seq_settings, genome):
     if bwa_index == "":
         print("WARNING: BWA index not found for " + genome)
         print("Generating BWA index") 
-        index_dir = os.path.join(script_dir, "index", "bwa", genome)
-        index_file = os.path.join(index_dir, genome)      
+        index_dir = os.path.join(script_dir, "index", "bwa", genome)    
         os.makedirs(index_dir, exist_ok = True) 
                 
         fasta = chip_seq_settings["fasta"][genome]
