@@ -242,65 +242,8 @@ def hisat2(script_dir, work_dir, threads, chip_seq_settings, genome):
     else:
         index_location = index
     
-    ###look for blacklist###
-    with open(os.path.join(script_dir, "yaml", "chip-seq.yaml")) as f:
-        doc = yaml.safe_load(f)
-                    
-    blacklist = doc["blacklist"][genome] 
-    
-    if blacklist == "":
-        print("WARNING: no blacklisted region BED file found")
-        print("Downloading blacklist file for " + genome)
-        
-        def getBlacklist(script_dir, url, genome):
-            os.makedirs(os.path.join(script_dir,
-                                     "blacklist",
-                                     genome),
-                        exist_ok = True)
-            
-            download_file = os.path.join(script_dir,
-                                         "blacklist",
-                                         genome,
-                                         os.path.basename(url))
-            
-            urllib.request.urlretrieve(url,
-                                       download_file)
-            
-            #unzip bed file
-            with gzip.open(download_file, "rb") as f_in:
-                with open(download_file.replace(".gz",""), "wb") as f_out:
-                    shutil.copyfileobj(f_in, f_out)
-            
-                       
-            #remove downloaded file
-            os.remove(download_file)
-            
-            #write black list location to chip-seq.yaml
-            blacklist = download_file.replace(".gz", "")
-            
-            with open(os.path.join(script_dir, "yaml", "chip-seq.yaml")) as f:
-                        doc = yaml.safe_load(f)
-                    
-            doc["blacklist"][genome] = blacklist
-                    
-            with open(os.path.join(script_dir,"yaml" ,"chip-seq.yaml"), "w") as f:
-                yaml.dump(doc,f)
-                
-            return(blacklist)
-        
-        if genome == "hg19":
-            url = "http://hgdownload.soe.ucsc.edu/goldenPath/hg19/encodeDCC/wgEncodeMapability/wgEncodeDukeMapabilityRegionsExcludable.bed.gz"
-            blacklist = getBlacklist(script_dir, url, genome)
-        elif genome == "hg38":
-            url = "https://www.encodeproject.org/files/ENCFF356LFX/@@download/ENCFF356LFX.bed.gz"
-            blacklist = getBlacklist(script_dir, url, genome)
-        elif genome == "mm9":
-            url = "http://mitra.stanford.edu/kundaje/akundaje/release/blacklists/mm9-mouse/mm9-blacklist.bed.gz"
-            blacklist = getBlacklist(script_dir, url, genome)
-    elif os.path.isfile(blacklist):
-        if blacklist.endswith(".bed"):
-            if os.path.getsize(blacklist) > 0:
-                pass
+    #load blacklist
+    blacklist = utils.blackList(script_dir, genome)
     
     ###perform alignment with HISAT2###
     os.makedirs(os.path.join(work_dir, "bam"),

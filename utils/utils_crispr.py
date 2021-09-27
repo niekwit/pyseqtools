@@ -354,7 +354,7 @@ def join_counts(work_dir,library,crispr_library):
     counts = {}
     
     #remove all leading white spaces from all count files
-    sed = 'sed "s/^[ \t]*//" -i '
+    sed = 'sed "s/^ *//" -i '
 
     for file in file_list:
        sed_command = sed + file 

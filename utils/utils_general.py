@@ -13,6 +13,8 @@ import stat
 from  builtins import any as b_any
 import tarfile
 from shutil import copy
+import gzip
+import shutil
 
 
 import matplotlib.pyplot as plt
@@ -20,6 +22,7 @@ import pandas as pd
 import seaborn as sns
 import pysam
 import git
+import yaml
 
 
 ###GENERAL FUNCTIONS
@@ -597,9 +600,79 @@ def trim(script_dir, threads, work_dir):
         trimPE(work_dir, threads)
     elif getEND(work_dir) == "SE":
         trimSE(work_dir, threads)
-       
+
         
-def bwa(work_dir, script_dir, threads, chip_seq_settings, genome):
+def blackList(script_dir, genome):
+    with open(os.path.join(script_dir, "yaml", "chip-seq.yaml")) as f:
+        doc = yaml.safe_load(f)
+                    
+    blacklist = doc["blacklist"][genome] 
+    
+    if blacklist == "":
+        print("WARNING: no blacklisted region BED file found")
+        print("Downloading blacklist file for " + genome)
+        
+        def getBlacklist(script_dir, url, genome):
+            os.makedirs(os.path.join(script_dir,
+                                     "blacklist",
+                                     genome),
+                        exist_ok = True)
+            
+            download_file = os.path.join(script_dir,
+                                         "blacklist",
+                                         genome,
+                                         os.path.basename(url))
+            
+            urllib.request.urlretrieve(url,
+                                       download_file)
+            
+            #unzip bed file
+            with gzip.open(download_file, "rb") as f_in:
+                with open(download_file.replace(".gz",""), "wb") as f_out:
+                    shutil.copyfileobj(f_in, f_out)
+            
+                       
+            #remove downloaded file
+            os.remove(download_file)
+            
+            #write black list location to chip-seq.yaml
+            blacklist = download_file.replace(".gz", "")
+            
+            with open(os.path.join(script_dir, "yaml", "chip-seq.yaml")) as f:
+                        doc = yaml.safe_load(f)
+                    
+            doc["blacklist"][genome] = blacklist
+                    
+            with open(os.path.join(script_dir,"yaml" ,"chip-seq.yaml"), "w") as f:
+                yaml.dump(doc,f)
+                
+            return(blacklist)
+        
+        if genome == "hg19":
+            url = "http://hgdownload.soe.ucsc.edu/goldenPath/hg19/encodeDCC/wgEncodeMapability/wgEncodeDukeMapabilityRegionsExcludable.bed.gz"
+            blacklist = getBlacklist(script_dir, url, genome)
+            return blacklist
+        elif genome == "hg38":
+            url = "https://www.encodeproject.org/files/ENCFF356LFX/@@download/ENCFF356LFX.bed.gz"
+            blacklist = getBlacklist(script_dir, url, genome)
+            return blacklist
+        elif genome == "mm9":
+            url = "http://mitra.stanford.edu/kundaje/akundaje/release/blacklists/mm9-mouse/mm9-blacklist.bed.gz"
+            blacklist = getBlacklist(script_dir, url, genome)
+            return blacklist
+    elif os.path.isfile(blacklist):
+        if blacklist.endswith(".bed"):
+            if os.path.getsize(blacklist) > 0:
+                return blacklist
+            else:
+                sys.exit("ERROR: blacklist has size zero")
+        else:
+            sys.exit("ERROR: blacklist has invalid file format (should be .bed)")
+    
+
+
+        
+def bwa(work_dir, script_dir, args, threads, chip_seq_settings, genome):
 
     #get $PATH
     path = os.environ["PATH"].lower()
@@ -645,7 +718,79 @@ def bwa(work_dir, script_dir, threads, chip_seq_settings, genome):
         subprocess.run([bwa, "index", os.path.join(os.path.dirname(fasta_index), genome + ".fasta")])
         os.remove(os.path.join(os.path.dirname(fasta_index), genome + ".fasta"))
         
+        #add index to yaml
+        with open(os.path.join(script_dir, "yaml" ,"chip-seq.yaml")) as f:
+            doc = yaml.safe_load(f)
+        doc["bwa"][genome] = os.path.join(index_dir, genome + ".fasta")
+        with open(os.path.join(script_dir, "yaml","chip-seq.yaml"), "w") as f:
+            yaml.dump(doc, f)
+        
+        #reload yaml
+        with open(os.path.join(script_dir, "yaml" ,"chip-seq.yaml")) as f:
+            chip_seq_settings = yaml.safe_load(f)
         
         
         
+    def bwaMem(work_dir, threads, chip_seq_settings, genome):
+        #check if data is paired-end
+        paired_end = getEND(work_dir)
+        
+        #load other requirements for alignment
+        if paired_end == "SE":
+            file_list = glob.glob(os.path.join(work_dir, "trim_galore","*_trimmed.fq.gz"))
+        elif paired_end == "PE":
+            read1_list = glob.glob(os.path.join(work_dir, "trim_galore","*_R1_001_val_1.fq.gz"))
+        
+        index_path = chip_seq_settings["bwa"][genome]
+        blacklist = blackList(script_dir, genome)
+        
+        common_command = ["2>>", "align.log", "|", "samtools", "view", "-q", "15",
+                          "-F", "260", "-bS", "-@", threads, "-", "|", "bedtools", 
+                          "intersect", "-v", "-a", "stdin", "-b", blacklist, 
+                          "-nonamecheck", "|", "samtools", "sort", "-@", 
+                          threads, "-", ">"] #output file will be be added later
+        
+        bwa_mem = ["bwa", "mem", index_path, "-t", threads] #input file(s) to be specified
+        
+        #Run BWA
+        os.makedirs(os.path.join(work_dir, "bam"), exist_ok = True)
+        if paired_end == "SE":
+            for file in file_list:
+                out_file = file.replace("_trimmed.fq.gz",".bam")
+                out_file = out_file.replace("trim_galore","bam")
+                
+                bwa_mem.append(file)
+                bwa_mem.extend(common_command)
+                bwa_mem.append(out_file)
+                
+                if not file_exists(out_file):
+                    write2log(work_dir, bwa_mem, "BWA mem: ")
+                    print("Aligning fastq files with BWA mem (single-end mode)")
+                    subprocess.run(bwa_mem)
+        elif paired_end == "PE":
+            read2_list = [i.replace("_R1_001_val_1.fq.gz"," _R2_001_val_1.fq.gz") for i in read1_list]
+            
+            for read1, read2 in zip(read1_list, read2_list):
+                out_file = read1.replace("_R1_001_val_1.fq.gz",".bam")
+                out_file = out_file.replace("trim_galore","bam")
+                bwa_mem.append(read1)
+                bwa_mem.append(read2)
+                bwa_mem.extend(common_command)
+                bwa_mem.append(out_file)
+                
+                if not file_exists(out_file):
+                    write2log(work_dir, bwa_mem, "BWA mem: ")
+                    print("Aligning fastq files with BWA mem (paired-end mode)")
+                    subprocess.run(bwa_mem)
+            
+    #run selected BWA aligner
+    if args["align"] == "bwa-mem":
+        bwaMem(work_dir, threads, chip_seq_settings, genome)
+    else:
+        pass
+        
+    def bwaAln():
+        pass
+    
+
             

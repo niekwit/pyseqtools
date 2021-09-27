@@ -51,6 +51,7 @@ def main():
                                required = False, 
                                default = 1,
                                metavar="<int>",
+                               type = str,
                                help = "Number of CPU threads to use (default is 1). Use max to apply all available CPU threads")
     parser_crispr.add_argument("-r", "--rename",
                                required = False, 
@@ -166,11 +167,12 @@ def main():
                              default = 'hg19',
                              help = "Choose reference genome (default is hg19)")
     parser_chip.add_argument("-a", "--align",
-                             choices = ['hisat2',
-                                        'bwa'], 
+                             choices = ["hisat2",
+                                        "bwa-mem",
+                                        "bwa-aln"], 
                              default = "hisat2",
                              required = False,
-                             help = "Create BAM files using HISAT2 or BWA")
+                             help = "Create BAM files using HISAT2 or BWA (mem or aln")
     parser_chip.add_argument("-d", "--deduplication", 
                              required = False, 
                              action = 'store_true',
@@ -434,13 +436,14 @@ def main():
         align = args["align"]
         genome = args["genome"]
         
-        if align.lower() in "hisat2":
+        if align in "hisat2":
             utils.trim(script_dir, threads, work_dir)
             chipseq_utils.hisat2(script_dir, work_dir, threads, chip_seq_settings, genome)
             utils.indexBam(work_dir, threads)
-        elif align.lower() == "bwa":
-            #utils.trim(threads, work_dir)
-            utils.bwa(work_dir, script_dir, threads, chip_seq_settings, genome)
+        elif "bwa" in align:
+            utils.trim(script_dir, threads, work_dir)
+            utils.bwa(work_dir, script_dir, args, threads, chip_seq_settings, genome)
+            
             
         dedup = args["deduplication"]
         if dedup == True:
@@ -501,7 +504,7 @@ if __name__ == "__main__":
     
     script_dir = os.path.abspath(os.path.dirname(__file__))
     work_dir = os.getcwd()
-    
+        
     #adds script directory to runtime for importing modules
     sys.path.append(os.path.join(script_dir,"utils"))
     import utils_crispr as crispr_utils
