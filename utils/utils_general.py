@@ -261,7 +261,7 @@ def checkPicard(script_dir):
         return("picard.jar")
  
             
-def deduplicationBam(script_dir, work_dir, threads):
+def deduplicationBam(script_dir, work_dir, threads, args):
     #check if Picard is installed
     picard = checkPicard(script_dir)
     print(picard)
@@ -287,57 +287,58 @@ def deduplicationBam(script_dir, work_dir, threads):
         
     #plot number of reads after deduplication
     #get counts from non-deduplicated bam files
-    file_list = glob.glob(os.path.join(work_dir,
-                                       "bam",
-                                       "*-sort-bl.bam"))
-    
-    column_names = [os.path.basename(bam).replace("-sort-bl.bam","") for bam in file_list]
-    df = pd.DataFrame(columns = column_names)
-    
-    for bam in file_list:
-          count = pysam.view("-@", str(threads) ,"-c", "-F" "260", bam)
-          column = os.path.basename(bam).replace("-sort-bl.bam","")
-          df.loc[1, column] = count
-    
-    df["condition"] = "pre-deduplication"
-    
-    #get counts for deduplicated bam files
-    file_list = glob.glob(os.path.join(work_dir,
-                                       "bam",
-                                       "*-sort-bl-dedupl.bam"))
-           
-    for bam in file_list:
-          count = pysam.view("-@", str(threads) ,"-c", "-F" "260", bam)
-          column = os.path.basename(bam).replace("-sort-bl-dedupl.bam","")
-          df.loc[2, column] = count
-    
-    df.loc[2, "condition"] = "deduplicated"
-    
-    #create df for plotting
-    df_melt = pd.melt(df, id_vars = ["condition"], 
-                      value_vars = column_names)
-    df_melt["value"] = pd.to_numeric(df_melt["value"])
-    df_melt["value"] = df_melt["value"] / 1000000
-    
-    #create plot
-    save_file = os.path.join(work_dir,
-                             "bam",
-                             "read-counts-deduplication.pdf")
-    
-    sns.catplot(x = 'variable', y = 'value', 
-               hue = 'condition', 
-               data = df_melt, 
-               kind = 'bar', 
-               legend_out = False,
-               edgecolor = "black",)
-    plt.ylabel("Uniquely mapped read count (millions)")
-    plt.xticks(rotation = 45, ha="right")
-    plt.xlabel("")
-    plt.ylim((0, df_melt["value"].max() * 1.3))
-    plt.legend(title = None,
-               frameon = False)
-    plt.tight_layout()
-    plt.savefig(save_file)
+    if "bwa" not in args["align"]:
+        file_list = glob.glob(os.path.join(work_dir,
+                                           "bam",
+                                           "*-sort-bl.bam"))
+        
+        column_names = [os.path.basename(bam).replace("-sort-bl.bam","") for bam in file_list]
+        df = pd.DataFrame(columns = column_names)
+        
+        for bam in file_list:
+              count = pysam.view("-@", str(threads) ,"-c", "-F" "260", bam)
+              column = os.path.basename(bam).replace("-sort-bl.bam","")
+              df.loc[1, column] = count
+        
+        df["condition"] = "pre-deduplication"
+        
+        #get counts for deduplicated bam files
+        file_list = glob.glob(os.path.join(work_dir,
+                                           "bam",
+                                           "*-sort-bl-dedupl.bam"))
+               
+        for bam in file_list:
+              count = pysam.view("-@", str(threads) ,"-c", "-F" "260", bam)
+              column = os.path.basename(bam).replace("-sort-bl-dedupl.bam","")
+              df.loc[2, column] = count
+        
+        df.loc[2, "condition"] = "deduplicated"
+        
+        #create df for plotting
+        df_melt = pd.melt(df, id_vars = ["condition"], 
+                          value_vars = column_names)
+        df_melt["value"] = pd.to_numeric(df_melt["value"])
+        df_melt["value"] = df_melt["value"] / 1000000
+        
+        #create plot
+        save_file = os.path.join(work_dir,
+                                 "bam",
+                                 "read-counts-deduplication.pdf")
+        
+        sns.catplot(x = 'variable', y = 'value', 
+                   hue = 'condition', 
+                   data = df_melt, 
+                   kind = 'bar', 
+                   legend_out = False,
+                   edgecolor = "black",)
+        plt.ylabel("Uniquely mapped read count (millions)")
+        plt.xticks(rotation = 45, ha="right")
+        plt.xlabel("")
+        plt.ylim((0, df_melt["value"].max() * 1.3))
+        plt.legend(title = None,
+                   frameon = False)
+        plt.tight_layout()
+        plt.savefig(save_file)
     
 
 def indexBam(work_dir, threads):
@@ -750,28 +751,33 @@ def bwa(work_dir, script_dir, args, threads, chip_seq_settings, genome):
                           "-nonamecheck", "|", "samtools", "sort", "-@", 
                           threads, "-", ">"] #output file will be be added later
         
-        bwa_mem = ["bwa", "mem", index_path, "-t", threads] #input file(s) to be specified
-        
         #Run BWA
         os.makedirs(os.path.join(work_dir, "bam"), exist_ok = True)
         if paired_end == "SE":
+            print("Aligning fastq files with BWA mem (single-end mode)")
             for file in file_list:
-                out_file = file.replace("_trimmed.fq.gz",".bam")
+                out_file = file.replace("_trimmed.fq.gz","-sort-bl.bam")
                 out_file = out_file.replace("trim_galore","bam")
+                
+                bwa_mem = ["bwa", "mem", index_path, "-t", threads] #input file(s) to be specified
                 
                 bwa_mem.append(file)
                 bwa_mem.extend(common_command)
                 bwa_mem.append(out_file)
                 
                 if not file_exists(out_file):
-                    write2log(work_dir, bwa_mem, "BWA mem: ")
-                    print("Aligning fastq files with BWA mem (single-end mode)")
-                    subprocess.run(bwa_mem)
+                    with open(os.path.join(work_dir, "align.log"), "a") as f:
+                        print(os.path.basename(file) + ":", file = f)
+                    write2log(work_dir, " ".join(bwa_mem), "BWA mem: ")
+                    
+                    print("Aligning " + os.path.basename(file))
+                    bwa_mem = " ".join(bwa_mem)
+                    subprocess.run(bwa_mem, check = True, text = True, shell = True)
         elif paired_end == "PE":
             read2_list = [i.replace("_R1_001_val_1.fq.gz"," _R2_001_val_1.fq.gz") for i in read1_list]
-            
+            print("Aligning fastq files with BWA mem (paired-end mode)")
             for read1, read2 in zip(read1_list, read2_list):
-                out_file = read1.replace("_R1_001_val_1.fq.gz",".bam")
+                out_file = read1.replace("_R1_001_val_1.fq.gz","*-sort-bl.bam")
                 out_file = out_file.replace("trim_galore","bam")
                 bwa_mem.append(read1)
                 bwa_mem.append(read2)
@@ -779,18 +785,20 @@ def bwa(work_dir, script_dir, args, threads, chip_seq_settings, genome):
                 bwa_mem.append(out_file)
                 
                 if not file_exists(out_file):
-                    write2log(work_dir, bwa_mem, "BWA mem: ")
-                    print("Aligning fastq files with BWA mem (paired-end mode)")
+                    write2log(work_dir, " ".join(bwa_mem), "BWA mem: ")
+                    print("Aligning " + os.path.basename(read1.replace("_R1_001_val_1.fq.gz","")))
                     subprocess.run(bwa_mem)
             
+    def bwaAln():
+        pass
+    
     #run selected BWA aligner
     if args["align"] == "bwa-mem":
         bwaMem(work_dir, threads, chip_seq_settings, genome)
     else:
         pass
         
-    def bwaAln():
-        pass
+    
     
 
             

@@ -450,6 +450,11 @@ def bam_bwQC(work_dir, threads):
         bw_list = " ".join(bw_list)
         os.makedirs(os.path.join(work_dir, "chip-qc"), exist_ok= True)
         
+        dedup = b_any("dedupl" in x for x in bw_list) 
+    
+        if dedup == True:
+            bw_list = sorted(glob.glob(os.path.join(work_dir, "bigwig", "*dedupl-norm.bw")))
+        
         sum_file = os.path.join(work_dir, "chip-qc", "multibigwigsummary.npz")
 
         if not utils.file_exists(sum_file):
@@ -457,7 +462,7 @@ def bam_bwQC(work_dir, threads):
             bw_sum = "multiBigwigSummary bins --numberOfProcessors " + threads + " -b " + \
                 bw_list + " -o " + sum_file
                 
-            utils.write2log(work_dir, pca, "multiBigwigSummary: ")
+            utils.write2log(work_dir, bw_sum, "multiBigwigSummary: ")
             
             subprocess.run(bw_sum, shell = True)   
         
@@ -478,7 +483,7 @@ def bam_bwQC(work_dir, threads):
         if not utils.file_exists(pearson_file):
             pearson = "plotCorrelation -in " + sum_file + " --corMethod pearson --skipZeros --plotTitle 'Pearson Correlation of Average Scores Per Read' --whatToPlot scatterplot -o " \
                 + pearson_file + " --outFileCorMatrix PearsonCorr_bigwig-Scores.tab"
-            utils.write2log(work_dir, bam_sum, "Pearson correlation BigWig files: ")
+            utils.write2log(work_dir, pearson, "Pearson correlation BigWig files: ")
             subprocess.run(pearson, shell = True)
             
         #create Spearman correlation heatmap

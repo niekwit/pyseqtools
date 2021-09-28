@@ -8,25 +8,34 @@ import multiprocessing
 import timeit
 import time
 import pkg_resources
-
+from platform import python_version
 
 def checkPythonPackages(): #check for required python packages; installs if absent
-        required = {"shyaml", "pyyaml", "pandas", "numpy",
-                    "matplotlib", "seaborn", "multiqc",
-                    "cutadapt", "tqdm","gseapy",
-                    "matplotlib-venn", "pysam", "deeptools"}
-        installed = {pkg.key for pkg in pkg_resources.working_set}
-        missing = required - installed
-        if missing:
-            python = sys.executable
-            print("Installing missing required Python3 packages")
-            try:
-                install_command = [python, '-m', 'pip', 'install', *missing]
-                subprocess.check_call(install_command, stdout=subprocess.DEVNULL)
-            except:
-                sys.exit("ERROR: package installation failed")
-        else:
-            pass
+    #check if Python => 3.5
+    try:
+        version = float(python_version().rsplit(".",1)[0])
+        if version < 3.5:
+            sys.exit("ERROR: please update to at least Python 3.5")
+    except:
+        pass
+    
+    #check packages
+    required = {"shyaml", "pyyaml", "pandas", "numpy",
+                "matplotlib", "seaborn", "multiqc",
+                "cutadapt", "tqdm","gseapy",
+                "matplotlib-venn", "pysam", "deeptools"}
+    installed = {pkg.key for pkg in pkg_resources.working_set}
+    missing = required - installed
+    if missing:
+        python = sys.executable
+        print("Installing missing required Python3 packages")
+        try:
+            install_command = [python, '-m', 'pip', 'install', *missing]
+            subprocess.check_call(install_command, stdout=subprocess.DEVNULL)
+        except:
+            sys.exit("ERROR: package installation failed")
+    else:
+        pass
 
 
 def main():
@@ -443,16 +452,21 @@ def main():
         elif "bwa" in align:
             utils.trim(script_dir, threads, work_dir)
             utils.bwa(work_dir, script_dir, args, threads, chip_seq_settings, genome)
+            utils.indexBam(work_dir, threads)
             
             
         dedup = args["deduplication"]
         if dedup == True:
-            utils.deduplicationBam(script_dir, work_dir, threads)
+            utils.deduplicationBam(script_dir, work_dir, threads, args)
             utils.indexBam(work_dir, threads)
         
         bigwig = args["bigwig"]
         if bigwig == True:
             utils.createBigWig(work_dir, threads)
+            
+        qc = args["qc"]
+        if qc == True:
+            chipseq_utils.bam_bwQC(work_dir, threads)
         
         metagene = args["metagene"]
         if metagene == True:
