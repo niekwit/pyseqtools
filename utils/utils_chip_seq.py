@@ -12,6 +12,7 @@ import itertools
 from fuzzywuzzy import fuzz
 
 import yaml
+import pandas as pd
 
 
 script_dir = os.path.abspath(os.path.dirname(__file__))
@@ -397,6 +398,12 @@ def peak(work_dir, threads, genome):
         
     
 def bam_bwQC(work_dir, threads):
+    #import sample info
+    sample_df = pd.read_csv(os.path.join(work_dir, "samples.csv"))
+    conditions = set(sample_df["condition"])
+    samples = len(sample_df["sample"])
+    
+    #get bam and bigwig files
     bam_list = sorted(glob.glob(os.path.join(work_dir, "bam", "*.bam")))
     bw_list = sorted(glob.glob(os.path.join(work_dir, "bigwig", "*.bw")))
     
@@ -440,27 +447,46 @@ def bam_bwQC(work_dir, threads):
         spearman_file = os.path.join(work_dir, "chip-qc", "heatmap_SpearmanCorr_readCounts_bam.pdf")
         if not utils.file_exists(pearson_file):
             spearman = "plotCorrelation -in " + sum_file + " --corMethod spearman --skipZeros --plotTitle 'Spearman Correlation of Read Counts' --whatToPlot scatterplot --colorMap viridis --whatToPlot heatmap -o " + spearman_file \
-             + " --outFileCorMatrix SpearmanCorr_readCounts_bam.tab"   
+             + " --outFileCorMatrix" + os.path.join(work_dir, "chip-qc","SpearmanCorr_readCounts_bam.tab")   
              
             utils.write2log(work_dir, spearman, "Spearman correlation BAM files: ")
-            subprocess.run(pearson, shell = True)
+            subprocess.run(spearman, shell = True)
     
     else:
         #create multiBigwigSummary:
-        bw_list = " ".join(bw_list)
+        
         os.makedirs(os.path.join(work_dir, "chip-qc"), exist_ok= True)
         
-        dedup = b_any("dedupl" in x for x in bw_list) 
+        dedup = b_any("dedupl" in x for x in bw_list)
     
         if dedup == True:
             bw_list = sorted(glob.glob(os.path.join(work_dir, "bigwig", "*dedupl-norm.bw")))
+            labels = [i.replace("-dedupl-norm.bw","") for i in bw_list]
+        else:
+            labels = [i.replace("-norm.bw","") for i in bw_list]
         
+        markers = len(conditions) * "o s "
+        all_colours = ["forestgreen","navy","red","orange","salmon","yellow",
+                       "brown","black","cyan","orchid","chocolate","palegreen",
+                       "silver","gray","teal","beige","skyblue","gold",]
+        _colours = all_colours[0:len(conditions)]
+        colours = []
+        for i in _colours:
+            colours.append(i)
+            colours.append(i)
+        
+        colours = " ".join(colours)
+        
+        labels = [os.path.basename(i) for i in labels]
+        labels = " ".join(labels)
+                
+        bw_list = " ".join(bw_list)
         sum_file = os.path.join(work_dir, "chip-qc", "multibigwigsummary.npz")
 
         if not utils.file_exists(sum_file):
-            
+            print("Generating multiBigWigSummary file")
             bw_sum = "multiBigwigSummary bins --numberOfProcessors " + threads + " -b " + \
-                bw_list + " -o " + sum_file
+                bw_list + " -o " + sum_file + " --labels " + labels
                 
             utils.write2log(work_dir, bw_sum, "multiBigwigSummary: ")
             
@@ -470,8 +496,10 @@ def bam_bwQC(work_dir, threads):
         pca_file = os.path.join(work_dir, "chip-qc", "PCA_bigwig.pdf")
         
         if not utils.file_exists(pca_file):
+            print("Generating PCA plot")
             
-            pca = "plotPCA -in " + sum_file + " -o " + pca_file + " -T 'Principle component analysis'"
+            pca = "plotPCA -in " + sum_file + " -o " + pca_file + " -T 'Principle component analysis'" \
+                + " --markers " + markers + " --colors " + colours
             
             utils.write2log(work_dir, pca, "PCA BigWig files: ")
             
@@ -481,18 +509,20 @@ def bam_bwQC(work_dir, threads):
         pearson_file = os.path.join(work_dir, "chip-qc", "scatterplot_PearsonCorr_bigwig-Scores.pdf")
         
         if not utils.file_exists(pearson_file):
+            print("Generating Pearson correlation plot")
             pearson = "plotCorrelation -in " + sum_file + " --corMethod pearson --skipZeros --plotTitle 'Pearson Correlation of Average Scores Per Read' --whatToPlot scatterplot -o " \
-                + pearson_file + " --outFileCorMatrix PearsonCorr_bigwig-Scores.tab"
+                + pearson_file + " --outFileCorMatrix " + os.path.join(work_dir, "chip-qc","PearsonCorr_bigwig-Scores.tab")
             utils.write2log(work_dir, pearson, "Pearson correlation BigWig files: ")
             subprocess.run(pearson, shell = True)
             
         #create Spearman correlation heatmap
         spearman_file = os.path.join(work_dir, "chip-qc", "heatmap_SpearmanCorr_readCounts_bigwig.pdf")
         if not utils.file_exists(pearson_file):
+            print("Generating Spearman correlation plot")
             spearman = "plotCorrelation -in " + sum_file + " --corMethod spearman --skipZeros --plotTitle 'Spearman Correlation of Read Counts' --whatToPlot heatmap --colorMap viridis -o " + spearman_file \
-             + " --outFileCorMatrix SpearmanCorr_readCounts_bigwig.tab"   
+             + " --outFileCorMatrix " + os.path.join(work_dir,"chip-qc"," SpearmanCorr_readCounts_bigwig.tab")
              
-            utils.write2log(work_dir, spearman, "Spearman correlation BAM files: ")
+            utils.write2log(work_dir, spearman, "Spearman correlation BigWig files: ")
             subprocess.run(spearman, shell = True)
             
     #create bam Fingerprint
@@ -502,9 +532,10 @@ def bam_bwQC(work_dir, threads):
     if dedup == True:
         bam_list = sorted(glob.glob(os.path.join(work_dir, "bam", "*dedupl.bam")))
     
-    out_file = os.path.join(work_dir,"chip-qc", "chip_fingerprints.pdf")
+    out_file = os.path.join(work_dir,"chip-qc", "bam_fingerprints.pdf")
     
     if not utils.file_exists(out_file):
+        print("Generating BAM fingerprint plot")
         labels = [os.path.basename(i.replace("-sort-bl-dedupl.bam","")) for i in bam_list]
         labels = " ".join(labels)
         bam_list = " ".join(bam_list)
