@@ -360,49 +360,111 @@ def ngsplot(work_dir, genome, feature, window):
     url= "https://drive.google.com/file/d/0B5ldivL0Hd2JN05MOEFuZ0FRQTA/view?usp=sharing&resourcekey=0-Y6Sq22xOYTAb9Yng8ZlmJg"
     
     
-def peak(work_dir, threads, genome):
+def peak(work_dir, threads, genome, chip_seq_settings):
+    
+    print("Calling peaks with MACS3")
     
     if "hg" in genome:
-        genome_size = "2.7e9"
+        genome = "hs"
     elif "mm" in genome:
-        genome_size = "1.87e9"
+        genome = "mm"
     elif "ce" in genome:
-        genome_size = "1.87e9"
-    elif "ce" in genome:
-        genome_size = "9e7"
+        genome = "ce"
     elif "dm" in genome:
-        genome_size = "1.2e8"
+        genome = "dm"
     
+    #load/check MACS3 settings from yaml
+    q_value = chip_seq_settings["MACS3"]["q-value"]
+    data_format = chip_seq_settings["MACS3"]["format"]
+    ip = chip_seq_settings["MACS3"]["IP"]
+    broad_cutoff = chip_seq_settings["MACS3"]["broad-cutoff"]
+    
+    if q_value > 0.05:
+        print("WARNING: selected q value higher that default (0.05)")
+        q_value = str(q_value)
+    else:
+        q_value = str(q_value)
+        
+    format_list = ["ELAND", "BED", "ELANDMULTI", "ELANDEXPORT", "SAM",
+                   "BAM", "BOWTIE", "BAMPE", "BEDPE", "AUTO"]    
+    if data_format not in format_list:
+        print("ERROR: invalid input file format chosen")
+        return
+    if data_format == "AUTO":
+        print("WARNING: AUTO format tag selected. Please make sure your data is \nnot BAMPE or BEDPE, as this cannot be detected by MACS3")
+    input_format = ["-f", data_format]
+    
+    peak_settings = ["TF","histone"]
+    if ip not in peak_settings:
+        print("ERROR: invalid peak calling option chosen \nAvailable options: TF or histone")
+        return
+    
+    if broad_cutoff > 0.1:
+        print("WARNING: selected broad cutoff higher that default (0.1)")
+    
+    if ip == "TF":
+        peak_setting = "--call-summits"
+    elif ip == "histone":
+        peak_setting = ["--broad", "--broad-cutoff", str(broad_cutoff)]
+        
     #check if there are any deduplicated bam files
-    bam_list = glob.glob(os.path.join(work_dir, "bam", "*.bam"))
+    bam_list = sorted(glob.glob(os.path.join(work_dir, "bam", "*.bam")))
     dedup = b_any("dedupl" in x for x in bam_list)
     if dedup == True:
         bam_list = glob.glob(os.path.join(work_dir, "bam", "*sort-bl-dedupl.bam"))
         
-    #detect replicates
-    combinations = list(itertools.combinations(bam_list, 2))
+    #import sample info
+    sample_df = pd.read_csv(os.path.join(work_dir, "samples.csv"))
+    conditions = set(sample_df["condition"])
     
-    fuzz_ratios = {}
-    for i in combinations:
-        fuzz_ratios.update({i:fuzz.ratio(*i)})
-    max_value = fuzz_ratios.get(max(fuzz_ratios, key = fuzz_ratios.get))
-    replicates = {key:value for key, value in fuzz_ratios.items() if value == max_value}
+
+    #run MACS2 for each sample and input combination
+    for i in list(conditions):
+        df = sample_df[sample_df["condition"] == i]
+        replicates = int(len(df["condition"]) / len(set(df["input"])))
+        for j in range(1,replicates + 1):
+            pattern = "_" + str(j)
+            df_rep = df[df["sample"].str.contains(pattern)]
+            df_input = df_rep[df_rep["input"] == "yes"]
+            input_sample = df_input["sample"].values[0]
+            df_sample = df_rep[df_rep["input"] == "no"]
+            chip_sample = df_sample["sample"].values[0]
+            
+            #get bam files for input and sample
+            input_bam = [k for k in bam_list if input_sample in k]
+            input_bam, = input_bam #unpack list
+            sample_bam = [k for k in bam_list if chip_sample in k]
+            sample_bam, = sample_bam #unpack list
+            
+            #run MACS2
+            out_dir = os.path.join(work_dir, "peaks", chip_sample)
+            os.makedirs(out_dir, exist_ok = True)
+            out_file = os.path.join(work_dir, "peaks", chip_sample, chip_sample + "_peaks.xls")
+            
+            if not utils.file_exists(out_file):
+                macs3 = ["macs3", "callpeak", "-t", sample_bam, "-c", input_bam,
+                         "-n", chip_sample, "--outdir", out_dir, "-q", q_value,
+                         "-g", genome]
+                macs3.extend(input_format )
+                macs3.extend(peak_setting) # add peak settings
+                utils.write2log(work_dir, " ".join(macs3), "MACS3: ")
+                subprocess.call(macs3)
     
-    #detect input samples
-    input_replicates = {key:value for key, value in replicates.items() if any("input" in i.lower() for i in key)}
     
-    #couple sample replicates with input replicates
-    macs2_sample_pairs = {}
-    for i in [*replicates]:
-        print(i[0])
+    #get overlapping peaks from each replicate
+    
+    
+    #annotate peaks with HOMER
+    
+    
+  
         
     
 def bam_bwQC(work_dir, threads):
     #import sample info
     sample_df = pd.read_csv(os.path.join(work_dir, "samples.csv"))
     conditions = set(sample_df["condition"])
-    samples = len(sample_df["sample"])
-    
+        
     #get bam and bigwig files
     bam_list = sorted(glob.glob(os.path.join(work_dir, "bam", "*.bam")))
     bw_list = sorted(glob.glob(os.path.join(work_dir, "bigwig", "*.bw")))
@@ -517,10 +579,10 @@ def bam_bwQC(work_dir, threads):
             
         #create Spearman correlation heatmap
         spearman_file = os.path.join(work_dir, "chip-qc", "heatmap_SpearmanCorr_readCounts_bigwig.pdf")
-        if not utils.file_exists(pearson_file):
+        if not utils.file_exists(spearman_file):
             print("Generating Spearman correlation plot")
             spearman = "plotCorrelation -in " + sum_file + " --corMethod spearman --skipZeros --plotTitle 'Spearman Correlation of Read Counts' --whatToPlot heatmap --colorMap viridis -o " + spearman_file \
-             + " --outFileCorMatrix " + os.path.join(work_dir,"chip-qc"," SpearmanCorr_readCounts_bigwig.tab")
+             + " --outFileCorMatrix " + os.path.join(work_dir,"chip-qc","SpearmanCorr_readCounts_bigwig.tab")
              
             utils.write2log(work_dir, spearman, "Spearman correlation BigWig files: ")
             subprocess.run(spearman, shell = True)

@@ -11,7 +11,7 @@ import pkg_resources
 from platform import python_version
 
 def checkPythonPackages(): #check for required python packages; installs if absent
-    #check if Python => 3.5
+    #check if Python >= 3.5
     try:
         version = float(python_version().rsplit(".",1)[0])
         if version < 3.5:
@@ -23,7 +23,8 @@ def checkPythonPackages(): #check for required python packages; installs if abse
     required = {"shyaml", "pyyaml", "pandas", "numpy",
                 "matplotlib", "seaborn", "multiqc",
                 "cutadapt", "tqdm","gseapy",
-                "matplotlib-venn", "pysam", "deeptools"}
+                "matplotlib-venn", "pysam", "deeptools",
+                "macs3"}
     installed = {pkg.key for pkg in pkg_resources.working_set}
     missing = required - installed
     if missing:
@@ -179,7 +180,8 @@ def main():
                              choices = ["hisat2",
                                         "bwa-mem",
                                         "bwa-aln"], 
-                             default = "hisat2",
+                             const = "hisat2",
+                             nargs = "?",
                              required = False,
                              help = "Create BAM files using HISAT2 or BWA (mem or aln")
     parser_chip.add_argument("-d", "--deduplication", 
@@ -200,15 +202,12 @@ def main():
                              help = "Perform QC analysis of BAM files")
     parser_chip.add_argument("-p", "--peaks", 
                              required = False, 
-                             const = "0.05",
-                             nargs = "?",
-                             metavar = "q value",
-                             type = str,
-                             help = "Call and annotate peaks. \nDefault q value for MACS2 is 0.05")
+                             action = 'store_true',
+                             help = "Call and annotate peaks with MACS3/HOMER")
     parser_chip.add_argument("--metagene", 
                              required = False, 
                              action = 'store_true', 
-                             help = "Generate metageneplots and heatmaps with ngs.plot")
+                             help = "Generate metageneplots and heatmaps with plotProfile (deepTools)")
     parser_chip.add_argument("--skip-fastqc",
                                required = False,
                                action = 'store_true',
@@ -423,7 +422,7 @@ def main():
             rnaseq_utils.geneSetEnrichment(work_dir, pvalue, gene_sets)
     
     def chip_seq(args, script_dir):
-        
+                
         #set thread count for processing
         max_threads = str(multiprocessing.cpu_count())
         threads = args["threads"]
@@ -433,26 +432,38 @@ def main():
         #Check md5sums
         utils.checkMd5(work_dir)
     
-        ##Run FastQC/MultiQC
-        skip_fastqc = args["skip_fastqc"]
-        file_extension = utils.get_extension(work_dir)
-        if not skip_fastqc:
-            utils.fastqc(script_dir, work_dir,threads, file_extension)
-        else:
-            print("Skipping FastQC/MultiQC analysis")
-            
+                
         #create BAM files
         align = args["align"]
         genome = args["genome"]
         
-        if align in "hisat2":
-            utils.trim(script_dir, threads, work_dir)
-            chipseq_utils.hisat2(script_dir, work_dir, threads, chip_seq_settings, genome)
-            utils.indexBam(work_dir, threads)
-        elif "bwa" in align:
-            utils.trim(script_dir, threads, work_dir)
-            utils.bwa(work_dir, script_dir, args, threads, chip_seq_settings, genome)
-            utils.indexBam(work_dir, threads)
+               
+        if align is not None:
+            if align == "hisat2":
+                ##Run FastQC/MultiQC
+                skip_fastqc = args["skip_fastqc"]
+                file_extension = utils.get_extension(work_dir)
+                if not skip_fastqc:
+                    utils.fastqc(script_dir, work_dir,threads, file_extension)
+                else:
+                    print("Skipping FastQC/MultiQC analysis")
+                
+                utils.trim(script_dir, threads, work_dir)
+                chipseq_utils.hisat2(script_dir, work_dir, threads, chip_seq_settings, genome)
+                utils.indexBam(work_dir, threads)
+            elif "bwa" in align:
+                ##Run FastQC/MultiQC
+                skip_fastqc = args["skip_fastqc"]
+                file_extension = utils.get_extension(work_dir)
+                if not skip_fastqc:
+                    utils.fastqc(script_dir, work_dir,threads, file_extension)
+                else:
+                    print("Skipping FastQC/MultiQC analysis")
+                
+                utils.trim(script_dir, threads, work_dir)
+                utils.bwa(work_dir, script_dir, args, threads, chip_seq_settings, genome)
+                utils.indexBam(work_dir, threads)
+        
             
             
         dedup = args["deduplication"]
@@ -471,6 +482,10 @@ def main():
         metagene = args["metagene"]
         if metagene == True:
             chipseq_utils.plotProfile(work_dir, chip_seq_settings, genome, threads)
+        
+        peak = args["peaks"]
+        if peak == True:
+            chipseq_utils.peak(work_dir, threads, genome, chip_seq_settings)
     
     
     def cutrun(args, script_dir):

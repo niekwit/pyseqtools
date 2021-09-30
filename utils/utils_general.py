@@ -288,9 +288,9 @@ def deduplicationBam(script_dir, work_dir, threads, args):
     #plot number of reads after deduplication
     #get counts from non-deduplicated bam files
     if "bwa" not in args["align"]:
-        file_list = glob.glob(os.path.join(work_dir,
+        file_list = sorted(glob.glob(os.path.join(work_dir,
                                            "bam",
-                                           "*-sort-bl.bam"))
+                                           "*-sort-bl.bam")))
         
         column_names = [os.path.basename(bam).replace("-sort-bl.bam","") for bam in file_list]
         df = pd.DataFrame(columns = column_names)
@@ -303,9 +303,9 @@ def deduplicationBam(script_dir, work_dir, threads, args):
         df["condition"] = "pre-deduplication"
         
         #get counts for deduplicated bam files
-        file_list = glob.glob(os.path.join(work_dir,
+        file_list = sorted(glob.glob(os.path.join(work_dir,
                                            "bam",
-                                           "*-sort-bl-dedupl.bam"))
+                                           "*-sort-bl-dedupl.bam")))
                
         for bam in file_list:
               count = pysam.view("-@", str(threads) ,"-c", "-F" "260", bam)
