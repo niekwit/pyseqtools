@@ -13,6 +13,7 @@ from fuzzywuzzy import fuzz
 
 import yaml
 import pandas as pd
+import pybedtools
 
 
 script_dir = os.path.abspath(os.path.dirname(__file__))
@@ -449,9 +450,69 @@ def peak(work_dir, threads, genome, chip_seq_settings):
                 macs3.extend(peak_setting) # add peak settings
                 utils.write2log(work_dir, " ".join(macs3), "MACS3: ")
                 subprocess.call(macs3)
+                
+                #convert MACS3 output to BED format for bedtools 
+                bed_file = os.path.join(out_dir, chip_sample + ".bed")
+                
+                if not utils.file_exists(bed_file):
+                    df_bed = pd.read_csv(os.path.join(out_dir, chip_sample + "_peaks.broadPeak"),
+                                         sep = "\t",
+                                         header = None)
+                    df_bed = df_bed.drop(range(3,9), axis = 1)
+                    new_order = [0,1,2]
+                    df_bed = df_bed[df_bed.columns[new_order]]
+                    df_bed.to_csv(bed_file, 
+                                     sep = "\t", 
+                                     index = False, 
+                                     header = False)
+                    
+            
+    #group replicates together in list and get bed files
+    peak_dirs = sorted(glob.glob(os.path.join(work_dir,"peaks","*")))
+    df_repl = pd.DataFrame(peak_dirs, columns = ["Dir"])
+    df_repl["base"] = df_repl["Dir"].str.rsplit("_", n=1, expand=True)[0]
+    
+    unique_repl = set(df_repl["base"])
+    replicates = []
+  
+    for i in unique_repl:
+        j = glob.glob(os.path.join(work_dir,i + "*"))
+        replicates.append(j)
+        
+    bed_list = []
+    for i in replicates:
+        bed = []
+        repl_range = range(0,len(i))
+        
+        for j in repl_range:
+            _bed = glob.glob(os.path.join(i[j], "*.bed"))
+        
+            bed.append(_bed)
+        bed_list.append(bed)
+    
+    #check for bedtools
     
     
-    #get overlapping peaks from each replicate
+    #put intersecting peaks from each replicate in new BED file
+    for bed in bed_list:
+        a_bed, = bed[0]
+       
+        bedtools = ["bedtools", "intersect", "-a", a_bed, "-b"]
+        b_bed = bed[1:(len(bed))]
+        b_bed = [i[0] for i in b_bed]
+        bedtools.extend(b_bed)
+    
+        os.makedirs(os.path.dirname(a_bed).rsplit("_",1)[0], exist_ok = True)    
+        output_bed = os.path.join(os.path.dirname(a_bed).rsplit("_",1)[0], 
+                                  os.path.basename(a_bed).rsplit("_",1)[0]) + ".bed"
+        
+        if not utils.file_exists(output_bed):
+            bedtools.extend([">", output_bed])
+            utils.write2log(work_dir, " ".join(bedtools), "Get overlapping peaks between replicates: ")
+            
+            
+            subprocess.run(" ".join(bedtools), shell = True)
+    
     
     
     #annotate peaks with HOMER

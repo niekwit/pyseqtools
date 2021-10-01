@@ -24,7 +24,7 @@ def checkPythonPackages(): #check for required python packages; installs if abse
                 "matplotlib", "seaborn", "multiqc",
                 "cutadapt", "tqdm","gseapy",
                 "matplotlib-venn", "pysam", "deeptools",
-                "macs3"}
+                "macs3", "pybedtools"}
     installed = {pkg.key for pkg in pkg_resources.working_set}
     missing = required - installed
     if missing:
