@@ -7,14 +7,11 @@ import urllib.request
 import sys
 import gzip
 import shutil
-from  builtins import any as b_any
-import itertools
-from fuzzywuzzy import fuzz
+from builtins import any as b_any
 
 import yaml
 import pandas as pd
 import pybedtools
-
 
 script_dir = os.path.abspath(os.path.dirname(__file__))
 script_dir = os.path.dirname(script_dir)
@@ -32,7 +29,7 @@ def hisat2(script_dir, work_dir, threads, chip_seq_settings, genome):
     if "hisat2" not in path:
         #Check for HISAT2 elsewhere
         try:
-            hisat2 = [line[0:] for line in subprocess.check_output("find $HOME -name hisat2 ! -path '*/multiqc*'", 
+            hisat2 = [line[0:] for line in subprocess.check_output("find $HOME -name hisat2 ! -path '*/multiqc*'",
                                                                    shell = True).splitlines()]
             hisat2 = hisat2[0].decode("utf-8")
         except:
@@ -367,8 +364,10 @@ def peak(work_dir, threads, genome, chip_seq_settings):
     
     if "hg" in genome:
         genome = "hs"
+        species = "human"
     elif "mm" in genome:
         genome = "mm"
+        species = "mouse"
     elif "ce" in genome:
         genome = "ce"
     elif "dm" in genome:
@@ -482,44 +481,66 @@ def peak(work_dir, threads, genome, chip_seq_settings):
     bed_list = []
     for i in replicates:
         bed = []
-        repl_range = range(0,len(i))
+        repl_range = range(0, len(i))
         
         for j in repl_range:
             _bed = glob.glob(os.path.join(i[j], "*.bed"))
         
             bed.append(_bed)
         bed_list.append(bed)
-    
-    #check for bedtools
-    
-    
+
     #put intersecting peaks from each replicate in new BED file
-    for bed in bed_list:
-        a_bed, = bed[0]
-       
-        bedtools = ["bedtools", "intersect", "-a", a_bed, "-b"]
-        b_bed = bed[1:(len(bed))]
-        b_bed = [i[0] for i in b_bed]
-        bedtools.extend(b_bed)
-    
-        os.makedirs(os.path.dirname(a_bed).rsplit("_",1)[0], exist_ok = True)    
-        output_bed = os.path.join(os.path.dirname(a_bed).rsplit("_",1)[0], 
-                                  os.path.basename(a_bed).rsplit("_",1)[0]) + ".bed"
-        
-        if not utils.file_exists(output_bed):
-            bedtools.extend([">", output_bed])
-            utils.write2log(work_dir, " ".join(bedtools), "Get overlapping peaks between replicates: ")
-            
-            
-            subprocess.run(" ".join(bedtools), shell = True)
-    
-    
-    
+
+    if len(unique_repl) > 1:
+        for bed in bed_list:
+            a_bed, = bed[0]
+            b_bed, = bed[1]
+
+            os.makedirs(os.path.dirname(a_bed).rsplit("_", 1)[0], exist_ok = True)
+            output_bed = os.path.join(os.path.dirname(a_bed).rsplit("_", 1)[0],
+                                      os.path.basename(a_bed).rsplit("_", 1)[0]) + ".bed"
+
+            if not utils.file_exists(output_bed):
+                a_bed = pybedtools.Bedtool(a_bed)
+                b_bed = pybedtools.Bedtool(b_bed)
+
+                intersect_bed = a_bed.intersect(b_bed)
+                out = intersect_bed.saveas(output_bed)
+
+    #check for HOMER
+
+    path = os.environ["PATH"].lower()
+
+    if "homer" not in path:
+        # Check for HOMER elsewhere
+        try:
+            homer = [line[0:] for line in subprocess.check_output("find $HOME -iname homer -type d ! -path '*/multiqc*'",
+                                                                   shell = True).splitlines()]
+            homer = homer[0].decode("utf-8")
+            configure_file = os.path.join(homer, "configureHomer.pl")
+        except:
+            print("WARNING: HOMER was not found\nInstalling HOMER now")
+            url = "http://homer.ucsd.edu/homer/configureHomer.pl"
+            os.makedirs(os.path.join(script_dir, "homer"), exist_ok = True)
+            configure_file = os.path.join(script_dir, "homer", "configureHomer.pl")
+            urllib.request.urlretrieve(url, configure_file)
+            subprocess.run(["perl", configure_file, "-install"])
+
+            homer = os.path.join(script_dir, "homer")
+            configure_file = os.path.join(homer, "configureHomer.pl")
+
+    else:
+        homer = ""
+        configure_file = os.path.join(homer, "configureHomer.pl")
+
+    #install HOMER package for chosen genome if unavailable
+    homer_genomes = glob.glob(os.path.join(homer, "data", "genomes", "*"))
+    if not b_any(genome in x for x in homer_genomes):
+        subprocess.call(["perl", configure_file, "-install", genome])
+
     #annotate peaks with HOMER
-    
-    
-  
-        
+    bed_list = glob.glob(os.path.join(work_dir, "peaks", "*", "*.bed"))
+
     
 def bam_bwQC(work_dir, threads):
     #import sample info
@@ -670,8 +691,7 @@ def bam_bwQC(work_dir, threads):
 def plotProfile(work_dir, chip_seq_settings, genome, threads):
     #check for gtf file
     gtf = chip_seq_settings["gtf"][genome]
-    
-       
+
     #download gtf file if not available
     if gtf == "":
         if genome == "hg19":
