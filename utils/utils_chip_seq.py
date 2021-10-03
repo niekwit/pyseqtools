@@ -8,6 +8,7 @@ import sys
 import gzip
 import shutil
 from builtins import any as b_any
+from itertools import compress
 
 import yaml
 import pandas as pd
@@ -418,7 +419,7 @@ def peak(work_dir, threads, genome, chip_seq_settings):
     conditions = set(sample_df["condition"])
     
 
-    #run MACS2 for each sample and input combination
+    #run MACS3 for each sample and input combination
     for i in list(conditions):
         df = sample_df[sample_df["condition"] == i]
         replicates = int(len(df["condition"]) / len(set(df["input"])))
@@ -508,7 +509,7 @@ def peak(work_dir, threads, genome, chip_seq_settings):
                 out = intersect_bed.saveas(output_bed)
 
     #check for HOMER
-
+    print("Annotating peaks with HOMER")
     path = os.environ["PATH"].lower()
 
     if "homer" not in path:
@@ -518,6 +519,7 @@ def peak(work_dir, threads, genome, chip_seq_settings):
                                                                    shell = True).splitlines()]
             homer = homer[0].decode("utf-8")
             configure_file = os.path.join(homer, "configureHomer.pl")
+            homer_dir = homer
         except:
             print("WARNING: HOMER was not found\nInstalling HOMER now")
             url = "http://homer.ucsd.edu/homer/configureHomer.pl"
@@ -528,18 +530,46 @@ def peak(work_dir, threads, genome, chip_seq_settings):
 
             homer = os.path.join(script_dir, "homer")
             configure_file = os.path.join(homer, "configureHomer.pl")
+            homer_dir = homer
 
     else:
         homer = ""
-        configure_file = os.path.join(homer, "configureHomer.pl")
+        configure_file = "configureHomer.pl"
+        path = os.environ["PATH"].split(":")
+        homer_dir = list(compress(path, ["pyseqtools" in x.lower() for x in path]))
+        if len(homer_dir) > 1:
+            print("ERROR: multiple instances of HOMER found:\n" + homer_dir)
+            return
+        elif len(homer_dir) == 1:
+            homer_dir, = homer_dir
 
     #install HOMER package for chosen genome if unavailable
-    homer_genomes = glob.glob(os.path.join(homer, "data", "genomes", "*"))
+    homer_genomes = glob.glob(os.path.join(homer_dir, "data", "genomes", "*"))
     if not b_any(genome in x for x in homer_genomes):
         subprocess.call(["perl", configure_file, "-install", genome])
 
     #annotate peaks with HOMER
     bed_list = glob.glob(os.path.join(work_dir, "peaks", "*", "*.bed"))
+    
+    for bed in bed_list:
+        out_file = bed.replace(".bed", "_peaks.txt")
+        
+        if not utils.file_exists(out_file):
+            #add unique peak id to .bed file (required by HOMER)
+            df_bed = pd.read_csv(bed, sep = "\t", header = None)
+            peak_number = len(df_bed)
+            peak_ids = []
+            for i in range(1, peak_number):
+                peak_id = "peak_" + i
+                peak_ids.append(peak_id)
+            df_bed = df_bed.insert(loc = 0, value = peak_ids)
+            df_bed.to_csv(bed, sep = "\t", index = False, header = False)
+            
+            #run HOMER
+            command = ["perl", os.path.join(homer_dir, "annotatePeaks.pl",),
+                       bed, genome, ">", out_file]
+            utils.write2log(work_dir, command, "Peak annotation (HOMER): " )
+            subprocess.run(command)
 
     
 def bam_bwQC(work_dir, threads):
@@ -687,6 +717,7 @@ def bam_bwQC(work_dir, threads):
         command = "plotFingerprint -b " + bam_list + " --labels " + labels \
             + " --skipZeros -p " + threads + " --plotFile " + out_file
         subprocess.run(command, shell = True)
+
         
 def plotProfile(work_dir, chip_seq_settings, genome, threads):
     #check for gtf file
