@@ -361,18 +361,18 @@ def ngsplot(work_dir, genome, feature, window):
     
 def peak(work_dir, threads, genome, chip_seq_settings):
     
-    print("Calling peaks with MACS3")
+    print("Calling peaks with MACS3:")
     
     if "hg" in genome:
-        genome = "hs"
+        _genome = "hs"
         species = "human"
     elif "mm" in genome:
-        genome = "mm"
+        _genome = "mm"
         species = "mouse"
     elif "ce" in genome:
-        genome = "ce"
+        _genome = "ce"
     elif "dm" in genome:
-        genome = "dm"
+        _genome = "dm"
     
     #load/check MACS3 settings from yaml
     q_value = chip_seq_settings["MACS3"]["q-value"]
@@ -418,7 +418,6 @@ def peak(work_dir, threads, genome, chip_seq_settings):
     sample_df = pd.read_csv(os.path.join(work_dir, "samples.csv"))
     conditions = set(sample_df["condition"])
     
-
     #run MACS3 for each sample and input combination
     for i in list(conditions):
         df = sample_df[sample_df["condition"] == i]
@@ -445,7 +444,7 @@ def peak(work_dir, threads, genome, chip_seq_settings):
             if not utils.file_exists(out_file):
                 macs3 = ["macs3", "callpeak", "-t", sample_bam, "-c", input_bam,
                          "-n", chip_sample, "--outdir", out_dir, "-q", q_value,
-                         "-g", genome]
+                         "-g", _genome]
                 macs3.extend(input_format )
                 macs3.extend(peak_setting) # add peak settings
                 utils.write2log(work_dir, " ".join(macs3), "MACS3: ")
@@ -466,7 +465,6 @@ def peak(work_dir, threads, genome, chip_seq_settings):
                                      index = False, 
                                      header = False)
                     
-            
     #group replicates together in list and get bed files
     peak_dirs = sorted(glob.glob(os.path.join(work_dir,"peaks","*")))
     df_repl = pd.DataFrame(peak_dirs, columns = ["Dir"])
@@ -491,7 +489,6 @@ def peak(work_dir, threads, genome, chip_seq_settings):
         bed_list.append(bed)
 
     #put intersecting peaks from each replicate in new BED file
-
     if len(unique_repl) > 1:
         for bed in bed_list:
             a_bed, = bed[0]
@@ -502,14 +499,14 @@ def peak(work_dir, threads, genome, chip_seq_settings):
                                       os.path.basename(a_bed).rsplit("_", 1)[0]) + ".bed"
 
             if not utils.file_exists(output_bed):
-                a_bed = pybedtools.Bedtool(a_bed)
-                b_bed = pybedtools.Bedtool(b_bed)
+                a_bed = pybedtools.BedTool(a_bed)
+                b_bed = pybedtools.BedTool(b_bed)
 
                 intersect_bed = a_bed.intersect(b_bed)
                 out = intersect_bed.saveas(output_bed)
 
     #check for HOMER
-    print("Annotating peaks with HOMER")
+    print("Annotating peaks with HOMER:")
     path = os.environ["PATH"].lower()
 
     if "homer" not in path:
@@ -520,6 +517,9 @@ def peak(work_dir, threads, genome, chip_seq_settings):
             homer = homer[0].decode("utf-8")
             configure_file = os.path.join(homer, "configureHomer.pl")
             homer_dir = homer
+            print("Please add the following line to your ~/.bashrc file and run pyseqtools again:")
+            print("export PATH=" + os.path.join(script_dir,"homer","bin") + ":$PATH")
+            return
         except:
             print("WARNING: HOMER was not found\nInstalling HOMER now")
             url = "http://homer.ucsd.edu/homer/configureHomer.pl"
@@ -531,45 +531,60 @@ def peak(work_dir, threads, genome, chip_seq_settings):
             homer = os.path.join(script_dir, "homer")
             configure_file = os.path.join(homer, "configureHomer.pl")
             homer_dir = homer
+            print("Please add the following line to your ~/.bashrc file and run pyseqtools again:")
+            print("export PATH=" + os.path.join(script_dir,"homer","bin") + ":$PATH")
+            return
 
     else:
         homer = ""
-        configure_file = "configureHomer.pl"
         path = os.environ["PATH"].split(":")
-        homer_dir = list(compress(path, ["pyseqtools" in x.lower() for x in path]))
+        homer_dir = list(compress(path, ["homer" in x.lower() for x in path]))
+        
         if len(homer_dir) > 1:
-            print("ERROR: multiple instances of HOMER found:\n" + homer_dir)
+            print("ERROR: multiple instances of HOMER found:" )
+            print(homer_dir)
             return
         elif len(homer_dir) == 1:
             homer_dir, = homer_dir
+            configure_file = os.path.join(os.path.dirname(homer_dir),"configureHomer.pl")
 
     #install HOMER package for chosen genome if unavailable
-    homer_genomes = glob.glob(os.path.join(homer_dir, "data", "genomes", "*"))
+    homer_genomes = glob.glob(os.path.join(os.path.dirname(homer_dir), "data", "genomes", "*"))
     if not b_any(genome in x for x in homer_genomes):
+        print("WARNING: HOMER genome files not found\nInstalling now for " +genome)
         subprocess.call(["perl", configure_file, "-install", genome])
 
     #annotate peaks with HOMER
     bed_list = glob.glob(os.path.join(work_dir, "peaks", "*", "*.bed"))
     
     for bed in bed_list:
-        out_file = bed.replace(".bed", "_peaks.txt")
+        out_file = bed.replace(".bed", "_annotated-peaks.txt")
         
         if not utils.file_exists(out_file):
             #add unique peak id to .bed file (required by HOMER)
             df_bed = pd.read_csv(bed, sep = "\t", header = None)
-            peak_number = len(df_bed)
-            peak_ids = []
-            for i in range(1, peak_number):
-                peak_id = "peak_" + i
-                peak_ids.append(peak_id)
-            df_bed = df_bed.insert(loc = 0, value = peak_ids)
-            df_bed.to_csv(bed, sep = "\t", index = False, header = False)
+            column_number = len(df_bed.columns)
+            if column_number == 3:
+                peak_number = len(df_bed)
+                peak_ids = []
+                for i in range(1, peak_number + 1):
+                    peak_id = "peak_" + str(i)
+                    peak_ids.append(peak_id)
+                df_bed["peak_id"] = peak_ids
+                df_bed["empty"] = ""
+                df_bed["strand"] = "+"
+                df_bed.to_csv(bed, sep = "\t", index = False, header = False)
+            elif column_number > 6:
+                print("ERROR: too many columns found in .bed file\n" + bed)
+                return
             
             #run HOMER
-            command = ["perl", os.path.join(homer_dir, "annotatePeaks.pl",),
+            command = ["perl", os.path.join(homer_dir, "annotatePeaks.pl"),
                        bed, genome, ">", out_file]
+            command = " ".join(command)
             utils.write2log(work_dir, command, "Peak annotation (HOMER): " )
-            subprocess.run(command)
+            print("Annotating peaks for " + os.path.basename(bed))
+            subprocess.run(command, shell = True, check = True)
 
     
 def bam_bwQC(work_dir, threads):
