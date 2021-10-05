@@ -1,0 +1,40 @@
+BigWig:
+  binSize: '50'
+  effectiveGenomeSize: '2827437033'
+  extendReads: '200'
+  normalizeUsing: RPKM
+blacklist:
+  hg19: /home/niek/Documents/references/blacklists/Human/hg19/wgEncodeDukeMapabilityRegionsExcludable.bed
+  hg38: ''
+  mm10: ''
+  mm9: /home/niek/Documents/scripts/pyseqtools/blacklist/mm9/mm9-blacklist.bed
+bowtie:
+  hg19: ''
+  hg38: ''
+  mm10: ''
+  mm9: ''
+bwa:
+  hg19: /home/niek/Documents/scripts/pyseqtools/index/bwa/hg19/hg19.fasta
+  hg38: ''
+  mm10: ''
+  mm9: ''
+fasta:
+  hg19: /home/niek/Documents/references/fasta/Human/GRCh37/ucsc-hg19-fasta/ucsc.hg19.fasta
+  hg38: ''
+  mm10: ''
+  mm9: /home/niek/Documents/scripts/pyseqtools/fasta/mm9/ucsc.mm9.fasta
+gtf:
+  hg19: /home/niek/Documents/scripts/pyseqtools/gtf/hg19/gencode.v19.annotation.gtf
+  hg38: ''
+  mm10: ''
+  mm9: /home/niek/Documents/scripts/pyseqtools/gtf/mm9/gencode.vM1.annotation.gtf
+hisat2:
+  hg19: /home/niek/Documents/references/hisat2-index/GRCh37-hg19ucsc/hg19-index
+  hg38: ''
+  mm10: ''
+  mm9: /home/niek/Documents/scripts/pyseqtools/index/hisat2/mm9/index
+MACS3:
+  q-value: 0.05
+  format: BAM
+  IP: histone
+  broad-cutoff: 0.1

@@ -50,7 +50,8 @@ def main():
     #create subparsers for each module, i.e. functionality
     
     #create subparser for crispr screen analysis commands
-    parser_crispr = subparsers.add_parser('crispr', 
+    parser_crispr = subparsers.add_parser('crispr',
+                                          description = "Analysis pipeline for CRISPR-Cas screens",
                                           help = 'CRISPR screen analysis')
 
     parser_crispr.add_argument("-l", "--library",
@@ -121,6 +122,7 @@ def main():
      
     # create the parser for RNA-Seq-analysis
     parser_rnaseq = subparsers.add_parser('rna-seq', 
+                                          description = "Analysis pipeline for RNA-Seq experiments",
                                           help='RNA-Seq analysis')
             
     parser_rnaseq.add_argument("-t", "--threads",
@@ -161,7 +163,8 @@ def main():
     
     #create subparser for ChIP-Seq analysis commands
     parser_chip = subparsers.add_parser('chip-seq', 
-                                          help='ChIP-Seq analysis')
+                                        description = "Analysis pipeline for ChIP-Seq experiments",
+                                        help='ChIP-Seq analysis')
     
     parser_chip.add_argument("-t", "--threads",
                              required = False,
@@ -217,11 +220,50 @@ def main():
     
     #create subparser for CUT&RUN analysis commands
     parser_cutrun = subparsers.add_parser('cutrun', 
+                                          description = "Analysis pipeline for CUT & RUN experiments",
                                           help = 'CUT & RUN analysis')
     parser_cutrun.add_argument("-t", "--threads",
                              required = False,
                              default = 1,
                              help = "<INT> number of CPU threads to use (default is 1). Use max to apply all available CPU threads")
+    parser_cutrun.add_argument("-g", "--genome", 
+                             required = False,
+                             default = 'hg19',
+                             help = "Choose reference genome (default is hg19)")
+    parser_cutrun.add_argument("-a", "--align",
+                             choices = ["bowtie",
+                                        "hisat2",
+                                        "bwa-mem",
+                                        "bwa-aln"], 
+                             const = "bowtie",
+                             nargs = "?",
+                             required = False,
+                             help = "Create BAM files using Bowtie2, HISAT2 or BWA (mem or aln")
+    parser_cutrun.add_argument("-d", "--deduplication", 
+                             required = False, 
+                             action = 'store_true',
+                             help = "Perform deduplication of BAM files")
+    parser_cutrun.add_argument("-b", "--bigwig", 
+                             required = False,
+                             action = 'store_true',
+                             help = "Create BigWig files")
+    parser_cutrun.add_argument("--qc", 
+                             required = False, 
+                             action = 'store_true',
+                             help = "Perform QC analysis of BAM files")
+    parser_cutrun.add_argument("-p", "--peaks", 
+                             required = False, 
+                             action = 'store_true',
+                             help = "Call and annotate peaks with MACS3/HOMER")
+    parser_cutrun.add_argument("--metagene", 
+                             required = False, 
+                             action = 'store_true', 
+                             help = "Generate metageneplots and heatmaps with plotProfile (deepTools)")
+    parser_cutrun.add_argument("--skip-fastqc",
+                               required = False,
+                               action = 'store_true',
+                               default = False,
+                               help = "Skip FastQC/MultiQC")
     
     #create subparser for gene symbol conversion
     parser_conversion = subparsers.add_parser('genesymconv', 
@@ -241,7 +283,8 @@ def main():
     
     #create subparser for subsetting GTF files
     parser_subsetgtf = subparsers.add_parser('subsetgtf', 
-                                          help = 'Subset GTF files for selected genes')
+                                             description = "Tools for subsetting GTF files according to input gene list",
+                                             help = 'Subset GTF files for selected genes')
     
     parser_subsetgtf.add_argument("-l", "--list",
                              required = True,
@@ -489,8 +532,56 @@ def main():
     
     
     def cutrun(args, script_dir):
-        pass
+        #set thread count for processing
+        max_threads = str(multiprocessing.cpu_count())
+        threads = args["threads"]
+        if threads == "max":
+            threads = max_threads
     
+        #Check md5sums
+        utils.checkMd5(work_dir)
+    
+                
+        #create BAM files
+        align = args["align"]
+        genome = args["genome"]
+    
+        if align is not None:
+            if align == "hisat2":
+                ##Run FastQC/MultiQC
+                skip_fastqc = args["skip_fastqc"]
+                file_extension = utils.get_extension(work_dir)
+                if not skip_fastqc:
+                    utils.fastqc(script_dir, work_dir,threads, file_extension)
+                else:
+                    print("Skipping FastQC/MultiQC analysis")
+                
+                utils.trim(script_dir, threads, work_dir)
+                chipseq_utils.hisat2(script_dir, work_dir, threads, chip_seq_settings, genome)
+                utils.indexBam(work_dir, threads)
+            elif "bwa" in align:
+                ##Run FastQC/MultiQC
+                skip_fastqc = args["skip_fastqc"]
+                file_extension = utils.get_extension(work_dir)
+                if not skip_fastqc:
+                    utils.fastqc(script_dir, work_dir,threads, file_extension)
+                else:
+                    print("Skipping FastQC/MultiQC analysis")
+                
+                utils.trim(script_dir, threads, work_dir)
+                utils.bwa(work_dir, script_dir, args, threads, chip_seq_settings, genome)
+                utils.indexBam(work_dir, threads)
+            elif align == "bowtie":
+                ##Run FastQC/MultiQC
+                skip_fastqc = args["skip_fastqc"]
+                file_extension = utils.get_extension(work_dir)
+                if not skip_fastqc:
+                    utils.fastqc(script_dir, work_dir,threads, file_extension)
+                else:
+                    print("Skipping FastQC/MultiQC analysis")
+                
+                utils.trim(script_dir, threads, work_dir)
+                cutrun_utils.bowtie(work_dir, script_dir, threads, cutrun_seq_settings, genome)
     
     def geneSymConv(args, script_dir):
         conversion = args["conversion"]
@@ -540,7 +631,7 @@ if __name__ == "__main__":
     import utils_general as utils
     import utils_rna_seq as rnaseq_utils
     import utils_chip_seq as chipseq_utils
-    #import utils_cutrun as cutrun_utils
+    import utils_cutrun as cutrun_utils
     
     #log all command line arguments to commands.log
     utils.logCommandLineArgs(work_dir)
@@ -579,6 +670,15 @@ if __name__ == "__main__":
             chip_seq_settings = yaml.full_load(file)
     except FileNotFoundError:
         sys.exit("ERROR: chip-seq.yaml not found in yaml folder. Please provide this file for further analysis.")
+        
+    ###loads ChIP-Seq settings
+    try:
+        with open(os.path.join(script_dir,
+                               "yaml",
+                               "cut-run.yaml")) as file:
+            cutrun_settings = yaml.full_load(file)
+    except FileNotFoundError:
+        sys.exit("ERROR: cut-run.yaml not found in yaml folder. Please provide this file for further analysis.")
    
 
     
