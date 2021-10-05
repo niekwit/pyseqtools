@@ -581,7 +581,7 @@ def main():
                     print("Skipping FastQC/MultiQC analysis")
                 
                 utils.trim(script_dir, threads, work_dir)
-                cutrun_utils.bowtie(work_dir, script_dir, threads, cutrun_seq_settings, genome)
+                cutrun_utils.bowtie(work_dir, script_dir, threads, cutrun_settings, genome)
     
     def geneSymConv(args, script_dir):
         conversion = args["conversion"]
