@@ -225,6 +225,7 @@ def main():
     parser_cutrun.add_argument("-t", "--threads",
                              required = False,
                              default = 1,
+                             type = str,
                              help = "<INT> number of CPU threads to use (default is 1). Use max to apply all available CPU threads")
     parser_cutrun.add_argument("-g", "--genome", 
                              required = False,
@@ -264,6 +265,11 @@ def main():
                                action = 'store_true',
                                default = False,
                                help = "Skip FastQC/MultiQC")
+    
+    #create subparser for DamID
+    parser_damid = subparsers.add_parser('damid',
+                                          description = "Analysis pipeline for DamID",
+                                          help = 'DamID analysis')
     
     #create subparser for gene symbol conversion
     parser_conversion = subparsers.add_parser('genesymconv', 
@@ -580,8 +586,8 @@ def main():
                 else:
                     print("Skipping FastQC/MultiQC analysis")
                 
-                utils.trim(script_dir, threads, work_dir)
-                cutrun_utils.bowtie(work_dir, script_dir, threads, cutrun_settings, genome)
+                #utils.trim(script_dir, threads, work_dir)
+                cutrun_utils.bowtie(work_dir, script_dir, str(threads), cutrun_settings, genome)
     
     def geneSymConv(args, script_dir):
         conversion = args["conversion"]
@@ -671,7 +677,7 @@ if __name__ == "__main__":
     except FileNotFoundError:
         sys.exit("ERROR: chip-seq.yaml not found in yaml folder. Please provide this file for further analysis.")
         
-    ###loads ChIP-Seq settings
+    ###loads CUT & RUN settings
     try:
         with open(os.path.join(script_dir,
                                "yaml",
