@@ -1,12 +1,16 @@
 # pyseqtools
 Tool box for a variety of NGS data analyses
 
-Available analyses:
+Available analyses/tools:
 
 - CRISPR screens
 - RNA-Seq
 - ChIP-Seq
 - CUT & RUN
+- DamID (work in progress)
+
+- Interspecies gene symbol conversion
+- Subsetting of GTF file based on selected genes
 
 ## Installation
 
