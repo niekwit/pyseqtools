@@ -16,20 +16,24 @@ When running an analysis, `pyseqtools.py` will first check whether the relevant 
 ## Usage:
 
 ```
-pyseqtools.py [-h] {crispr,rna-seq,chip-seq,cutrun} ...
+usage: pyseqtools.py [-h] {crispr,rna-seq,chip-seq,cutrun,damid,genesymconv,subsetgtf} ...
 
-Analysis of a variety of NGS data
+Analysis pipelines for a variety of NGS data, and related tools
 
 positional arguments:
-  {crispr,rna-seq,chip-seq,cutrun}
-                        Available analyses:
-    crispr              CRISPR screens
-    rna-seq             RNA-Seq
-    chip-seq            ChIP-Seq
-    cutrun              CUT & RUN
+  {crispr,rna-seq,chip-seq,cutrun,damid,genesymconv,subsetgtf}
+                        Available pipelines/tools:
+    crispr              CRISPR screen analysis
+    rna-seq             RNA-Seq analysis
+    chip-seq            ChIP-Seq analysis
+    cutrun              CUT & RUN analysis
+    damid               DamID analysis
+    genesymconv         Inter-species gene symbol conversion
+    subsetgtf           Subset GTF files for selected genes
 
 optional arguments:
   -h, --help            show this help message and exit
+
 
 ```
 
@@ -100,27 +104,84 @@ optional arguments:
 ### ChIP-Seq analysis
 
 ```
-pyseqtools.py chip-seq [-h] [-t THREADS] [-r] [-f] [-g GENOME] [-a {hisat2,bwa}] [-d] [-s] [-b] [-q] [-p] [-n]
+pyseqtools.py chip-seq [-h] [-t THREADS] [-r] [-g GENOME] [-a [{hisat2,bwa-mem,bwa-aln}]] [-d]
+                              [--downsample] [-b] [--qc] [-p] [--metagene] [--skip-fastqc]
 
 optional arguments:
   -h, --help            show this help message and exit
   -t THREADS, --threads THREADS
-                        <INT> number of CPU threads to use (default is 1). Use max to apply all available CPU threads
+                        <INT> number of CPU threads to use (default is 1). Use max to apply all available
+                        CPU threads
   -r, --rename          Rename fq files
-  -f, --fastqc          Perform FASTQC
   -g GENOME, --genome GENOME
                         Choose reference genome (default is hg19)
-  -a {hisat2,bwa}, --align {hisat2,bwa}
-                        Trim and align raw data to index using HISAT2 or BWA
+  -a [{hisat2,bwa-mem,bwa-aln}], --align [{hisat2,bwa-mem,bwa-aln}]
+                        Create BAM files using HISAT2 or BWA (mem or aln
   -d, --deduplication   Perform deduplication of BAM files
-  -s, --downsample      Perform downsampling of BAM files
+  --downsample          Perform downsampling of BAM files
   -b, --bigwig          Create BigWig files
-  -q, --qc              Perform QC analysis of BAM files
-  -p, --peaks           Call and annotate peaks
-  -n, --ngsplot         Generate metageneplots and heatmaps with ngs.plot
+  --qc                  Perform QC analysis of BAM files
+  -p, --peaks           Call and annotate peaks with MACS3/HOMER
+  --metagene            Generate metageneplots and heatmaps with plotProfile (deepTools)
+  --skip-fastqc         Skip FastQC/MultiQC
+
 
 ```
 
 ### CUT&RUN analysis
 
-under construction
+```
+pyseqtools.py cutrun [-h] [-t THREADS] [-g GENOME] [-a [{bowtie,bowtie2,hisat2,bwa-mem,bwa-aln}]]
+                            [-d] [-b] [--qc] [-p] [--metagene] [--skip-fastqc]
+
+Analysis pipeline for CUT & RUN experiments
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -t THREADS, --threads THREADS
+                        <INT> number of CPU threads to use (default is 1). Use max to apply all available
+                        CPU threads
+  -g GENOME, --genome GENOME
+                        Choose reference genome (default is hg19)
+  -a [{bowtie,bowtie2,hisat2,bwa-mem,bwa-aln}], --align [{bowtie,bowtie2,hisat2,bwa-mem,bwa-aln}]
+                        Create BAM files using Bowtie2, HISAT2 or BWA (mem or aln
+  -d, --deduplication   Perform deduplication of BAM files
+  -b, --bigwig          Create BigWig files
+  --qc                  Perform QC analysis of BAM files
+  -p, --peaks           Call and annotate peaks with MACS3/HOMER
+  --metagene            Generate metageneplots and heatmaps with plotProfile (deepTools)
+  --skip-fastqc         Skip FastQC/MultiQC
+
+```
+
+### Gene symbol conversion
+```
+pyseqtools.py genesymconv [-h] -c {hm,mh} -i INPUT -o OUTPUT
+
+Convert human gene symbols to mouse gene symbols, or vice versa
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -c {hm,mh}, --conversion {hm,mh}
+                        Conversion type: human to mouse (hm) or mouse to human (mh)
+  -i INPUT, --input INPUT
+                        Input gene list file. Each gene symbol should be on a new line
+  -o OUTPUT, --output OUTPUT
+                        Output file name
+
+```
+### Generate subset of GTF based on selected genes
+```
+pyseqtools.py subsetgtf [-h] -l LIST -i INPUT -o OUTPUT
+
+Tool for subsetting GTF files according to input gene list
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -l LIST, --list LIST  Input gene list file. Each gene symbol should be on a new line
+  -i INPUT, --input INPUT
+                        GTF file to be subsetted (must be specified with genome name, loaded from chip-
+                        seq.yaml)
+  -o OUTPUT, --output OUTPUT
+                        Output file name
+```
