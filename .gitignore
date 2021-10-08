@@ -134,7 +134,7 @@ dmypy.json
 #hidden files
 .*
 
-bowtie2*/
+bowtie*/
 FastQC/
 bagel2/
 index/

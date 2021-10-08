@@ -233,6 +233,7 @@ def main():
                              help = "Choose reference genome (default is hg19)")
     parser_cutrun.add_argument("-a", "--align",
                              choices = ["bowtie",
+                                        "bowtie2",
                                         "hisat2",
                                         "bwa-mem",
                                         "bwa-aln"], 
@@ -588,6 +589,17 @@ def main():
                 
                 #utils.trim(script_dir, threads, work_dir)
                 cutrun_utils.bowtie(work_dir, script_dir, str(threads), cutrun_settings, genome)
+            elif align == "bowtie2":
+                ##Run FastQC/MultiQC
+                skip_fastqc = args["skip_fastqc"]
+                file_extension = utils.get_extension(work_dir)
+                if not skip_fastqc:
+                    utils.fastqc(script_dir, work_dir,threads, file_extension)
+                else:
+                    print("Skipping FastQC/MultiQC analysis")
+                
+                #utils.trim(script_dir, threads, work_dir)
+                cutrun_utils.bowtie2(work_dir, script_dir, str(threads), cutrun_settings, genome)
     
     def geneSymConv(args, script_dir):
         conversion = args["conversion"]

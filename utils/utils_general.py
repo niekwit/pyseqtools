@@ -3,6 +3,7 @@
 import os
 import subprocess
 from subprocess import DEVNULL
+from subprocess import CalledProcessError
 import multiprocessing
 import sys
 import glob
@@ -15,6 +16,7 @@ import tarfile
 from shutil import copy
 import gzip
 import shutil
+import re
 
 
 import matplotlib.pyplot as plt
@@ -183,6 +185,7 @@ def checkSamtools(script_dir):
     else:
         return("samtools")
 
+
 def checkBedtools(script_dir):
     path = os.environ["PATH"].lower()
     
@@ -224,9 +227,91 @@ def checkBedtools(script_dir):
         return("bedtools")
     
 
+def checkBowtie(script_dir):
+    #check for bowtie1 (exclude bowtie2) in $PATH
+    path = os.environ["PATH"].lower().split(":")
+    
+    bowtie = list(filter(lambda x: re.search(r"bowtie*[-1][^2]", x), path))
+    if len(bowtie) == 1:
+        bowtie, = bowtie #unpack list
+        return(bowtie)
+    elif len(bowtie) > 1:
+        print("ERROR: multiple instances of Bowtie found:")
+        print(bowtie)
+        sys.exit()
+    elif len(bowtie) == 0:
+        try:
+            bowtie = [line[0:] for line in subprocess.check_output('find $HOME -depth -type d -iname *bowtie* | grep "bowtie*-*1[^2]"', shell = True).splitlines()]
+            if len(bowtie) > 1:
+                print("ERROR: multiple instances of Bowtie found:")
+                bowtie = [i.decode("utf-8") for i in bowtie]
+                print(bowtie)
+                sys.exit()
+            elif len(bowtie) == 1:
+                bowtie = bowtie[0].decode("utf-8")
+                return(bowtie)
+        except CalledProcessError: #when no instance of bowtie is found
+            print("WARING: Bowtie not found\nInstalling Bowtie now")     
+            if sys.platform in ["linux", "linux2"]:    
+                url = "https://sourceforge.net/projects/bowtie-bio/files/bowtie/1.3.1/bowtie-1.3.1-linux-x86_64.zip/download"
+                download_file = os.path.join(script_dir, "bowtie-1.3.1-linux-x86_64.zip")
+                bowtie = os.path.join(script_dir, "bowtie-1.3.1-linux-x86_64")
+            elif sys.platform == "darwin":
+                url = "https://sourceforge.net/projects/bowtie-bio/files/bowtie/1.3.1/bowtie-1.3.1-macos-x86_64.zip/download"
+                download_file = os.path.join(script_dir, "bowtie-1.3.1-macos-x86_64.zip")
+                bowtie = os.path.join(script_dir, "bowtie-1.3.1-macos-x86_64")
+            
+            #download bowtie zip file
+            urllib.request.urlretrieve(url, download_file)
+            
+            #unzip bowtie
+            unzip = ["unzip", "-qq", download_file, "-d", script_dir]
+            subprocess.run(unzip)
+            return(bowtie)
 
 
-
+def checkBowtie2(script_dir):
+    #check for bowtie1 (exclude bowtie2) in $PATH
+    path = os.environ["PATH"].lower().split(":")
+    
+    bowtie2 = list(filter(lambda x: "bowtie2" in x, path))
+    
+    if len(bowtie2) == 1:
+        bowtie2, = bowtie2 #unpack list
+        return(bowtie2)
+    elif len(bowtie2) > 1:
+        print("ERROR: multiple instances of Bowtie found:")
+        print(bowtie2)
+        sys.exit()
+    elif len(bowtie2) == 0:
+        try:
+            bowtie2 = [line[0:] for line in subprocess.check_output("find $HOME -type d -iname bowtie2*linux* ! -path '*/multiqc*' ! -path '*/pyseqtools/index/*'", shell = True).splitlines()]
+            if len(bowtie2) > 1:
+                print("ERROR: multiple instances of Bowtie2 found:")
+                bowtie2 = [i.decode("utf-8") for i in bowtie2]
+                print(bowtie2)
+                sys.exit()
+            elif len(bowtie2) == 1:
+                bowtie2 = bowtie2[0].decode("utf-8")
+                return(bowtie2)
+        except CalledProcessError: #when no instance of bowtie is found
+            print("WARING: Bowtie not found\nInstalling Bowtie now")     
+            if sys.platform in ["linux", "linux2"]:    
+                url = "https://sourceforge.net/projects/bowtie-bio/files/bowtie/1.3.1/bowtie-1.3.1-linux-x86_64.zip/download"
+                download_file = os.path.join(script_dir, "bowtie-1.3.1-linux-x86_64.zip")
+                bowtie2 = os.path.join(script_dir, "bowtie-1.3.1-linux-x86_64")
+            elif sys.platform == "darwin":
+                url = "https://sourceforge.net/projects/bowtie-bio/files/bowtie/1.3.1/bowtie-1.3.1-macos-x86_64.zip/download"
+                download_file = os.path.join(script_dir, "bowtie-1.3.1-macos-x86_64.zip")
+                bowtie2 = os.path.join(script_dir, "bowtie-1.3.1-macos-x86_64")
+            
+            #download bowtie zip file
+            urllib.request.urlretrieve(url, download_file)
+            
+            #unzip bowtie
+            unzip = ["unzip", "-qq", download_file, "-d", script_dir]
+            subprocess.run(unzip)
+            return(bowtie2)
 
 def checkPicard(script_dir):
     #check for Java Runtime Environment
