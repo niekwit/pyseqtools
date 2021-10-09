@@ -285,7 +285,11 @@ def checkBowtie2(script_dir):
         sys.exit()
     elif len(bowtie2) == 0:
         try:
-            bowtie2 = [line[0:] for line in subprocess.check_output("find $HOME -type d -iname bowtie2*linux* ! -path '*/multiqc*' ! -path '*/pyseqtools/index/*'", shell = True).splitlines()]
+            
+            if sys.platform in ["linux", "linux2"]:
+                bowtie2 = [line[0:] for line in subprocess.check_output("find $HOME -type d -iname bowtie2*linux* ! -path '*/multiqc*' ! -path '*/pyseqtools/index/*'", shell = True).splitlines()]
+            elif sys.platform == "darwin":
+                bowtie2 = [line[0:] for line in subprocess.check_output("find $HOME -type d -iname bowtie2*mac* ! -path '*/multiqc*' ! -path '*/pyseqtools/index/*'", shell = True).splitlines()]
             if len(bowtie2) > 1:
                 print("ERROR: multiple instances of Bowtie2 found:")
                 bowtie2 = [i.decode("utf-8") for i in bowtie2]
@@ -295,15 +299,15 @@ def checkBowtie2(script_dir):
                 bowtie2 = bowtie2[0].decode("utf-8")
                 return(bowtie2)
         except CalledProcessError: #when no instance of bowtie is found
-            print("WARING: Bowtie not found\nInstalling Bowtie now")     
+            print("WARING: Bowtie2 not found\nInstalling Bowtie now")     
             if sys.platform in ["linux", "linux2"]:    
-                url = "https://sourceforge.net/projects/bowtie-bio/files/bowtie/1.3.1/bowtie-1.3.1-linux-x86_64.zip/download"
-                download_file = os.path.join(script_dir, "bowtie-1.3.1-linux-x86_64.zip")
-                bowtie2 = os.path.join(script_dir, "bowtie-1.3.1-linux-x86_64")
+                url = "https://sourceforge.net/projects/bowtie-bio/files/bowtie2/2.4.4/bowtie2-2.4.4-linux-x86_64.zip/download"
+                download_file = os.path.join(script_dir, "bowtie2-2.4.4-linux-x86_64.zip")
+                bowtie2 = os.path.join(script_dir, "bowtie2-2.4.4-linux-x86_64")
             elif sys.platform == "darwin":
-                url = "https://sourceforge.net/projects/bowtie-bio/files/bowtie/1.3.1/bowtie-1.3.1-macos-x86_64.zip/download"
-                download_file = os.path.join(script_dir, "bowtie-1.3.1-macos-x86_64.zip")
-                bowtie2 = os.path.join(script_dir, "bowtie-1.3.1-macos-x86_64")
+                url = "https://sourceforge.net/projects/bowtie-bio/files/bowtie2/2.4.4/bowtie2-2.4.4-macos-x86_64.zip/download"
+                download_file = os.path.join(script_dir, "bowtie2-2.4.4-macos-x86_64.zip")
+                bowtie2 = os.path.join(script_dir, "bowtie2-2.4.4-macos-x86_64")
             
             #download bowtie zip file
             urllib.request.urlretrieve(url, download_file)
