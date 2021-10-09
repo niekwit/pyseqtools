@@ -11,10 +11,10 @@ import pkg_resources
 from platform import python_version
 
 def checkPythonPackages(): #check for required python packages; installs if absent
-    #check if Python >= 3.5
+    #check if Python >= 3.7 (required for GitPython)
     try:
         version = float(python_version().rsplit(".",1)[0])
-        if version < 3.5:
+        if version < 3.7:
             sys.exit("ERROR: please update to at least Python 3.5")
     except:
         pass
@@ -24,7 +24,7 @@ def checkPythonPackages(): #check for required python packages; installs if abse
                 "matplotlib", "seaborn", "multiqc",
                 "cutadapt", "tqdm","gseapy",
                 "matplotlib-venn", "pysam", "deeptools",
-                "macs3", "pybedtools"}
+                "macs3", "pybedtools", "GitPython"}
     installed = {pkg.key for pkg in pkg_resources.working_set}
     missing = required - installed
     if missing:
@@ -32,6 +32,7 @@ def checkPythonPackages(): #check for required python packages; installs if abse
         print("Installing missing required Python3 packages")
         try:
             install_command = [python, '-m', 'pip', 'install', *missing]
+            #print("Installing " + missing)
             subprocess.check_call(install_command, stdout=subprocess.DEVNULL)
         except:
             sys.exit("ERROR: package installation failed")
@@ -587,7 +588,7 @@ def main():
                 else:
                     print("Skipping FastQC/MultiQC analysis")
                 
-                #utils.trim(script_dir, threads, work_dir)
+                utils.trim(script_dir, threads, work_dir)
                 cutrun_utils.bowtie(work_dir, script_dir, str(threads), cutrun_settings, genome)
             elif align == "bowtie2":
                 ##Run FastQC/MultiQC
@@ -600,6 +601,12 @@ def main():
                 
                 #utils.trim(script_dir, threads, work_dir)
                 cutrun_utils.bowtie2(work_dir, script_dir, str(threads), cutrun_settings, genome)
+                utils.indexBam(work_dir, threads)
+                
+        dedup = args["deduplication"]
+        if dedup == True:
+            utils.deduplicationBam(script_dir, work_dir, threads, args)
+            utils.indexBam(work_dir, threads)
     
     def geneSymConv(args, script_dir):
         conversion = args["conversion"]
@@ -655,7 +662,7 @@ if __name__ == "__main__":
     utils.logCommandLineArgs(work_dir)
     
     #check if required Python packages are available
-    checkPythonPackages()
+    #checkPythonPackages()
     
     ###loads available CRISPR libraries from library.yaml
     import yaml
