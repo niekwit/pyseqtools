@@ -15,9 +15,19 @@ Available analyses/tools:
 
 ## Installation
 
-> `git clone https://github.com/niekwit/pyseqtools.git`
+Perform the following command in the directory of your choice:
+```
+git clone https://github.com/niekwit/pyseqtools.git
+```
+
+## Software requirements
+
+- Python >= 3.7
+- Perl
+- R
 
 When running an analysis, `pyseqtools.py` will first check whether the relevant dependencies are available in `$PATH`. If not, it will then look for it in any `$HOME` directories, and finally if it does not find them there it will install them.
+
 ## Usage:
 
 ```
