@@ -607,6 +607,14 @@ def main():
         if dedup == True:
             utils.deduplicationBam(script_dir, work_dir, threads, args)
             utils.indexBam(work_dir, threads)
+        
+        bigwig = args["bigwig"]
+        if bigwig == True:
+            utils.createBigWig(work_dir, threads)
+            
+        qc = args["qc"]
+        if qc == True:
+            chipseq_utils.bam_bwQC(work_dir, threads)
     
     def geneSymConv(args, script_dir):
         conversion = args["conversion"]

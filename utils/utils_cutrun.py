@@ -14,6 +14,7 @@ script_dir = os.path.abspath(os.path.dirname(__file__))
 script_dir = os.path.dirname(script_dir)
 sys.path.append(os.path.join(script_dir, "utils"))
 import utils_general as utils
+#plt.style.use(os.path.join(script_dir,"utils", "pyseqtools.mplstyle"))
 
 
 def bowtie(work_dir, script_dir, threads, cutrun_settings, genome):
@@ -70,7 +71,7 @@ def bowtie(work_dir, script_dir, threads, cutrun_settings, genome):
         print("Aligning reads with Bowtie (paired-end mode):")
         read1_list = glob.glob(os.path.join(work_dir, "trim","*_R1_001_val_1.fq.gz"))
         read2_list = [x.replace("_R1_001_val_1.fq.gz", "_R2_001_val_2.fq.gz") for x in read1_list]
-        output_list = [x.replace("trim", "bam").replace("_R1_001_val_1.fq.gz",".bam") for x in read1_list]
+        output_list = [x.replace("trim", "bam").replace("_R1_001_val_1.fq.gz","-sort-bl.bam") for x in read1_list]
         
         out_dir = os.path.join(work_dir, "bam")
         os.makedirs(out_dir, exist_ok = True)
@@ -149,7 +150,7 @@ def bowtie2(work_dir, script_dir, threads, cutrun_settings, genome):
         print("Aligning reads with Bowtie (paired-end mode):")
         read1_list = glob.glob(os.path.join(work_dir, "trim","*_R1_001_val_1.fq.gz"))
         read2_list = [x.replace("_R1_001_val_1.fq.gz", "_R2_001_val_2.fq.gz") for x in read1_list]
-        output_list = [x.replace("trim", "bam").replace("_R1_001_val_1.fq.gz",".bam") for x in read1_list]
+        output_list = [x.replace("trim", "bam").replace("_R1_001_val_1.fq.gz","-sort-bl.bam") for x in read1_list]
         
         out_dir = os.path.join(work_dir, "bam")
         os.makedirs(out_dir, exist_ok = True)
@@ -181,7 +182,7 @@ def bowtie2(work_dir, script_dir, threads, cutrun_settings, genome):
                 bowtie2_command.extend(samtools)
                 bowtie2_command.append(out_file)
                 bowtie2_command = " ".join(bowtie2_command)
-                #print(" ".join(bowtie2_command))
+                print(os.path.basename(read1.replace("_R1_001_val_1.fq.gz", "")) + ":", file = open("align.log", "a"))
                 utils.write2log(work_dir, bowtie2_command, "Bowtie2 alignment: ")
                 subprocess.call(bowtie2_command, shell = True)
 

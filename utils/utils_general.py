@@ -351,9 +351,10 @@ def checkPicard(script_dir):
  
             
 def deduplicationBam(script_dir, work_dir, threads, args):
-    #check if Picard is installed
+    #Get Picard location
     picard = checkPicard(script_dir)
-    print(picard)
+    
+    
     file_list = glob.glob(os.path.join(work_dir,
                                        "bam",
                                        "*-sort-bl.bam"))
@@ -376,58 +377,58 @@ def deduplicationBam(script_dir, work_dir, threads, args):
         
     #plot number of reads after deduplication
     #get counts from non-deduplicated bam files
-    if "bwa" not in args["align"]:
-        file_list = sorted(glob.glob(os.path.join(work_dir,
-                                           "bam",
-                                           "*-sort-bl.bam")))
-        
-        column_names = [os.path.basename(bam).replace("-sort-bl.bam","") for bam in file_list]
-        df = pd.DataFrame(columns = column_names)
-        
-        for bam in file_list:
-              count = pysam.view("-@", str(threads) ,"-c", "-F" "260", bam)
-              column = os.path.basename(bam).replace("-sort-bl.bam","")
-              df.loc[1, column] = count
-        
-        df["condition"] = "pre-deduplication"
-        
-        #get counts for deduplicated bam files
-        file_list = sorted(glob.glob(os.path.join(work_dir,
-                                           "bam",
-                                           "*-sort-bl-dedupl.bam")))
-               
-        for bam in file_list:
-              count = pysam.view("-@", str(threads) ,"-c", "-F" "260", bam)
-              column = os.path.basename(bam).replace("-sort-bl-dedupl.bam","")
-              df.loc[2, column] = count
-        
-        df.loc[2, "condition"] = "deduplicated"
-        
-        #create df for plotting
-        df_melt = pd.melt(df, id_vars = ["condition"], 
-                          value_vars = column_names)
-        df_melt["value"] = pd.to_numeric(df_melt["value"])
-        df_melt["value"] = df_melt["value"] / 1000000
-        
-        #create plot
-        save_file = os.path.join(work_dir,
-                                 "bam",
-                                 "read-counts-deduplication.pdf")
-        
-        sns.catplot(x = 'variable', y = 'value', 
-                   hue = 'condition', 
-                   data = df_melt, 
-                   kind = 'bar', 
-                   legend_out = False,
-                   edgecolor = "black",)
-        plt.ylabel("Uniquely mapped read count (millions)")
-        plt.xticks(rotation = 45, ha="right")
-        plt.xlabel("")
-        plt.ylim((0, df_melt["value"].max() * 1.3))
-        plt.legend(title = None,
-                   frameon = False)
-        plt.tight_layout()
-        plt.savefig(save_file)
+
+    file_list = sorted(glob.glob(os.path.join(work_dir,
+                                       "bam",
+                                       "*-sort-bl.bam")))
+    
+    column_names = [os.path.basename(bam).replace("-sort-bl.bam","") for bam in file_list]
+    df = pd.DataFrame(columns = column_names)
+    
+    for bam in file_list:
+          count = pysam.view("-@", str(threads) ,"-c", "-F" "260", bam)
+          column = os.path.basename(bam).replace("-sort-bl.bam","")
+          df.loc[1, column] = count
+    
+    df["condition"] = "pre-deduplication"
+    
+    #get counts for deduplicated bam files
+    file_list = sorted(glob.glob(os.path.join(work_dir,
+                                       "bam",
+                                       "*-sort-bl-dedupl.bam")))
+           
+    for bam in file_list:
+          count = pysam.view("-@", str(threads) ,"-c", "-F" "260", bam)
+          column = os.path.basename(bam).replace("-sort-bl-dedupl.bam","")
+          df.loc[2, column] = count
+    
+    df.loc[2, "condition"] = "deduplicated"
+    
+    #create df for plotting
+    df_melt = pd.melt(df, id_vars = ["condition"], 
+                      value_vars = column_names)
+    df_melt["value"] = pd.to_numeric(df_melt["value"])
+    df_melt["value"] = df_melt["value"] / 1000000
+    
+    #create plot
+    save_file = os.path.join(work_dir,
+                             "bam",
+                             "read-counts-deduplication.pdf")
+    
+    sns.catplot(x = 'variable', y = 'value', 
+               hue = 'condition', 
+               data = df_melt, 
+               kind = 'bar', 
+               legend_out = False,
+               edgecolor = "black",)
+    plt.ylabel("Uniquely mapped read count (millions)")
+    plt.xticks(rotation = 45, ha="right")
+    plt.xlabel("")
+    plt.ylim((0, df_melt["value"].max() * 1.3))
+    plt.legend(title = None,
+               frameon = False)
+    plt.tight_layout()
+    plt.savefig(save_file)
     
 
 def indexBam(work_dir, threads):
