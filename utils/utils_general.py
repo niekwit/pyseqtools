@@ -18,21 +18,22 @@ import gzip
 import shutil
 import re
 
-
 import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
 import pysam
-import git
 import yaml
-
+try:
+    import git #module name is GitPython
+except ModuleNotFoundError:
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "GitPython"])
 
 ###GENERAL FUNCTIONS
 
 
 def checkMd5(work_dir):
-    md5sum_file = os.path.join(work_dir,"raw-data", "md5sums.csv")     
-   
+    md5sum_file = os.path.join(work_dir,"raw-data", "md5sums.csv")
+
     def md5(file):
         work_dir = os.getcwd()
         file = os.path.join(work_dir, "raw-data", file)
@@ -47,10 +48,10 @@ def checkMd5(work_dir):
             print("Checking MD5 checksums")
             df = pd.read_csv(md5sum_file)
             df["md5sum_new"] = df["file"].apply(md5)
-            
+
             #compare original checksums with calculated ones
             df["md5sumCorrect"] = df["md5sum"] == df["md5sum_new"]
-            
+
             check_list = df[~df["md5sumCorrect"]]
             if len(check_list) > 0:
                 print("Calculated MD5 checksums do not match originals:")
@@ -58,17 +59,17 @@ def checkMd5(work_dir):
                 sys.exit(1)
             else:
                 print("MD5 checksums correct")
-                df.to_csv("md5sums_checked.csv", 
+                df.to_csv("md5sums_checked.csv",
                           index=False)
 
 
 def logCommandLineArgs(work_dir):
     args = sys.argv
     args = " ".join(args)
-        
+
     if "-h" not in args:
             if "--help" not in args:
-                print("Command line arguments: " + args, 
+                print("Command line arguments: " + args,
                       file = open(os.path.join(work_dir,"commands.log"), "a"))
 
 def write2log(work_dir,command,name):
@@ -102,13 +103,13 @@ def rename(work_dir):
                                 "raw-data",
                                 new_name))
 
-                                           
+
 def get_extension(work_dir):
     file_list=glob.glob(os.path.join(work_dir,"raw-data","*.gz"))
-    
+
     if len(file_list) == 0:
         sys.exit("ERROR: no fastq files found")
-    
+
     test_file=file_list[0]
     file_extension = ".".join(test_file.rsplit(".",2)[-2:])
     return(file_extension)
@@ -126,60 +127,60 @@ def file_exists(file): #check if file exists/is not size zero
 def checkSamtools(script_dir):
     #Check for samtools in $PATH
     path = os.environ["PATH"].lower()
-        
+
     if "samtools" not in path:
-        
+
         #Check for samtools elsewhere
         samtools = [line[0:] for line in subprocess.check_output("find $HOME -name samtools", shell = True).splitlines()]
-        
+
         samtools_file = None
         for i in samtools:
             i = i.decode("utf-8")
-            
+
             if "bin/samtools" in i:
                 samtools_file = i
                 return(samtools_file)
-            
+
         if samtools_file == None:
             print("WARNING: samtools was not found\nInstalling samtools now")
-            
+
             url = "https://github.com/samtools/samtools/releases/download/1.13/samtools-1.13.tar.bz2"
             download_file = os.path.join(script_dir,
                                          os.path.basename(url))
-            
+
             urllib.request.urlretrieve(url,
                                        download_file)
-            
+
             #untar download file
-            tar = tarfile.open(download_file, "r:bz2")  
+            tar = tarfile.open(download_file, "r:bz2")
             tar.extractall(script_dir)
             tar.close()
-            
+
             os.remove(download_file)
-            
+
             #make samtools
             samtools_dir = os.path.join(script_dir,
                                      "samtools")
             os.makedirs(samtools_dir,
                         exist_ok = True)
-            
+
             os.chdir(os.path.join(script_dir,
                                   os.path.basename(url).replace(".tar.bz2", "")))
-            
+
             subprocess.run(["./configure", "--prefix=" + samtools_dir])
             subprocess.run(["make"])
             subprocess.run(["make", "install"])
-            
+
             samtools_file = os.path.join(script_dir,
                                          "samtools",
                                          "bin",
                                          "samtools")
-            
+
             #remove downloaded files
             samtools_dir = download_file.rsplit(".", 2)[0]
-            
+
             subprocess.run(["rm", "-rf", samtools_dir])
-            
+
             return(samtools_file)
 
     else:
@@ -188,49 +189,49 @@ def checkSamtools(script_dir):
 
 def checkBedtools(script_dir):
     path = os.environ["PATH"].lower()
-    
+
     if "bedtools" not in path:
         #Check for bedtools elsewhere
         bedtools = [line[0:] for line in subprocess.check_output("find $HOME -name bedtools",
                                                                shell = True).splitlines()]
-        
+
         try:
             bedtools = bedtools[0].decode("utf-8")
             return(bedtools)
         except:
             print("WARNING: Bedtools was not found\nInstalling Bedtools now")
-           
+
             url = "https://github.com/arq5x/bedtools2/releases/download/v2.30.0/bedtools.static.binary"
-            
+
             os.makedirs(os.path.join(script_dir,
                                      "bedtools-2.30"),
                         exist_ok = True)
-            
+
             download_file = os.path.join(script_dir,
                                          "bedtools-2.30",
                                          os.path.basename(url))
-            
-            
+
+
             urllib.request.urlretrieve(url,
                                        download_file)
-            
+
             bedtools = download_file.rsplit(".", 2)[0]
             os.rename(download_file,
                       bedtools)
-            
+
             #make bedtools executable
             st = os.stat(bedtools)
             os.chmod(bedtools, st.st_mode | stat.S_IEXEC)
-            
+
             return(bedtools)
     else:
         return("bedtools")
-    
+
 
 def checkBowtie(script_dir):
     #check for bowtie1 (exclude bowtie2) in $PATH
     path = os.environ["PATH"].lower().split(":")
-    
+
     bowtie = list(filter(lambda x: re.search(r"bowtie*[-1][^2]", x), path))
     if len(bowtie) == 1:
         bowtie, = bowtie #unpack list
@@ -251,8 +252,8 @@ def checkBowtie(script_dir):
                 bowtie = bowtie[0].decode("utf-8")
                 return(bowtie)
         except CalledProcessError: #when no instance of bowtie is found
-            print("WARING: Bowtie not found\nInstalling Bowtie now")     
-            if sys.platform in ["linux", "linux2"]:    
+            print("WARING: Bowtie not found\nInstalling Bowtie now")
+            if sys.platform in ["linux", "linux2"]:
                 url = "https://sourceforge.net/projects/bowtie-bio/files/bowtie/1.3.1/bowtie-1.3.1-linux-x86_64.zip/download"
                 download_file = os.path.join(script_dir, "bowtie-1.3.1-linux-x86_64.zip")
                 bowtie = os.path.join(script_dir, "bowtie-1.3.1-linux-x86_64")
@@ -260,10 +261,10 @@ def checkBowtie(script_dir):
                 url = "https://sourceforge.net/projects/bowtie-bio/files/bowtie/1.3.1/bowtie-1.3.1-macos-x86_64.zip/download"
                 download_file = os.path.join(script_dir, "bowtie-1.3.1-macos-x86_64.zip")
                 bowtie = os.path.join(script_dir, "bowtie-1.3.1-macos-x86_64")
-            
+
             #download bowtie zip file
             urllib.request.urlretrieve(url, download_file)
-            
+
             #unzip bowtie
             unzip = ["unzip", "-qq", download_file, "-d", script_dir]
             subprocess.run(unzip)
@@ -273,9 +274,9 @@ def checkBowtie(script_dir):
 def checkBowtie2(script_dir):
     #check for bowtie1 (exclude bowtie2) in $PATH
     path = os.environ["PATH"].lower().split(":")
-    
+
     bowtie2 = list(filter(lambda x: "bowtie2" in x, path))
-    
+
     if len(bowtie2) == 1:
         bowtie2, = bowtie2 #unpack list
         return(bowtie2)
@@ -285,7 +286,7 @@ def checkBowtie2(script_dir):
         sys.exit()
     elif len(bowtie2) == 0:
         try:
-            
+
             if sys.platform in ["linux", "linux2"]:
                 bowtie2 = [line[0:] for line in subprocess.check_output("find $HOME -type d -iname bowtie2*linux* ! -path '*/multiqc*' ! -path '*/pyseqtools/index/*'", shell = True).splitlines()]
             elif sys.platform == "darwin":
@@ -299,8 +300,8 @@ def checkBowtie2(script_dir):
                 bowtie2 = bowtie2[0].decode("utf-8")
                 return(bowtie2)
         except CalledProcessError: #when no instance of bowtie is found
-            print("WARING: Bowtie2 not found\nInstalling Bowtie now")     
-            if sys.platform in ["linux", "linux2"]:    
+            print("WARING: Bowtie2 not found\nInstalling Bowtie now")
+            if sys.platform in ["linux", "linux2"]:
                 url = "https://sourceforge.net/projects/bowtie-bio/files/bowtie2/2.4.4/bowtie2-2.4.4-linux-x86_64.zip/download"
                 download_file = os.path.join(script_dir, "bowtie2-2.4.4-linux-x86_64.zip")
                 bowtie2 = os.path.join(script_dir, "bowtie2-2.4.4-linux-x86_64")
@@ -308,10 +309,10 @@ def checkBowtie2(script_dir):
                 url = "https://sourceforge.net/projects/bowtie-bio/files/bowtie2/2.4.4/bowtie2-2.4.4-macos-x86_64.zip/download"
                 download_file = os.path.join(script_dir, "bowtie2-2.4.4-macos-x86_64.zip")
                 bowtie2 = os.path.join(script_dir, "bowtie2-2.4.4-macos-x86_64")
-            
+
             #download bowtie zip file
             urllib.request.urlretrieve(url, download_file)
-            
+
             #unzip bowtie
             unzip = ["unzip", "-qq", download_file, "-d", script_dir]
             subprocess.run(unzip)
@@ -323,13 +324,13 @@ def checkPicard(script_dir):
         subprocess.run(["java", "--version",], stdout=DEVNULL)
     except:
         sys.exit("ERROR: No Java Runtime Environment available\nUbuntu installation: https://ubuntu.com/tutorials/install-jre#1-overview")
-    
+
     #check for Picard
     path = os.environ["PATH"].lower()
-    
+
     if "picard" not in path:
         #Check for Picard elsewhere
-        picard = [line[0:] for line in subprocess.check_output("find $HOME -name picard.jar", 
+        picard = [line[0:] for line in subprocess.check_output("find $HOME -name picard.jar",
                                                                shell = True).splitlines()]
         try:
             picard = picard[0].decode("utf-8")
@@ -348,13 +349,13 @@ def checkPicard(script_dir):
             return(picard)
     else:
         return("picard.jar")
- 
-            
+
+
 def deduplicationBam(script_dir, work_dir, threads, args):
     #Get Picard location
     picard = checkPicard(script_dir)
-    
-    
+
+
     file_list = glob.glob(os.path.join(work_dir,
                                        "bam",
                                        "*-sort-bl.bam"))
@@ -363,62 +364,62 @@ def deduplicationBam(script_dir, work_dir, threads, args):
         dedup_output = bam.replace("-sort-bl.bam",
                                    "-sort-bl-dedupl.bam")
         if not file_exists(dedup_output):
-            
+
             log_name = os.path.basename(bam).split("-", 1)[0] + "-dedup_metrics.log"
             log_name = os.path.join(work_dir,
                                     "bam",
                                     log_name)
             picard_command = "java -jar " + picard + " MarkDuplicates INPUT=" + bam + " OUTPUT=" + dedup_output + " REMOVE_DUPLICATES=TRUE METRICS_FILE=" + log_name
-            
+
             write2log(work_dir, picard_command, "Deduplication: ")
-                
+
             subprocess.run(picard_command,
                            shell = True)
-        
+
     #plot number of reads after deduplication
     #get counts from non-deduplicated bam files
 
     file_list = sorted(glob.glob(os.path.join(work_dir,
                                        "bam",
                                        "*-sort-bl.bam")))
-    
+
     column_names = [os.path.basename(bam).replace("-sort-bl.bam","") for bam in file_list]
     df = pd.DataFrame(columns = column_names)
-    
+
     for bam in file_list:
           count = pysam.view("-@", str(threads) ,"-c", "-F" "260", bam)
           column = os.path.basename(bam).replace("-sort-bl.bam","")
           df.loc[1, column] = count
-    
+
     df["condition"] = "pre-deduplication"
-    
+
     #get counts for deduplicated bam files
     file_list = sorted(glob.glob(os.path.join(work_dir,
                                        "bam",
                                        "*-sort-bl-dedupl.bam")))
-           
+
     for bam in file_list:
           count = pysam.view("-@", str(threads) ,"-c", "-F" "260", bam)
           column = os.path.basename(bam).replace("-sort-bl-dedupl.bam","")
           df.loc[2, column] = count
-    
+
     df.loc[2, "condition"] = "deduplicated"
-    
+
     #create df for plotting
-    df_melt = pd.melt(df, id_vars = ["condition"], 
+    df_melt = pd.melt(df, id_vars = ["condition"],
                       value_vars = column_names)
     df_melt["value"] = pd.to_numeric(df_melt["value"])
     df_melt["value"] = df_melt["value"] / 1000000
-    
+
     #create plot
     save_file = os.path.join(work_dir,
                              "bam",
                              "read-counts-deduplication.pdf")
-    
-    sns.catplot(x = 'variable', y = 'value', 
-               hue = 'condition', 
-               data = df_melt, 
-               kind = 'bar', 
+
+    sns.catplot(x = 'variable', y = 'value',
+               hue = 'condition',
+               data = df_melt,
+               kind = 'bar',
                legend_out = False,
                edgecolor = "black",)
     plt.ylabel("Uniquely mapped read count (millions)")
@@ -429,18 +430,18 @@ def deduplicationBam(script_dir, work_dir, threads, args):
                frameon = False)
     plt.tight_layout()
     plt.savefig(save_file)
-    
+
 
 def indexBam(work_dir, threads):
     print("Indexing BAM files")
     file_list = glob.glob(os.path.join(work_dir,
                                        "bam",
                                        "*.bam"))
-    
+
     #index bam files
     #also check if bam files have been indexed
     index_file_list = [bam + ".bai" for bam in file_list]
-    
+
     for bai, bam in zip(index_file_list, file_list):
         if not file_exists(bai):
             pysam.index("-@", str(threads), bam)
@@ -452,75 +453,75 @@ def createBigWig(work_dir, threads):
     os.makedirs(os.path.join(work_dir,
                              "bigwig"),
                 exist_ok = True)
-    
+
     file_list = glob.glob(os.path.join(work_dir,
                                        "bam",
                                        "*.bam"))
-    
-           
+
+
     #create BigWigs with deeptools
     for bam in file_list:
         if "-sort-bl.bam" in bam:
             bigwig_output = bam.replace("-sort-bl.bam", "-norm.bw")
             bigwig_output = bigwig_output.replace("bam", "bigwig")
-            
+
             if not file_exists(bigwig_output):
-                bigwig = "bamCoverage -p " + str(threads) + " --binSize 200 --normalizeUsing RPKM --extendReads 200 --effectiveGenomeSize 2827437033 -b " 
+                bigwig = "bamCoverage -p " + str(threads) + " --binSize 200 --normalizeUsing RPKM --extendReads 200 --effectiveGenomeSize 2827437033 -b "
                 bigwig = bigwig + bam +" -o " + bigwig_output
-        
-                subprocess.run(bigwig, 
+
+                subprocess.run(bigwig,
                                shell = True)
         elif "-sort-bl-dedupl.bam" in bam:
             bigwig_output = bam.replace("-sort-bl-dedupl.bam", "-dedupl-norm.bw")
             bigwig_output = bigwig_output.replace("bam", "bigwig")
-            
+
             if not file_exists(bigwig_output):
-                bigwig = "bamCoverage -p " + str(threads) + " --binSize 200 --normalizeUsing RPKM --extendReads 200 --effectiveGenomeSize 2827437033 -b " 
+                bigwig = "bamCoverage -p " + str(threads) + " --binSize 200 --normalizeUsing RPKM --extendReads 200 --effectiveGenomeSize 2827437033 -b "
                 bigwig = bigwig + bam +" -o " + bigwig_output
-            
-                subprocess.run(bigwig, 
+
+                subprocess.run(bigwig,
                                shell = True)
 
 
 def bigwigQC(work_dir, threads):
-    
+
     #generate PCA plot of all BigWig files
     if os.path.exists(os.path.join(work_dir,
                                    "bigwig")):
-        
-        
+
+
         file_list = glob.glob(os.path.join(work_dir,
                                            "bigwig",
                                            "*-dedupl-norm.bw"))
-        
+
         if len(file_list) == 0:
             file_list = glob.glob(os.path.join(work_dir,
                                            "bigwig",
                                            "*.bw"))
-        
+
         summary_file = os.path.join(work_dir,
                                     "bigwig",
                                     "bigwig-summary.npz")
         summary = "multiBigwigSummary bins --numberOfProcessors " + str(threads)
         summary =  summary + " -b " + " ".join(file_list) + " -o " + summary_file
-        
+
         if not file_exists(summary_file):
             subprocess.run(summary, shell = True)
-            
+
         pca_output = os.path.join(work_dir, "bigwig", "PCA-bigwig.pdf")
-        
+
         if not file_exists(pca_output):
             pca = "plotPCA -in " + summary_file + "-o " + pca_output + " -T PCA of BigWig files"
             subprocess.run(pca, shell = True)
-            
+
 def checkFastqc(script_dir):
-    
+
     #Check for FastQC in $PATH
     path = os.environ["PATH"].lower()
-    
+
     if "fastqc" not in path:
         #Check for FastQC elsewhere
-        fastqc = [line[0:] for line in subprocess.check_output("find $HOME -name run_fastqc.bat", 
+        fastqc = [line[0:] for line in subprocess.check_output("find $HOME -name run_fastqc.bat",
                                                                shell = True).splitlines()]
         try:
             fastqc = fastqc[0].decode("utf-8")
@@ -545,11 +546,11 @@ def checkFastqc(script_dir):
         return(fastqc_file)
 
 def fastqc(script_dir, work_dir, threads, file_extension):
-    
+
     #check for FastQC
     fastqc_file = checkFastqc(script_dir)
-        
-    #run fastqc/multiqc 
+
+    #run fastqc/multiqc
     if not os.path.isdir(os.path.join(work_dir,"fastqc")) or len(os.listdir(os.path.join(work_dir,"fastqc"))) == 0:
         os.makedirs(os.path.join(work_dir,"fastqc"),exist_ok = True)
         fastqc_command = fastqc_file + " --threads " + str(threads) + " --quiet -o fastqc/ raw-data/*" + file_extension
@@ -573,30 +574,30 @@ def fastqc(script_dir, work_dir, threads, file_extension):
 def getEND(work_dir):
     '''
     Determine whether samples are single-end of paired-end
-    '''    
-    
+    '''
+
     file_list = glob.glob(os.path.join(work_dir,
                                        "raw-data",
-                                       "*.gz")) 
-    
+                                       "*.gz"))
+
     PE_tag = "R2_001.fastq.gz"
     PE = b_any(PE_tag in x for x in file_list)
-    
+
     ##based on Illumina naming convention: https://support.illumina.com/help/BaseSpace_OLH_009008/Content/Source/Informatics/BS/NamingConvention_FASTQ-files-swBS.htm
-    
+
     if PE == True:
         return("PE")
     else:
         return("SE")
-    
+
 def trim(script_dir, threads, work_dir):
-    
+
     #check for trim_galore
     path = os.environ["PATH"]
-    
+
     if "TrimGalore" not in path:
         #Check for TrimGalore elsewhere
-        trimgalore = [line[0:] for line in subprocess.check_output("find $HOME -wholename *TrimGalore-*/trim_galore", 
+        trimgalore = [line[0:] for line in subprocess.check_output("find $HOME -wholename *TrimGalore-*/trim_galore",
                                                                shell = True).splitlines()]
         try:
             trimgalore_file = trimgalore[0].decode("utf-8")
@@ -608,39 +609,39 @@ def trim(script_dir, threads, work_dir):
             #unzip TrimGalore file
             with ZipFile(download_file, 'r') as zip_ref:
                 zip_ref.extractall(script_dir)
-            
+
             #remove download file
             os.remove(download_file)
-            
+
             #tell TrimGalore where FastQC is located
             fastqc_file = checkFastqc(script_dir)
-            trimgalore_file = [line[0:] for line in subprocess.check_output("find $HOME -name trim_galore", 
+            trimgalore_file = [line[0:] for line in subprocess.check_output("find $HOME -name trim_galore",
                                                                        shell = True).splitlines()]
             trimgalore_file = trimgalore_file[0].decode("utf-8")
             new_line = '"' + "my $path_to_fastqc = " + "q^" + fastqc_file + "^;" + '"'
             awk_command = "awk " + "'NR==456 {$0=" + new_line + "} { print }' " + trimgalore_file + " > " + trimgalore_file + "_temp"
-        
+
             subprocess.run(awk_command, shell = True)
             #remove original file and rename temp file to original name
             os.remove(trimgalore_file)
-            os.rename(trimgalore_file + "_temp", 
+            os.rename(trimgalore_file + "_temp",
                       trimgalore_file)
-            
+
             #make TrimGalore file executable by shell
-            trimgalore_file = os.path.join(script_dir, 
-                                           "TrimGalore-0.6.7", 
+            trimgalore_file = os.path.join(script_dir,
+                                           "TrimGalore-0.6.7",
                                            "trim_galore")
             st = os.stat(trimgalore_file)
             os.chmod(trimgalore_file, st.st_mode | stat.S_IEXEC)
     else:
         trimgalore_file = "trim_galore"
-    
-        
+
+
     #cap threads at 4 for trim_galore
     if int(threads) > 4:
         threads = "4"
 
-      
+
     def trimPE(work_dir, threads):
         print("Trimming paired-end fastq files")
         extension = get_extension(work_dir)
@@ -653,29 +654,29 @@ def trim(script_dir, threads, work_dir):
             out_file1 = os.path.join(out_dir, out_file1)
             if not file_exists(out_file1):
                 read2 = read1.replace("R1","R2")
-                trim_galore_command = [trimgalore_file,"-j", str(threads), "-o", 
+                trim_galore_command = [trimgalore_file,"-j", str(threads), "-o",
                                        "./trim", "--paired", read1, read2]
                 #log commands
                 with open(work_dir+"/commands.log", "a") as file:
                     file.write("Trim Galore: ")
                     print(*trim_galore_command, sep = " ",file=file)
                 subprocess.run(trim_galore_command)
-                
+
     def trimSE(work_dir, threads):
         print("Trimming single-end fastq files")
         extension = get_extension(work_dir)
         fastq_list = glob.glob(os.path.join(work_dir,
                                             "raw-data",
                                             "*." + extension))
-        
+
         for file in fastq_list:
             out_file = os.path.join(work_dir,
                                     "trim_galore",
                                     file.replace("." + extension, "_trimmed.fq.gz"))
             out_file = out_file.replace("raw-data", "trim_galore")
             if not file_exists(out_file):
-                trim_galore_command = [trimgalore_file, "-j", threads, 
-                                       "-o", "./trim_galore",                                                                                                                                                                                                                                                                                                
+                trim_galore_command = [trimgalore_file, "-j", threads,
+                                       "-o", "./trim_galore",
                                        file]
                 #log command
                 with open(os.path.join(work_dir,"commands.log"), "a") as file:
@@ -685,60 +686,60 @@ def trim(script_dir, threads, work_dir):
                     subprocess.run(trim_galore_command)
                 except:
                     sys.exit("ERROR: trimming error. Check commands log.")
-    
+
     #Run appropriate trim function
     if getEND(work_dir) == "PE":
         trimPE(work_dir, threads)
     elif getEND(work_dir) == "SE":
         trimSE(work_dir, threads)
 
-        
+
 def blackList(script_dir, genome):
     with open(os.path.join(script_dir, "yaml", "chip-seq.yaml")) as f:
         doc = yaml.safe_load(f)
-                    
-    blacklist = doc["blacklist"][genome] 
-    
+
+    blacklist = doc["blacklist"][genome]
+
     if blacklist == "":
         print("WARNING: no blacklisted region BED file found")
         print("Downloading blacklist file for " + genome)
-        
+
         def getBlacklist(script_dir, url, genome):
             os.makedirs(os.path.join(script_dir,
                                      "blacklist",
                                      genome),
                         exist_ok = True)
-            
+
             download_file = os.path.join(script_dir,
                                          "blacklist",
                                          genome,
                                          os.path.basename(url))
-            
+
             urllib.request.urlretrieve(url,
                                        download_file)
-            
+
             #unzip bed file
             with gzip.open(download_file, "rb") as f_in:
                 with open(download_file.replace(".gz",""), "wb") as f_out:
                     shutil.copyfileobj(f_in, f_out)
-            
-                       
+
+
             #remove downloaded file
             os.remove(download_file)
-            
+
             #write black list location to chip-seq.yaml
             blacklist = download_file.replace(".gz", "")
-            
+
             with open(os.path.join(script_dir, "yaml", "chip-seq.yaml")) as f:
                         doc = yaml.safe_load(f)
-                    
+
             doc["blacklist"][genome] = blacklist
-                    
+
             with open(os.path.join(script_dir,"yaml" ,"chip-seq.yaml"), "w") as f:
                 yaml.dump(doc,f)
-                
+
             return(blacklist)
-        
+
         if genome == "hg19":
             url = "http://hgdownload.soe.ucsc.edu/goldenPath/hg19/encodeDCC/wgEncodeMapability/wgEncodeDukeMapabilityRegionsExcludable.bed.gz"
             blacklist = getBlacklist(script_dir, url, genome)
@@ -759,19 +760,19 @@ def blackList(script_dir, genome):
                 sys.exit("ERROR: blacklist has size zero")
         else:
             sys.exit("ERROR: blacklist has invalid file format (should be .bed)")
-    
 
 
-        
+
+
 def bwa(work_dir, script_dir, args, threads, chip_seq_settings, genome):
 
     #get $PATH
     path = os.environ["PATH"].lower()
-    
+
     #check for bwa in $PATH
     if "bwa" not in path:
         #check for bwa in $HOME
-        bwa = [line[0:] for line in subprocess.check_output("find $HOME -wholename *bwa/bwa", 
+        bwa = [line[0:] for line in subprocess.check_output("find $HOME -wholename *bwa/bwa",
                                                             shell = True).splitlines()]
         try:
             bwa = bwa[0].decode("utf-8")
@@ -789,58 +790,58 @@ def bwa(work_dir, script_dir, args, threads, chip_seq_settings, genome):
             bwa = os.path.join(script_dir,"bwa","bwa")
     else:
         bwa = "bwa"
-            
+
     #check for bwa index
     bwa_index = chip_seq_settings["bwa"][genome]
     if bwa_index == "":
         print("WARNING: BWA index not found for " + genome)
-        print("Generating BWA index") 
-        index_dir = os.path.join(script_dir, "index", "bwa", genome)    
-        os.makedirs(index_dir, exist_ok = True) 
-                
+        print("Generating BWA index")
+        index_dir = os.path.join(script_dir, "index", "bwa", genome)
+        os.makedirs(index_dir, exist_ok = True)
+
         fasta = chip_seq_settings["fasta"][genome]
-        
+
         copy(fasta, index_dir)
         fasta_index = os.path.join(index_dir,os.path.basename(fasta))
-        os.rename(fasta_index, 
+        os.rename(fasta_index,
                   os.path.join(os.path.dirname(fasta_index), genome + ".fasta"))
-        
+
         #print([bwa, "index", "-p", index_file, fasta])
         subprocess.run([bwa, "index", os.path.join(os.path.dirname(fasta_index), genome + ".fasta")])
         os.remove(os.path.join(os.path.dirname(fasta_index), genome + ".fasta"))
-        
+
         #add index to yaml
         with open(os.path.join(script_dir, "yaml" ,"chip-seq.yaml")) as f:
             doc = yaml.safe_load(f)
         doc["bwa"][genome] = os.path.join(index_dir, genome + ".fasta")
         with open(os.path.join(script_dir, "yaml","chip-seq.yaml"), "w") as f:
             yaml.dump(doc, f)
-        
+
         #reload yaml
         with open(os.path.join(script_dir, "yaml" ,"chip-seq.yaml")) as f:
             chip_seq_settings = yaml.safe_load(f)
-        
-        
-        
+
+
+
     def bwaMem(work_dir, threads, chip_seq_settings, genome):
         #check if data is paired-end
         paired_end = getEND(work_dir)
-        
+
         #load other requirements for alignment
         if paired_end == "SE":
             file_list = glob.glob(os.path.join(work_dir, "trim_galore","*_trimmed.fq.gz"))
         elif paired_end == "PE":
             read1_list = glob.glob(os.path.join(work_dir, "trim_galore","*_R1_001_val_1.fq.gz"))
-        
+
         index_path = chip_seq_settings["bwa"][genome]
         blacklist = blackList(script_dir, genome)
-        
+
         common_command = ["2>>", "align.log", "|", "samtools", "view", "-q", "15",
-                          "-F", "260", "-bS", "-@", threads, "-", "|", "bedtools", 
-                          "intersect", "-v", "-a", "stdin", "-b", blacklist, 
-                          "-nonamecheck", "|", "samtools", "sort", "-@", 
+                          "-F", "260", "-bS", "-@", threads, "-", "|", "bedtools",
+                          "intersect", "-v", "-a", "stdin", "-b", blacklist,
+                          "-nonamecheck", "|", "samtools", "sort", "-@",
                           threads, "-", ">"] #output file will be be added later
-        
+
         #Run BWA
         os.makedirs(os.path.join(work_dir, "bam"), exist_ok = True)
         if paired_end == "SE":
@@ -848,18 +849,18 @@ def bwa(work_dir, script_dir, args, threads, chip_seq_settings, genome):
             for file in file_list:
                 out_file = file.replace("_trimmed.fq.gz","-sort-bl.bam")
                 out_file = out_file.replace("trim_galore","bam")
-                
+
                 bwa_mem = ["bwa", "mem", index_path, "-t", threads] #input file(s) to be specified
-                
+
                 bwa_mem.append(file)
                 bwa_mem.extend(common_command)
                 bwa_mem.append(out_file)
-                
+
                 if not file_exists(out_file):
                     with open(os.path.join(work_dir, "align.log"), "a") as f:
                         print(os.path.basename(file) + ":", file = f)
                     write2log(work_dir, " ".join(bwa_mem), "BWA mem: ")
-                    
+
                     print("Aligning " + os.path.basename(file))
                     bwa_mem = " ".join(bwa_mem)
                     subprocess.run(bwa_mem, check = True, text = True, shell = True)
@@ -873,22 +874,17 @@ def bwa(work_dir, script_dir, args, threads, chip_seq_settings, genome):
                 bwa_mem.append(read2)
                 bwa_mem.extend(common_command)
                 bwa_mem.append(out_file)
-                
+
                 if not file_exists(out_file):
                     write2log(work_dir, " ".join(bwa_mem), "BWA mem: ")
                     print("Aligning " + os.path.basename(read1.replace("_R1_001_val_1.fq.gz","")))
                     subprocess.run(bwa_mem)
-            
+
     def bwaAln():
         pass
-    
+
     #run selected BWA aligner
     if args["align"] == "bwa-mem":
         bwaMem(work_dir, threads, chip_seq_settings, genome)
     else:
         pass
-        
-    
-    
-
-            
