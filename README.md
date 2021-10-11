@@ -169,7 +169,7 @@ optional arguments:
 
 ```
 
-### CUT&RUN analysis
+### DamID-Seq analysis
 ```
 pyseqtools.py damid [-h] [-t THREADS] [-g GENOME] [--skip-fastqc]
 

@@ -646,6 +646,8 @@ def main():
         
         genome = args["genome"]
         
+        #utils.trim(script_dir, threads, work_dir)
+        
         damid_utils.damID(script_dir, work_dir, threads, genome, damid_settings)
 
 

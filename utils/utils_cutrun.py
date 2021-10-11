@@ -73,7 +73,7 @@ def bowtie(work_dir, script_dir, threads, cutrun_settings, genome):
         print("Aligning reads with Bowtie (single-end mode):")
         #prepare lists for read1/2 and output files
         file_list = glob.glob(os.path.join(work_dir, "trim","*_trimmed.fq.gz"))
-        output_list = [x.replace("trim", "bam").replace("_trimmed.fq.gz","-sort-bl.bam") for x in read1_list]
+        output_list = [x.replace("trim", "bam").replace("_trimmed.fq.gz","-sort-bl.bam") for x in file_list]
 
         out_dir = os.path.join(work_dir, "bam")
         os.makedirs(out_dir, exist_ok = True)
@@ -206,7 +206,7 @@ def bowtie2(work_dir, script_dir, threads, cutrun_settings, genome):
                 subprocess.call(bowtie2_command, shell = True)
 
 
-def histogramReadLengths(work_dir):
+def histogramReadLengths(work_dir, threads):
     #check for samtools
     samtools_bin = utils.checkSamtools(script_dir)
 

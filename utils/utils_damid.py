@@ -22,6 +22,9 @@ import utils_general as utils
 
 
 def damID(script_dir, work_dir, threads, genome, damid_settings):
+    #check for trimmed fastq files
+    files = glob.glob(os.path.join(work_dir, "trim_galore"))
+    
     #check for damidseq_pipeline in $PATH
     path = os.environ["PATH"].lower().split(":")
 
@@ -69,7 +72,7 @@ def damID(script_dir, work_dir, threads, genome, damid_settings):
         os.makedirs(index_dir, exist_ok = True)
         index = os.path.join(index_dir, genome)
 
-        bowtie2_index = [os.path.join(bowtie2_dir, "bowtie2-build"), "--threads",
+        bowtie2_index = ["python3", os.path.join(bowtie2_dir, "bowtie2-build"), "--threads",
                         threads, fasta, index]
 
         #build index

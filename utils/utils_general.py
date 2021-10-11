@@ -648,7 +648,7 @@ def trim(script_dir, threads, work_dir):
         fastq_list = glob.glob(os.path.join(work_dir,"raw-data","*R1_001." + extension))
         for read1 in fastq_list:
             out_dir = os.path.dirname(read1)
-            out_dir = out_dir.replace("raw-data","trim_galore")
+            out_dir = out_dir.replace("raw-data","trim")
             out_file1 = read1.split(".",1)[0] + "_val_1.fq.gz"
             out_file1 = os.path.basename(out_file1)
             out_file1 = os.path.join(out_dir, out_file1)
@@ -671,12 +671,12 @@ def trim(script_dir, threads, work_dir):
 
         for file in fastq_list:
             out_file = os.path.join(work_dir,
-                                    "trim_galore",
+                                    "trim",
                                     file.replace("." + extension, "_trimmed.fq.gz"))
-            out_file = out_file.replace("raw-data", "trim_galore")
+            out_file = out_file.replace("raw-data", "trim")
             if not file_exists(out_file):
                 trim_galore_command = [trimgalore_file, "-j", threads,
-                                       "-o", "./trim_galore",
+                                       "-o", "./trim",
                                        file]
                 #log command
                 with open(os.path.join(work_dir,"commands.log"), "a") as file:
