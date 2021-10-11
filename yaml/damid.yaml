@@ -1,0 +1,18 @@
+bowtie2:
+  dm: /home/niek/Documents/scripts/pyseqtools/index/bowtie2/dm/dm
+  hg19: /home/niek/Documents/scripts/pyseqtools/index/bowtie/hg19/hg19
+  hg38: ''
+  mm10: ''
+  mm9: ''
+fasta:
+  dm: /home/niek/Documents/scripts/pyseqtools/fasta/dm5.57/dmel-all-chromosome-r5.57.fasta
+  hg19: /home/niek/Documents/references/fasta/Human/GRCh37/ucsc-hg19-fasta/ucsc.hg19.fasta
+  hg38: ''
+  mm10: ''
+  mm9: /home/niek/Documents/scripts/pyseqtools/fasta/mm9/ucsc.mm9.fasta
+GATC_gff:
+  dm: '/home/niek/Documents/scripts/pyseqtools/gff/dm/Dmel_r5.57.GATC.gff'
+  hg19: ''
+  hg38: ''
+  mm10: ''
+  mm9: ''

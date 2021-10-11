@@ -268,7 +268,7 @@ def main():
 
     #create subparser for DamID
     parser_damid = subparsers.add_parser('damid',
-                                          description = "Analysis pipeline for DamID",
+                                          description = "Analysis pipeline for DamID (wrapper for https://github.com/owenjm/damidseq_pipeline)",
                                           help = 'DamID analysis')
     parser_damid.add_argument("-t", "--threads",
                            required = False,
@@ -635,6 +635,19 @@ def main():
         peak = args["peaks"]
         if peak == True:
             chipseq_utils.peak(work_dir, threads, genome, chip_seq_settings)
+    
+    
+    def damID(args, script_dir):
+        #set thread count for processing
+        max_threads = str(multiprocessing.cpu_count())
+        threads = args["threads"]
+        if threads == "max":
+            threads = max_threads
+        
+        genome = args["genome"]
+        
+        damid_utils.damID(script_dir, work_dir, threads, genome, damid_settings)
+
 
     def geneSymConv(args, script_dir):
         conversion = args["conversion"]
@@ -666,6 +679,8 @@ def main():
         chip_seq(args, script_dir)
     elif args["module"] == "cutrun":
         cutrun(args, script_dir)
+    elif args["module"] == "damid":
+        damID(args, script_dir)
     elif args["module"] == "genesymconv":
         geneSymConv(args, script_dir)
     elif args["module"] == "subsetgtf":
@@ -685,6 +700,7 @@ if __name__ == "__main__":
     import utils_rna_seq as rnaseq_utils
     import utils_chip_seq as chipseq_utils
     import utils_cutrun as cutrun_utils
+    import utils_damid as damid_utils
 
     #log all command line arguments to commands.log
     utils.logCommandLineArgs(work_dir)
@@ -732,8 +748,15 @@ if __name__ == "__main__":
             cutrun_settings = yaml.full_load(file)
     except FileNotFoundError:
         sys.exit("ERROR: cut-run.yaml not found in yaml folder. Please provide this file for further analysis.")
-
-
+        
+    ###loads DamID settings
+    try:
+        with open(os.path.join(script_dir,
+                               "yaml",
+                               "damid.yaml")) as file:
+            damid_settings = yaml.full_load(file)
+    except FileNotFoundError:
+        sys.exit("ERROR: damid.yaml not found in yaml folder. Please provide this file for further analysis.")
 
 
     main()

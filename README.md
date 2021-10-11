@@ -169,6 +169,23 @@ optional arguments:
 
 ```
 
+### CUT&RUN analysis
+```
+pyseqtools.py damid [-h] [-t THREADS] [-g GENOME] [--skip-fastqc]
+
+Analysis pipeline for DamID, based on https://github.com/owenjm/damidseq_pipeline
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -t THREADS, --threads THREADS
+                        <INT> number of CPU threads to use (default is 1). Use max to apply all available
+                        CPU threads
+  -g GENOME, --genome GENOME
+                        Choose reference genome (default is hg19)
+  --skip-fastqc         Skip FastQC/MultiQC
+
+```
+
 ### Gene symbol conversion
 ```
 pyseqtools.py genesymconv [-h] -c {hm,mh} -i INPUT -o OUTPUT
@@ -185,6 +202,7 @@ optional arguments:
                         Output file name
 
 ```
+
 ### Generate subset of GTF based on selected genes
 ```
 pyseqtools.py subsetgtf [-h] -l LIST -i INPUT -o OUTPUT
