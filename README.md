@@ -7,7 +7,7 @@ Available analyses/tools:
 - RNA-Seq
 - ChIP-Seq
 - CUT & RUN
-- DamID (work in progress)
+- DamID
 
 
 - Interspecies gene symbol conversion

@@ -611,7 +611,7 @@ def main():
                 else:
                     print("Skipping FastQC/MultiQC analysis")
 
-                #utils.trim(script_dir, threads, work_dir)
+                utils.trim(script_dir, threads, work_dir)
                 cutrun_utils.bowtie2(work_dir, script_dir, str(threads), cutrun_settings, genome)
                 utils.indexBam(work_dir, threads)
 
@@ -646,10 +646,11 @@ def main():
         
         genome = args["genome"]
         
-        #utils.trim(script_dir, threads, work_dir)
-        
+        utils.trim(script_dir, threads, work_dir)
         damid_utils.damID(script_dir, work_dir, threads, genome, damid_settings)
-
+        damid_utils.bedgraph2BigWig(script_dir, work_dir, damid_settings, genome)
+        
+        
 
     def geneSymConv(args, script_dir):
         conversion = args["conversion"]
