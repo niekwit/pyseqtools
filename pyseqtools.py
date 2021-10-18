@@ -335,16 +335,15 @@ def main():
 
         ###set thread count for processing
         threads = utils.set_threads(args)
-
-        ###Check md5 checksums
-        utils.checkMd5(work_dir)
-
-        ###run modules based on parsed arguments:
+        
         ##rename files
         rename = args["rename"]
         if rename == True:
             utils.rename(work_dir)
-
+        
+        ###Check md5 checksums
+        utils.checkMd5(work_dir)
+       
         #determine file extension raw data
         file_extension = utils.get_extension(work_dir)
 
@@ -638,6 +637,9 @@ def main():
     
     
     def damID(args, script_dir):
+        #Check md5sums
+        utils.checkMd5(work_dir)
+        
         #set thread count for processing
         max_threads = str(multiprocessing.cpu_count())
         threads = args["threads"]
@@ -649,8 +651,7 @@ def main():
         utils.trim(script_dir, threads, work_dir)
         damid_utils.damID(script_dir, work_dir, threads, genome, damid_settings)
         damid_utils.bedgraph2BigWig(script_dir, work_dir, damid_settings, genome)
-        
-        
+                
 
     def geneSymConv(args, script_dir):
         conversion = args["conversion"]
