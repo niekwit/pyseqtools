@@ -190,7 +190,7 @@ def count(library,
     
        
     bowtie2 = os.path.join(bowtie2_dir, "bowtie2") + " --no-hd -p " + threads+" -t -N "+ mismatch + " -x " + index_path + " - 2>> crispr.log | "
-    bash = "sed '/XS:/d' | cut -f3 | sort | uniq -c > "
+    bash = "awk -F'\t' '{print $3}' | sort | uniq -c | sed " + '"s/^ *//" >'
 
     #trim, align and count
     if read_mod == "trim":
@@ -354,11 +354,11 @@ def join_counts(work_dir,library,crispr_library):
     counts = {}
     
     #remove all leading white spaces from all count files
-    sed = 'sed "s/^ *//" -i '
+    #sed = 'sed "s/^ *//" -i '
 
     for file in file_list:
-       sed_command = sed + file 
-       subprocess.run(sed_command, shell = True)
+       #sed_command = sed + file 
+       #subprocess.run(sed_command, shell = True)
        #add counts to counts dict
        df = pd.read_csv(file,
                         sep=" ",
