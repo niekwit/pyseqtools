@@ -9,6 +9,8 @@ import urllib.request
 import yaml
 import sys
 import glob
+import threading
+
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib_venn import venn2
@@ -24,6 +26,25 @@ import utils_general as utils
 
 ###CRISPR SCREEN ANALYSIS SPECIFIC FUNCTIONS
 
+#this will kill a subprocess call if it takes too long
+class RunCmd(threading.Thread):
+    def __init__(self, cmd, timeout):
+        threading.Thread.__init__(self)
+        self.cmd = cmd
+        self.timeout = timeout
+
+    def run(self):
+        self.p = subprocess.call(self.cmd, shell = True)
+        self.p.wait()
+
+    def Run(self):
+        self.start()
+        self.join(self.timeout)
+
+        if self.is_alive():
+            self.p.terminate()     
+            self.join()
+            print("Alignment aborted, time restriction reached (possible alignment failure)")
    
 def csv2fasta(csv,script_dir):
     df_CSV = pd.read_csv(csv)
@@ -188,9 +209,12 @@ def count(library,
     bowtie2 = bowtie2[0].decode("utf-8")
     bowtie2_dir = os.path.dirname(bowtie2)
     
-       
-    bowtie2 = os.path.join(bowtie2_dir, "bowtie2") + " --no-hd -p " + threads+" -t -N "+ mismatch + " -x " + index_path + " - 2>> crispr.log | "
-    bash = "awk -F'\t' '{print $3}' | sort | uniq -c | sed " + '"s/^ *//" >'
+    bowtie2 = [os.path.join(bowtie2_dir, "bowtie2"), "--no-hd", "-p", threads,
+               "-t", "-N", mismatch, "-x", index_path, "-", "2>>", "crispr.log",
+               "|"]   
+    
+    bash = ["sed", "'/XS:/d'", "|", "cut", "-f3","|", "sort", "|", "uniq", 
+            "-c", "|", "sed", '"s/^ *//"', "|", "sed", "'1d'", ">" ]
 
     #trim, align and count
     if read_mod == "trim":
@@ -202,14 +226,19 @@ def count(library,
             if not utils.file_exists(out_file):
                 tqdm.write("Aligning " + base_file)
                 print(base_file + ":", file = open("crispr.log", "a"))
-                cutadapt = "cutadapt -j " + threads + " --quality-base 33 -l " + sg_length+" -o - " + file + " 2>> crispr.log | "
-                cutadapt = str(cutadapt)
-                bowtie2 = str(bowtie2)
-                count_command = cutadapt+bowtie2+bash+out_file
-                utils.write2log(work_dir,count_command,"Count: ")
+                cutadapt = ["cutadapt", "-j", threads,"--quality-base", "33",
+                            "-l", sg_length, "-o", "-", file, "2>>", "crispr.log", "|"]
+                
+                cutadapt.extend(bowtie2)
+                cutadapt.extend(bash)
+                cutadapt.append(out_file)
+                utils.write2log(work_dir," ".join(cutadapt),"Count: ")
+                       
+                
                 try:
-                    subprocess.run(count_command,
-                                   shell = True)
+                    #RunCmd(" ".join(cutadapt), 6000)
+                    #print()
+                    subprocess.call(" ".join(cutadapt), shell = True)
                 except:
                     sys.exit("ERROR: read count failed, check logs")
     elif read_mod == "clip":
@@ -231,16 +260,6 @@ def count(library,
                                    shell = True)
                 except:
                     sys.exit("ERROR: read count failed, check logs")
-
-    #remove first line from guide count text files (bowtie2 artefact)
-    count_list = glob.glob(os.path.join(work_dir,"count","*guidecounts.txt"))
-    for file in count_list:
-        command = "sed '1d' "+file+" > "+file+".temp "+"&& mv "+file+".temp "+file
-        try:
-            subprocess.run(command, 
-                           shell = True)
-        except:
-            sys.exit("ERROR: removal of first line of count file failed")
 
 
 def plot(df,y_label,save_file):
@@ -353,9 +372,6 @@ def join_counts(work_dir,library,crispr_library):
     #dictionary to store all guide counts
     counts = {}
     
-    #remove all leading white spaces from all count files
-    #sed = 'sed "s/^ *//" -i '
-
     for file in file_list:
        #sed_command = sed + file 
        #subprocess.run(sed_command, shell = True)
