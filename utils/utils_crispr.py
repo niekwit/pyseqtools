@@ -559,7 +559,7 @@ def mageck(work_dir,script_dir,cnv,fdr):
                 subprocess.run(mageck_command, shell=True)
 
     #plot MAGeCK hits
-    file_list=glob.glob(os.path.join(work_dir,"mageck","*","*gene_summary.txt"))
+    file_list=glob.glob(os.path.join(work_dir,"mageck*","*","*gene_summary.txt"))
 
     for file in file_list:
         save_path=os.path.dirname(file)
