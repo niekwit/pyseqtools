@@ -15,7 +15,7 @@ def checkPythonPackages(): #check for required python packages; installs if abse
     try:
         version = float(python_version().rsplit(".",1)[0])
         if version < 3.7:
-            sys.exit("ERROR: please update to at least Python 3.5")
+            sys.exit("ERROR: please update to at least Python 3.7")
     except:
         pass
 

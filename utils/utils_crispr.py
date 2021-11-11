@@ -9,7 +9,6 @@ import urllib.request
 import yaml
 import sys
 import glob
-import threading
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -26,25 +25,6 @@ import utils_general as utils
 
 ###CRISPR SCREEN ANALYSIS SPECIFIC FUNCTIONS
 
-#this will kill a subprocess call if it takes too long
-class RunCmd(threading.Thread):
-    def __init__(self, cmd, timeout):
-        threading.Thread.__init__(self)
-        self.cmd = cmd
-        self.timeout = timeout
-
-    def run(self):
-        self.p = subprocess.call(self.cmd, shell = True)
-        self.p.wait()
-
-    def Run(self):
-        self.start()
-        self.join(self.timeout)
-
-        if self.is_alive():
-            self.p.terminate()     
-            self.join()
-            print("Alignment aborted, time restriction reached (possible alignment failure)")
    
 def csv2fasta(csv,script_dir):
     df_CSV = pd.read_csv(csv)
@@ -897,10 +877,7 @@ def bagel2(work_dir, script_dir, fdr, crispr_settings, crispr_library):
         plt.savefig(out_file)
         plt.clf()
 
-    file_list=glob.glob(os.path.join(work_dir,
-                                "bagel*",
-                                "*",
-                                "*.pr"))
+    file_list=glob.glob(os.path.join(work_dir, "bagel*", "*", "*.pr"))
 
     for file in file_list:
         #plot histogram BF
@@ -910,15 +887,15 @@ def bagel2(work_dir, script_dir, fdr, crispr_settings, crispr_library):
             histogramBF(df, out_file)
 
 
-def lib_analysis(work_dir,library,crispr_library,script_dir):
+def lib_analysis(work_dir, crispr_settings, crispr_library, script_dir):
     #determine whether count file contains library samples pre and post
-    header=subprocess.check_output(["head", "-1",
+    header = subprocess.check_output(["head", "-1",
                                     os.path.join(work_dir,
                                                 "count",
                                                 "counts-aggregated.tsv")])
     if "pre" and "post" in str(header):
         #check if analysis has been performed already
-        out_file=os.path.join(work_dir,
+        out_file = os.path.join(work_dir,
                                 "library-analysis",
                                 "normalised-guides-frequency.pdf")
         if not os.path.exists(out_file):
@@ -929,6 +906,22 @@ def lib_analysis(work_dir,library,crispr_library,script_dir):
 
         os.makedirs(os.path.join(work_dir,"library-analysis"),exist_ok=True)
         warnings.filterwarnings("ignore")
+
+        fasta = crispr_settings[crispr_library]["fasta"]
+        
+        subprocess.call(["Rscript", 
+                   os.path.join(script_dir, "R", "crispr-library_analysis.R"), 
+                   work_dir,
+                   fasta])
+        
+        '''
+        
+        
+        
+        
+        
+        
+        
 
         df = pd.read_csv(os.path.join(work_dir,
                                         "count",
@@ -991,6 +984,7 @@ def lib_analysis(work_dir,library,crispr_library,script_dir):
         plt.close()
 
         #Calculates Gini index of data sets
+        
         ##Code taken and adapted from https://zhiyzuo.github.io/Plot-Lorenz/
 
         #function to calculate Gini index
@@ -1035,7 +1029,7 @@ def lib_analysis(work_dir,library,crispr_library,script_dir):
         plt.tight_layout()
         plt.savefig(os.path.join(work_dir,"library-analysis","lorenz-curve.pdf"))
         plt.close()
-
+        '''
     else:
         return None
 
