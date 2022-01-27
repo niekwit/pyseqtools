@@ -31,6 +31,13 @@ except ModuleNotFoundError:
 ###GENERAL FUNCTIONS
 
 
+def check_whitespace(work_dir):
+    if " " in work_dir:
+        print("ERROR: please remove any whitespace from analysis directory name:")
+        print(work_dir)
+        sys.exit(1)
+    
+
 def checkMd5(work_dir):
     md5sum_file = os.path.join(work_dir,"raw-data", "md5sums.csv")
 

@@ -673,8 +673,11 @@ def main():
         subprocess.call(["grep", "-w", "-f", gene_list, gtf, ">", output])
 
 
+    #check for whitespace in directory
+    utils.check_whitespace(work_dir)
 
     #execute selected module
+       
     if args["module"] == "crispr":
         crispr(args, script_dir)
     elif args["module"] == "rna-seq":
