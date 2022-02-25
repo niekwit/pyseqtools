@@ -193,7 +193,7 @@ def main():
     parser_chip.add_argument("--downsample",
                              required = False,
                              action = 'store_true',
-                             help = "Perform downsampling of BAM files")
+                             help = "Perform downsampling of BAM files to lowest read count")
     parser_chip.add_argument("-b", "--bigwig",
                              required = False,
                              action = 'store_true',
@@ -548,6 +548,10 @@ def main():
         peak = args["peaks"]
         if peak == True:
             chipseq_utils.peak(work_dir, threads, genome, chip_seq_settings)
+            
+        downsample = args["downsample"]
+        if downsample == True:
+            chipseq_utils.downsample(script_dir, work_dir, threads)
 
 
     def cutrun(args, script_dir):

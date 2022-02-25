@@ -13,6 +13,7 @@ from itertools import compress
 import yaml
 import pandas as pd
 import pybedtools
+import pysam
 
 script_dir = os.path.abspath(os.path.dirname(__file__))
 script_dir = os.path.dirname(script_dir)
@@ -276,9 +277,11 @@ def hisat2(script_dir, work_dir, threads, chip_seq_settings, genome):
 
 
     def alignPE(work_dir, hisat2, blacklist, index_location, threads):
-        file_list = glob.glob(os.path.join(work_dir, "trim_galore","*1_val_1.fq.gz"))
+        file_list = glob.glob(os.path.join(work_dir, "trim","*1_val_1.fq.gz"))
         
         print("Generating BAM files with HISAT2 (paired-end mode)")
+        samtools = utils.checkSamtools(script_dir)
+        bedtools = utils.checkBedtools(script_dir)
         
         for read1 in file_list:
             read2 = read1.replace("R1_001_val_1.fq.gz", 
@@ -292,20 +295,19 @@ def hisat2(script_dir, work_dir, threads, chip_seq_settings, genome):
                                          hisat2_output)
             
             if not utils.file_exists(hisat2_output):
-                samtools = utils.checkSamtools(script_dir)
-                bedtools = utils.checkBedtools(script_dir)
+                
                                 
                 align_command = hisat2 + " -p " + str(threads) + " -x " + index_location
                 align_command = align_command + " -1 " + read1 + " -2 " + read2
-                align_command = align_command + " 2>> align.log | " + samtools + " view -q 15 -F 260 -bS -@"
+                align_command = align_command + " 2>> align.log | " + samtools + " view -q 15 -F 260 -bS -@ "
                 align_command = align_command + threads + " - | " + bedtools + " intersect -v -a 'stdin' -b "
                 align_command = align_command + blacklist + " -nonamecheck | " + samtools + " sort -@ "
                 align_command = align_command + threads + " - > " + hisat2_output
                 
                 utils.write2log(work_dir, align_command, "HISAT2 PE: ")
                 
-                subprocess.run(align_command,
-                           shell = True)
+                print(os.path.basename(read1.replace("_R1_001_val_1.fq.gz","")) + ":", file = open("align.log", "a"))
+                subprocess.run(align_command, shell = True)
                 
            
     if utils.getEND(work_dir) == "PE":
@@ -322,6 +324,47 @@ def hisat2(script_dir, work_dir, threads, chip_seq_settings, genome):
 def bwa():
     pass
 
+def downsample(script_dir, work_dir, threads):
+    #check if bam files have been deduplicated
+    file_list = glob.glob(os.path.join(work_dir, "bam", "*.bam"))
+    dedup = b_any("dedupl" in x for x in file_list)
+    
+    if dedup == True:
+        file_list = sorted(glob.glob(os.path.join(work_dir,
+                                           "bam",
+                                           "*-sort-bl-dedupl.bam")))
+      
+    #get counts from bam files
+    df = pd.DataFrame(columns = file_list)
+
+    for bam in file_list:
+          count = pysam.view("-@", str(threads) ,"-c", "-F" "260", bam)
+          df.loc[1, bam] = count.replace("\n","")
+    
+    #get lowest read count
+    df.loc[1] = df.loc[1].astype(int)
+    lowest_count = df.min(1).item()
+    df.loc[2] = lowest_count
+    
+    #calculate scaling factor for each bam file
+    df.loc[3] = df.loc[2] / df.loc[1]
+    df.drop([1,2],0, inplace=True)
+    
+    #downscale bam files
+    for bam,factor in df.iteritems():
+        factor = factor.item()
+        outfile = bam.replace(".bam","-downscaled.bam")
+        if factor == 1.0:
+            if not utils.file_exists(outfile):
+                shutil.copyfile(bam, outfile)
+        else:
+            if not utils.file_exists(outfile):
+                samtools = utils.checkSamtools(script_dir)
+                #seed for random number generator will be 0
+                command = [samtools, "view", "-@", threads,"-bs", str(factor), bam, ">", outfile]
+                utils.write2log(work_dir, " ".join(command), "Downscaling BAM: ")
+                subprocess.run(command)  
+    
 
 def ngsplot(work_dir, genome, feature, window):
     
