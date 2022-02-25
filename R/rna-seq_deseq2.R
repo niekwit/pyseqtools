@@ -81,6 +81,9 @@ if(file.exists(txdb.filename) == FALSE){
 k <- keys(txdb,keytype="TXNAME")
 tx2gene <- select(txdb,k,"GENEID","TXNAME")
 
+#create Salmon quant file list (for checking samples.csv)
+sf.list <- Sys.glob(file.path(work.dir, "salmon","*","quant.sf"))
+
 #Run DESeq2 for each sample df in df.list
 for (i in 1:length(df.list)){
   #create file list for DESeq2 input
@@ -89,11 +92,11 @@ for (i in 1:length(df.list)){
   names(files) <- samples$sample
   
   #check if files in samples.csv match with files present:
-  files.found <- length(list.files(path=work.dir,pattern="quant.sf", recursive = TRUE))
-  if (length(files) != files.found){
-    print("ERROR (DESeq2): number of samples in samples.csv does not match with actual samples in salmon directory")
-    quit(save = "no")
-  }
+  #files.found <- length(list.files(path=work.dir,pattern="quant.sf", recursive = TRUE))
+  #if (length(files) != files.found){
+  #  print("ERROR (DESeq2): number of samples in samples.csv does not match with actual samples in salmon directory")
+  #  quit(save = "no")
+  #}
   
   txi <- tximport(files,
                   type="salmon",

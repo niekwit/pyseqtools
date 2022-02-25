@@ -101,7 +101,7 @@ def salmon(salmon_index, threads, work_dir, gtf, fasta, script_dir, settings, re
         salmon_output_dir = os.path.join(work_dir,"salmon")
         os.makedirs(salmon_output_dir, 
                 exist_ok = True)
-        trim_list = glob.glob(os.path.join(work_dir,"trim_galore/*_trimmed.fq.gz"))
+        trim_list = glob.glob(os.path.join(work_dir,"trim/*_trimmed.fq.gz"))
         for read1 in trim_list:
             base_read1 = os.path.basename(read1).replace("_trimmed.fq.gz", "") + "-quant"
             salmon_folder_test = os.path.join(salmon_output_dir, base_read1)
@@ -143,10 +143,10 @@ def salmon(salmon_index, threads, work_dir, gtf, fasta, script_dir, settings, re
             
     
     if utils.getEND(work_dir) == "PE":
-        print("Mapping reads with Salmon:")
+        print("Mapping reads with Salmon (paired-end):")
         salmonPE(work_dir, threads, gtf, salmon_index, reference)
     elif utils.getEND(work_dir) == "SE":
-        print("Mapping reads with Salmon:")
+        print("Mapping reads with Salmon (single-end):")
         salmonSE(work_dir, threads, gtf, salmon_index, reference)
   
             
