@@ -247,17 +247,22 @@ def hisat2(script_dir, work_dir, threads, chip_seq_settings, genome):
     blacklist = utils.blackList(script_dir, genome)
     
     ###perform alignment with HISAT2###
-    os.makedirs(os.path.join(work_dir, "bam"),
-                    exist_ok = True)
+    os.makedirs(os.path.join(work_dir, "bam"), exist_ok = True)
     
-    def alignSE(work_dir, hisat2, blacklist, index_location, threads):
+    def alignSE(work_dir, hisat2, blacklist, index_location, threads, genome):
         file_list = glob.glob(os.path.join(work_dir, "trim_galore","*trimmed.fq.gz"))
         
         print("Generating BAM files with HISAT2 (single-end mode)")
         
         for file in file_list:
-            hisat2_output = os.path.basename(file).replace("_trimmed.fq.gz",
-                                                           "-sort-bl.bam")
+            
+            if genome == "dm3-ic":
+                hisat2_output = os.path.basename(file).replace("_trimmed.fq.gz",
+                                                               "-dm3ic-sort-bl.bam")
+            else:
+                hisat2_output = os.path.basename(file).replace("_trimmed.fq.gz",
+                                                               "-sort-bl.bam")
+                
             hisat2_output = os.path.join(work_dir,
                                          "bam",
                                          hisat2_output)
@@ -276,7 +281,7 @@ def hisat2(script_dir, work_dir, threads, chip_seq_settings, genome):
                            shell = True)
 
 
-    def alignPE(work_dir, hisat2, blacklist, index_location, threads):
+    def alignPE(work_dir, hisat2, blacklist, index_location, threads, genome):
         file_list = glob.glob(os.path.join(work_dir, "trim","*1_val_1.fq.gz"))
         
         print("Generating BAM files with HISAT2 (paired-end mode)")
@@ -288,7 +293,11 @@ def hisat2(script_dir, work_dir, threads, chip_seq_settings, genome):
                                   "R2_001_val_2.fq.gz")
             
             
-            hisat2_output = os.path.basename(read1).replace("_R1_001_val_1.fq.gz",
+            if genome == "dm3-ic":
+                hisat2_output = os.path.basename(read1).replace("_R1_001_val_1.fq.gz",
+                                                               "-dm3ic-sort-bl.bam")
+            else:
+                hisat2_output = os.path.basename(read1).replace("_R1_001_val_1.fq.gz",
                                                            "-sort-bl.bam")
             hisat2_output = os.path.join(work_dir,
                                          "bam",
@@ -311,9 +320,9 @@ def hisat2(script_dir, work_dir, threads, chip_seq_settings, genome):
                 
            
     if utils.getEND(work_dir) == "PE":
-        alignPE(work_dir, hisat2, blacklist, index_location, threads)
+        alignPE(work_dir, hisat2, blacklist, index_location, threads, genome)
     elif utils.getEND(work_dir) == "SE":
-        alignSE(work_dir, hisat2, blacklist, index_location, threads)
+        alignSE(work_dir, hisat2, blacklist, index_location, threads, genome)
     
     #plot alignment rate
     
@@ -366,19 +375,18 @@ def downsample(script_dir, work_dir, threads):
                 subprocess.run(command)  
     
 
+
 def ngsplot(work_dir, genome, feature, window):
     
     file_list = glob.glob(os.path.join(work_dir, "bam", "*.bam"))
     
-    os.makedirs(os.path.join(work_dir, "ngsplot"),
-                exist_ok = True)
+    os.makedirs(os.path.join(work_dir, "ngsplot"), exist_ok = True)
     
     
-    def ngsplotFunction(work_dir, genome, feature, window, extension):
+    def ngsplotFunction(work_dir, genome, feature, window, extension, bam):
         base_name = os.path.basename(bam).replace(extension, "")
-        ngsplot_dir = os.path.join(os.path.dirname(bam).replace("bam",""), "ngsplot" , base_name)
-        os.makedirs(ngsplot_dir,
-            exist_ok = True)
+        ngsplot_dir = os.path.join(os.path.dirname(os.path.dirname(bam)), "ngsplot" , base_name)
+        os.makedirs(ngsplot_dir, exist_ok = True)
         ngsplot_output = os.path.join(ngsplot_dir, base_name) + "_" + feature
         
         ngsplot = "ngs.plot.r -G " + genome + " -R " + feature + " -C " + bam + \
@@ -386,14 +394,16 @@ def ngsplot(work_dir, genome, feature, window):
         
         utils.write2log(work_dir, ngsplot, "ngsplot: ")
          
-        subprocess.run(ngsplot,
-                       shell = True)
+        #subprocess.run(ngsplot,shell = True)
         
     
     for bam in file_list:
-        if "-sort-bl-dedupl.bam" in bam:
-            ngsplotFunction(work_dir, genome, feature, window, "-sort-bl-dedupl.bam")
+        if "-sort-bl-dedupl-downscaled.bam" in bam:
+            ngsplotFunction(work_dir, genome, feature, window, "-sort-bl-dedupl-downscaled.bam", bam)
+        
             
+        elif "-sort-bl-dedupl.bam" in bam:
+            ngsplotFunction(work_dir, genome, feature, window, "-sort-bl-dedupl.bam")
         elif "-sort-bl.bam" in bam:
             ngsplotFunction(work_dir, genome, feature, window, "-sort-bl.bam")
      
