@@ -66,8 +66,7 @@ def checkMd5(work_dir):
                 sys.exit(1)
             else:
                 print("MD5 checksums correct")
-                df.to_csv("md5sums_checked.csv",
-                          index=False)
+                df.to_csv("md5sums_checked.csv",index=False)
 
 
 def logCommandLineArgs(work_dir):
@@ -363,9 +362,7 @@ def deduplicationBam(script_dir, work_dir, threads, args):
     picard = checkPicard(script_dir)
 
 
-    file_list = glob.glob(os.path.join(work_dir,
-                                       "bam",
-                                       "*-sort-bl.bam"))
+    file_list = glob.glob(os.path.join(work_dir,"bam","*-sort-bl.bam"))
     print("Performing deduplication of BAM files")
     for bam in file_list:
         dedup_output = bam.replace("-sort-bl.bam",
@@ -441,9 +438,7 @@ def deduplicationBam(script_dir, work_dir, threads, args):
 
 def indexBam(work_dir, threads):
     print("Indexing BAM files")
-    file_list = glob.glob(os.path.join(work_dir,
-                                       "bam",
-                                       "*.bam"))
+    file_list = glob.glob(os.path.join(work_dir,"bam","*.bam"))
 
     #index bam files
     #also check if bam files have been indexed
@@ -457,38 +452,37 @@ def indexBam(work_dir, threads):
 def createBigWig(work_dir, threads):
     #creates BigWig files for all existing BAM files
     print("Generating BigWig files")
-    os.makedirs(os.path.join(work_dir,
-                             "bigwig"),
-                exist_ok = True)
+    os.makedirs(os.path.join(work_dir,"bigwig"), exist_ok = True)
 
-    file_list = glob.glob(os.path.join(work_dir,
-                                       "bam",
-                                       "*.bam"))
+    file_list = glob.glob(os.path.join(work_dir,"bam","*.bam"))
 
+    
+    def bamCoverage(work_dir, threads, bam):
+        bigwig_output = os.path.basename(bam.replace(".bam", "-norm.bw"))
+        base_dir = os.path.dirname(os.path.dirname(bam))
+        os.makedirs(os.path.join(base_dir,"bigwig"), exist_ok = True)
+        bigwig_output = os.path.join(base_dir,"bigwig", bigwig_output)
+        
+        if not file_exists(bigwig_output):
+            bigwig = "bamCoverage -p " + str(threads) + " --binSize 100 --normalizeUsing RPKM --extendReads 200 --effectiveGenomeSize 2827437033 -b "
+            bigwig = bigwig + bam +" -o " + bigwig_output
+            write2log(work_dir,bigwig, "Create BigWig file: ")
+            subprocess.run(bigwig, shell = True)
 
-    #create BigWigs with deeptools
-    for bam in file_list:
-        if "-sort-bl.bam" in bam:
-            bigwig_output = bam.replace("-sort-bl.bam", "-norm.bw")
-            bigwig_output = bigwig_output.replace("bam", "bigwig")
-
-            if not file_exists(bigwig_output):
-                bigwig = "bamCoverage -p " + str(threads) + " --binSize 200 --normalizeUsing RPKM --extendReads 200 --effectiveGenomeSize 2827437033 -b "
-                bigwig = bigwig + bam +" -o " + bigwig_output
-
-                subprocess.run(bigwig,
-                               shell = True)
-        elif "-sort-bl-dedupl.bam" in bam:
-            bigwig_output = bam.replace("-sort-bl-dedupl.bam", "-dedupl-norm.bw")
-            bigwig_output = bigwig_output.replace("bam", "bigwig")
-
-            if not file_exists(bigwig_output):
-                bigwig = "bamCoverage -p " + str(threads) + " --binSize 200 --normalizeUsing RPKM --extendReads 200 --effectiveGenomeSize 2827437033 -b "
-                bigwig = bigwig + bam +" -o " + bigwig_output
-
-                subprocess.run(bigwig,
-                               shell = True)
-
+        
+    if b_any("downscaled.bam" in x for x in file_list):
+        file_list = glob.glob(os.path.join(work_dir,"bam","*downscaled.bam"))
+        for bam in file_list:
+            bamCoverage(work_dir, threads, bam)
+    elif b_any("dedupl.bam" in x for x in file_list):
+        file_list = glob.glob(os.path.join(work_dir,"bam","*dedupl.bam"))
+        for bam in file_list:
+            bamCoverage(work_dir, threads, bam)
+    elif b_any("sort-bl.bam" in x for x in file_list):
+        file_list = glob.glob(os.path.join(work_dir,"bam","*sort-bl.bam"))
+        for bam in file_list:
+            bamCoverage(work_dir, threads, bam)
+    
 
 def bigwigQC(work_dir, threads):
 
@@ -895,3 +889,28 @@ def bwa(work_dir, script_dir, args, threads, chip_seq_settings, genome):
         bwaMem(work_dir, threads, chip_seq_settings, genome)
     else:
         pass
+
+def mergeBam(work_dir, threads):
+    file = open(os.path.join(work_dir,"merge-bam.csv"), "r")
+    lines = file.readlines()
+    lines = lines[1:]
+    count = 0
+    for line in lines: #removes newline characters
+        lines[count] = line.replace("\n","")
+        count+=1
+    
+    os.makedirs(os.path.join(work_dir, "bam", "merged_bam"), exist_ok = True)
+    
+    for line in lines:
+        out_bam = os.path.join(work_dir, "bam", "merged_bam", line.split(",")[0]) + ".bam"
+        in_bams = line.split(",")[1].split(";")
+        in_bams = [os.path.join(work_dir,"bam",x) for x in in_bams]
+        if not file_exists(out_bam):
+            pysam.merge("-@", str(threads) ,out_bam , in_bams[0], in_bams[1], in_bams[2], in_bams[3], in_bams[4])
+        
+        
+        
+        
+        
+        
+        
