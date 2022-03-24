@@ -444,6 +444,7 @@ def peak(work_dir, threads, genome, chip_seq_settings):
     if data_format not in format_list:
         print("ERROR: invalid input file format chosen")
         return
+    
     if data_format == "AUTO":
         print("WARNING: AUTO format tag selected. Please make sure your data is \nnot BAMPE or BEDPE, as this cannot be detected by MACS3")
     input_format = ["-f", data_format]
@@ -468,7 +469,7 @@ def peak(work_dir, threads, genome, chip_seq_settings):
         bam_list = glob.glob(os.path.join(work_dir, "bam", "*sort-bl-dedupl.bam"))
         
     #import sample info
-    sample_df = pd.read_csv(os.path.join(work_dir, "samples.csv"))
+    sample_df = pd.read_csv(os.path.join(work_dir, "peak_samples.csv"))
     conditions = set(sample_df["condition"])
     
     #run MACS3 for each sample and input combination
@@ -489,7 +490,7 @@ def peak(work_dir, threads, genome, chip_seq_settings):
             sample_bam = [k for k in bam_list if chip_sample in k]
             sample_bam, = sample_bam #unpack list
             
-            #run MACS2
+            #run MACS3
             out_dir = os.path.join(work_dir, "peaks", chip_sample)
             os.makedirs(out_dir, exist_ok = True)
             out_file = os.path.join(work_dir, "peaks", chip_sample, chip_sample + "_peaks.xls")
@@ -510,9 +511,9 @@ def peak(work_dir, threads, genome, chip_seq_settings):
                     df_bed = pd.read_csv(os.path.join(out_dir, chip_sample + "_peaks.broadPeak"),
                                          sep = "\t",
                                          header = None)
-                    df_bed = df_bed.drop(range(3,9), axis = 1)
-                    new_order = [0,1,2]
-                    df_bed = df_bed[df_bed.columns[new_order]]
+                    df_bed = df_bed.drop(range(4,9), axis = 1)
+                    #new_order = [0,1,2]
+                    #df_bed = df_bed[df_bed.columns[new_order]]
                     df_bed.to_csv(bed_file, 
                                      sep = "\t", 
                                      index = False, 
@@ -609,21 +610,17 @@ def peak(work_dir, threads, genome, chip_seq_settings):
 
     #annotate peaks with HOMER
     bed_list = glob.glob(os.path.join(work_dir, "peaks", "*", "*.bed"))
+    #bed_list = glob.glob(os.path.join(work_dir, "peak", "*.bed"))
     
     for bed in bed_list:
         out_file = bed.replace(".bed", "_annotated-peaks.txt")
         
         if not utils.file_exists(out_file):
-            #add unique peak id to .bed file (required by HOMER)
+            #further annotate BED file (required by HOMER)
             df_bed = pd.read_csv(bed, sep = "\t", header = None)
             column_number = len(df_bed.columns)
-            if column_number == 3:
-                peak_number = len(df_bed)
-                peak_ids = []
-                for i in range(1, peak_number + 1):
-                    peak_id = "peak_" + str(i)
-                    peak_ids.append(peak_id)
-                df_bed["peak_id"] = peak_ids
+            if column_number == 4:
+                
                 df_bed["empty"] = ""
                 df_bed["strand"] = "+"
                 df_bed.to_csv(bed, sep = "\t", index = False, header = False)
@@ -638,7 +635,39 @@ def peak(work_dir, threads, genome, chip_seq_settings):
             utils.write2log(work_dir, command, "Peak annotation (HOMER): " )
             print("Annotating peaks for " + os.path.basename(bed))
             subprocess.run(command, shell = True, check = True)
+    
+    #merge peak annotation with MACS3 output
+    macs3_list = glob.glob(os.path.join(work_dir, "peak", "*_peaks.xls"))
+    homer_list = [x.replace("_peaks.xls", "_annotated-peaks.txt") for x in macs3_list]
+    
+    for macs3, homer in zip(macs3_list, homer_list):
+        out_file = homer.replace("_annotated-peaks.txt","_annotated_macs3_peaks.csv")
+        if not utils.file_exists(out_file):
+            df_macs3 = pd.read_csv(macs3, skiprows=(29), sep = "\t")
+            df_homer = pd.read_csv(homer, sep = "\t")
+            df_homer = df_homer.rename(columns = {df_homer.columns[0]: "name"})
+            df_merge = pd.merge(df_macs3, df_homer[["name","Gene Name", "Gene Alias", 
+                                                    "Gene Description", "Gene Type"]], 
+                                on = "name", 
+                                how = "left" )
+            df_merge.to_csv(out_file, index = False)
+   
 
+def overlappingPeaks(work_dir):
+    #load settings
+    df_settings = pd.read_csv(os.path.join(work_dir, "peak_settings.txt"))
+    
+    for index, row in df_settings.iterrows():
+        control_bed = row["control"]
+        sample_bed = row["sample"]
+        output_bed = os.path.join(work_dir,"peak", "overlap-" + control_bed.replace(".bed","") + "_vs_" +sample_bed)
+        
+        if not utils.file_exists(output_bed):
+            a_bed = pybedtools.BedTool(os.path.join(work_dir, "peak", control_bed))
+            b_bed = pybedtools.BedTool(os.path.join(work_dir, "peak", sample_bed))
+
+            intersect_bed = a_bed.intersect(b_bed)
+            out = intersect_bed.saveas(output_bed)
     
 def bam_bwQC(work_dir, threads):
     #import sample info
@@ -878,3 +907,25 @@ def plotProfile(work_dir, chip_seq_settings, genome, threads):
             utils.write2log(work_dir, pp, "Generate metagene plot (overlay): ")
             subprocess.run(pp, shell = True)
 
+def bamCompare(work_dir, threads):
+    file = open(os.path.join(work_dir,"config_bamcompare.txt"), "r")
+    lines = file.readlines()
+    count = 0
+    for line in lines: #removes newline characters
+        lines[count] = line.replace("\n","")
+        count+=1
+    
+    os.makedirs(os.path.join(work_dir, "bigwig"), exist_ok = True)
+    
+    for line in lines:
+        chip_bam = line.split(":")[0]
+        input_bam = line.split(":")[1].split(",")[0]
+        output_bw = os.path.join(work_dir,"bigwig",line.split(":")[1].split(",")[1] + "-log2fc.bw")
+    
+        command = ["bamCompare", "-p", threads, "-b1", chip_bam, "-b2", input_bam, "-o", output_bw]
+        command = " ".join(command)
+        
+        if not utils.file_exists(output_bw):
+            utils.write2log(work_dir, command, "" )
+            subprocess.run(command, shell = True, check = True)
+            
