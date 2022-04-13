@@ -370,7 +370,7 @@ def main():
                      threads,
                      script_dir,
                      work_dir)
-
+        
         #plot alignment rates
         crispr_utils.plot_alignment_rate(work_dir)
 
@@ -387,7 +387,7 @@ def main():
 
         #plot sample coverage (read count / library size)
         crispr_utils.plot_coverage(work_dir, crispr_settings, crispr_library)
-
+        
         ##run library analysis
         crispr_utils.lib_analysis(work_dir, crispr_settings, crispr_library, script_dir)
         crispr_utils.gcBias(work_dir, crispr_settings, crispr_library)
@@ -422,6 +422,7 @@ def main():
                             crispr_library,
                             analysis,
                             gene_sets)
+        
 
     def rna_seq(args, script_dir):
 

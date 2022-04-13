@@ -181,7 +181,8 @@ def count(library,
     file_extension = utils.get_extension(work_dir)
 
     print("Aligning reads to reference (mismatches allowed: "+mismatch+")")
-
+    
+    '''
     #bowtie2 and bash commands (common to both trim and clip)
     bowtie2 = [line[0:] for line in subprocess.check_output("find $HOME -name bowtie2-build", 
                                                                shell = True).splitlines()]
@@ -189,38 +190,37 @@ def count(library,
     bowtie2 = bowtie2[0].decode("utf-8")
     bowtie2_dir = os.path.dirname(bowtie2)
     
-    bowtie2 = [os.path.join(bowtie2_dir, "bowtie2"), "--no-hd", "-p", threads,
-               "-t", "-N", mismatch, "-x", index_path, "-", "2>>", "crispr.log",
-               "|"]   
+    #bowtie2 = [os.path.join(bowtie2_dir, "bowtie2"), "--no-hd", "-p", threads,
+    #           "-t", "-N", mismatch, "-x", index_path, "-", "2>>", "crispr.log",
+    #           "|"]   
+    '''
     
-    bash = ["sed", "'/XS:/d'", "|", "cut", "-f3","|", "sort", "|", "uniq", 
-            "-c", "|", "sed", '"s/^ *//"', "|", "sed", "'1d'", ">" ]
-
-    #trim, align and count
+    #trim
     if read_mod == "trim":
-        file_list = glob.glob(os.path.join(work_dir,"raw-data","*"+file_extension))
+        file_list = [x for x in glob.glob(os.path.join(work_dir,"raw-data","*"+file_extension)) if not "_trim" in x]
         for file in tqdm(file_list, position = 0, leave = True):
             base_file = os.path.basename(file)
-            out_file = os.path.join(work_dir,"count",base_file.replace(file_extension,
-                                                                "guidecounts.txt"))
-            if not utils.file_exists(out_file):
-                tqdm.write("Aligning " + base_file)
+            if ".fq.gz" in file:
+                trim_file = file.replace(".fq.gz","_trim.fq.gz")
+            elif ".fastq.gz" in file:
+                trim_file = file.replace(".fastq.gz","_trim.fastq.gz")
+            
+            if not utils.file_exists(trim_file):
+                tqdm.write("Trimming " + base_file)
                 print(base_file + ":", file = open("crispr.log", "a"))
-                cutadapt = ["cutadapt", "-j", threads,"--quality-base", "33",
-                            "-l", sg_length, "-o", "-", file, "2>>", "crispr.log", "|"]
                 
-                cutadapt.extend(bowtie2)
-                cutadapt.extend(bash)
-                cutadapt.append(out_file)
-                utils.write2log(work_dir," ".join(cutadapt),"Count: ")
-                       
+                cutadapt = ["cutadapt", "-j", threads, "--quiet","--quality-base", "33",
+                            "-l", sg_length, "-o", trim_file, file, "2>>", "crispr.log"]
+                #cutadapt = ["cutadapt", "-j", threads,"--quality-base", "33",
+                 #           "-l", sg_length, "-o", "-", file, "2>>", "crispr.log", "|"]
+                
+                utils.write2log(work_dir," ".join(cutadapt),"Trimming: ")
                 
                 try:
-                    #RunCmd(" ".join(cutadapt), 6000)
-                    #print()
                     subprocess.call(" ".join(cutadapt), shell = True)
                 except:
-                    sys.exit("ERROR: read count failed, check logs")
+                    sys.exit("ERROR: trimming of fastq files failed, check log")
+    '''
     elif read_mod == "clip":
         file_list = glob.glob(os.path.join(work_dir,"raw-data","*"+file_extension))
         for file in tqdm(file_list, position=0, leave=True):
@@ -240,6 +240,37 @@ def count(library,
                                    shell = True)
                 except:
                     sys.exit("ERROR: read count failed, check logs")
+    '''
+                    
+    #count reads from trimmed fastq files
+    file_list = glob.glob(os.path.join(work_dir, "raw-data", "*_trim*"))
+    
+    for file in tqdm(file_list, position = 0, leave = True):
+        base_file = os.path.basename(file).replace("_trim","")
+        out_file = os.path.join(work_dir,"count",base_file.replace(file_extension,"guidecounts.txt"))
+        if not utils.file_exists(out_file):
+            tqdm.write("Aligning " + base_file)
+            #print("Aligning " + base_file)
+            print(base_file+":", file=open("crispr.log", "a"))
+            hisat2 = ["zcat", file,"|", "hisat2", 
+                       "--no-hd", "-p", threads, "-t", "-N", mismatch, "-x", index_path, 
+                       "-", "2>>", "crispr.log", "|"]   
+            bash = ["sed", "'/XS:/d'", "|", "cut", "-f3","|", "sort", "|", "uniq", 
+                    "-c", "|", "sed", '"s/^ *//"', "|", "sed", "'1d'", ">" ]
+            
+            hisat2.extend(bash)
+            hisat2.append(out_file)
+            utils.write2log(work_dir," ".join(hisat2),"Count sgRNAs: ")
+            
+            #cutadapt.extend(bowtie2)
+            #cutadapt.extend(bash)
+            #cutadapt.append(out_file)
+            #utils.write2log(work_dir," ".join(cutadapt),"Count: ")
+                        
+            try:
+                subprocess.call(" ".join(hisat2), shell = True)
+            except:
+                sys.exit("ERROR: read counting failed, check logs")
 
 
 def plot(df,y_label,save_file):
