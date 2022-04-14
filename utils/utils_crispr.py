@@ -705,9 +705,9 @@ def bagel2(work_dir, script_dir, fdr, crispr_settings, crispr_library):
                    sep=";")
 
     #remove rows with multiple samples (for MAGeCK) per condition (temp fix)
-    #df = df[~df["t"].str.contains(",")]
-    #df = df[~df["c"].str.contains(",")]
-    #df = df.reset_index()
+    df = df[~df["t"].str.contains(",")]
+    df = df[~df["c"].str.contains(",")]
+    df = df.reset_index()
 
     sample_number = len(df)
     sample_range = range(sample_number)

@@ -270,6 +270,10 @@ def main():
     parser_damid = subparsers.add_parser('damid',
                                           description = "Analysis pipeline for DamID (wrapper for https://github.com/owenjm/damidseq_pipeline)",
                                           help = 'DamID analysis')
+    parser_damid.add_argument("-r", "--rename",
+                               required = False,
+                               action = 'store_true',
+                               help = "Rename fastq files according to rename.config")
     parser_damid.add_argument("-t", "--threads",
                            required = False,
                            default = 1,
@@ -644,6 +648,11 @@ def main():
     def damID(args, script_dir):
         #Check md5sums
         utils.checkMd5(work_dir)
+        
+        ##rename files
+        rename = args["rename"]
+        if rename == True:
+            utils.rename(work_dir)
         
         #set thread count for processing
         max_threads = str(multiprocessing.cpu_count())

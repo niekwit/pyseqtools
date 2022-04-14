@@ -58,7 +58,7 @@ def damID(script_dir, work_dir, threads, genome, damid_settings):
     file_list = glob.glob(os.path.join(work_dir, "trim","*.gz"))
     
     #check whether there is a dam-only control
-    dam_control = b_any(["dam.fq.gz" in x for x in file_list])
+    dam_control = b_any(["dam" in x for x in file_list])
     
     if not dam_control:
         sys.exit("ERROR: no dam only control defined (dam.fastq.gz) in raw-data directory")

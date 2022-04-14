@@ -250,7 +250,7 @@ def hisat2(script_dir, work_dir, threads, chip_seq_settings, genome):
     os.makedirs(os.path.join(work_dir, "bam"), exist_ok = True)
     
     def alignSE(work_dir, hisat2, blacklist, index_location, threads, genome):
-        file_list = glob.glob(os.path.join(work_dir, "trim_galore","*trimmed.fq.gz"))
+        file_list = glob.glob(os.path.join(work_dir, "trim","*trimmed.fq.gz"))
         
         print("Generating BAM files with HISAT2 (single-end mode)")
         
@@ -263,9 +263,7 @@ def hisat2(script_dir, work_dir, threads, chip_seq_settings, genome):
                 hisat2_output = os.path.basename(file).replace("_trimmed.fq.gz",
                                                                "-sort-bl.bam")
                 
-            hisat2_output = os.path.join(work_dir,
-                                         "bam",
-                                         hisat2_output)
+            hisat2_output = os.path.join(work_dir,"bam",hisat2_output)
             
             if not utils.file_exists(hisat2_output):
                 samtools = utils.checkSamtools(script_dir)
@@ -277,6 +275,7 @@ def hisat2(script_dir, work_dir, threads, chip_seq_settings, genome):
                 utils.write2log(work_dir, align_command, "HISAT2: ")
                 
                 print(os.path.basename(file) + ":", file = open("align.log", "a"))
+                print("Aligning " + os.path.basename(file))
                 subprocess.run(align_command,
                            shell = True)
 
@@ -485,19 +484,22 @@ def peak(work_dir, threads, genome, chip_seq_settings):
             chip_sample = df_sample["sample"].values[0]
             
             #get bam files for input and sample
-            input_bam = [k for k in bam_list if input_sample in k]
-            input_bam, = input_bam #unpack list
-            sample_bam = [k for k in bam_list if chip_sample in k]
-            sample_bam, = sample_bam #unpack list
+            #input_bam = [k for k in bam_list if input_sample in k]
+            input_bam = os.path.join(work_dir,"bam",input_sample)
+            #input_bam, = input_bam #unpack list
+            #sample_bam = [k for k in bam_list if chip_sample in k]
+            sample_bam = os.path.join(work_dir,"bam",chip_sample)
+            #sample_bam, = sample_bam #unpack list
             
             #run MACS3
             out_dir = os.path.join(work_dir, "peaks", chip_sample)
             os.makedirs(out_dir, exist_ok = True)
             out_file = os.path.join(work_dir, "peaks", chip_sample, chip_sample + "_peaks.xls")
+            #out_file = os.path.join(work_dir, "peaks", chip_sample, os.path.basename(chip_sample) + "_peaks.xls")
             
             if not utils.file_exists(out_file):
                 macs3 = ["macs3", "callpeak", "-t", sample_bam, "-c", input_bam,
-                         "-n", chip_sample, "--outdir", out_dir, "-q", q_value,
+                         "-n", chip_sample, "--outdir", out_dir, "-q", str(q_value),
                          "-g", _genome]
                 macs3.extend(input_format )
                 macs3.extend(peak_setting) # add peak settings

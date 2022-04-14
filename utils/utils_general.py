@@ -656,7 +656,7 @@ def trim(script_dir, threads, work_dir):
             if not file_exists(out_file1):
                 read2 = read1.replace("R1","R2")
                 trim_galore_command = [trimgalore_file,"-j", str(threads), "-o",
-                                       "./trim", "--paired", read1, read2]
+                                       os.path.join(work_dir,"trim"), "--paired", read1, read2]
                 #log commands
                 with open(work_dir+"/commands.log", "a") as file:
                     file.write("Trim Galore: ")
@@ -666,9 +666,7 @@ def trim(script_dir, threads, work_dir):
     def trimSE(work_dir, threads):
         print("Trimming single-end fastq files")
         extension = get_extension(work_dir)
-        fastq_list = glob.glob(os.path.join(work_dir,
-                                            "raw-data",
-                                            "*." + extension))
+        fastq_list = glob.glob(os.path.join(work_dir,"raw-data","*." + extension))
 
         for file in fastq_list:
             out_file = os.path.join(work_dir,
@@ -677,7 +675,7 @@ def trim(script_dir, threads, work_dir):
             out_file = out_file.replace("raw-data", "trim")
             if not file_exists(out_file):
                 trim_galore_command = [trimgalore_file, "-j", threads,
-                                       "-o", "./trim",
+                                       "-o", os.path.join(work_dir,"trim"),
                                        file]
                 #log command
                 with open(os.path.join(work_dir,"commands.log"), "a") as file:
