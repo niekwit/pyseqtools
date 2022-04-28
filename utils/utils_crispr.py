@@ -527,7 +527,7 @@ def mageck(work_dir,script_dir,cnv,fdr):
             mageck_command="mageck test -k "+input+" -t "+test_sample+" -c "+control_sample+" -n "+prefix+log
             utils.write2log(work_dir,mageck_command,"MAGeCK: ")
             try:
-                print("Running MAGeCK without CNV correction")
+                print("Running MAGeCK without CNV correction: " + mageck_output.replace("_vs_", " vs "))
                 subprocess.run(mageck_command, shell=True)
             except:
                 print("MAGeCK failed. Check log")
