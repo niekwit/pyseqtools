@@ -169,21 +169,27 @@ def bedgraph2BigWig(script_dir, work_dir, damid_settings, genome):
             
             utils.write2log(work_dir, b2b_com, "bedgraphToBigWig: ")
             subprocess.call(b2b_com)
+
+def quantileNormalistion(work_dir, script_dir):
+    download_dir = os.path.join(script_dir, "DamID_scripts")
+    if not os.path.isdir(download_dir):
+        url = "https://github.com/AHBrand-Lab/DamID_scripts.git"
+        os.makedirs(download_dir)
+        git.Git(script_dir).clone(url)
         
-        
-def rev_log_trans(work_dir):
+def revLogTrans(work_dir):
     '''
     Creates reverse log transformed bedgraph files for visualisation of tracks
     '''
-    file_list = glob.glob(os.path.join(work_dir,"trim","*.bedgraph"))
-    out_files = [x.replace(".bedgraph","-rev_log.bedgraph") for x in file_list]
+    file_list = glob.glob(os.path.join(work_dir,"trim","*bedgraph.quant.norm.bedgraph"))
+    out_files = [x.replace(".bedgraph.quant.norm.bedgraph",".rev.log.quant.norm.bedgraph") for x in file_list]
     
     for outfile,file in zip(out_files,file_list):
         if not utils.file_exists(outfile):
             df = pd.read_csv(file, skiprows=1, header=None, sep="\t")
-            with np.errstate(divide='ignore'): #ignore divide by zero error 
-                df[3] = 1/np.log2(df[3])
-                df.fillna(0, inplace=True)
+            #with np.errstate(divide='ignore'): #ignore divide by zero error 
+            df[3] = 2**(df[3])
+            #df.fillna(0, inplace=True)
         header = subprocess.check_output(["head", "-1", file])
         header = header.decode("utf-8")
         df.to_csv(outfile, sep="\t", header=False, index=False)
