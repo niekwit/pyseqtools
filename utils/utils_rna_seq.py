@@ -121,9 +121,9 @@ def salmon(salmon_index, threads, work_dir, gtf, fasta, script_dir, settings, re
     
     def salmonPE(work_dir, threads, gtf, salmon_index, reference):
         salmon_output_dir = os.path.join(work_dir,"salmon")
-        os.makedirs(salmon_output_dir, 
-                exist_ok = True)
-        trim_list = glob.glob(os.path.join(work_dir,"trim/*_R1_001_val_1.fq.gz"))
+        os.makedirs(salmon_output_dir, exist_ok = True)
+        trim_list = glob.glob(os.path.join(work_dir,"trim","*_R1_001_val_1.fq.gz"))
+        salmon_index = settings["salmon_index"][reference] #reload index
         for read1 in trim_list:
             base_read1 = os.path.basename(read1).replace("_R1_001_val_1.fq.gz", "") + "-quant"
             salmon_folder_test = os.path.join(salmon_output_dir, base_read1)
@@ -132,7 +132,6 @@ def salmon(salmon_index, threads, work_dir, gtf, fasta, script_dir, settings, re
                 read2 = read1.replace("R1_001_val_1.fq.gz", "R2_001_val_2.fq.gz")
                 out_file = os.path.basename(read1.replace("_R1_001_val_1.fq.gz",""))
                 salmon_output_file = os.path.join(work_dir,"salmon",out_file)+"-quant"
-                salmon_index = settings["salmon_index"][reference] #reload index
                 salmon_command = [salmon_file,"quant","--index",salmon_index,"-l","A",
                 "-g", gtf,"-p",threads,"-1", read1,"-2",read2,"--validateMappings",
                 "--gcBias","-o", salmon_output_file]
@@ -148,8 +147,22 @@ def salmon(salmon_index, threads, work_dir, gtf, fasta, script_dir, settings, re
     elif utils.getEND(work_dir) == "SE":
         print("Mapping reads with Salmon (single-end):")
         salmonSE(work_dir, threads, gtf, salmon_index, reference)
-  
-            
+    
+    #merge Salmon quant files
+    salmon_list = glob.glob(os.path.join(work_dir,"salmon","*-quant"))
+    merge_output = [os.path.basename(i).replace("-quant","") for i in salmon_list]
+    out_file = os.path.join(work_dir,"salmon","salmon_merge.txt")
+    
+    
+    if not utils.file_exists(out_file):
+        salmon_merge = [salmon_file, "quantmerge", "--quants", "{" +",".join(salmon_list) + "}", "--names", 
+                       "{" + ",".join(merge_output) + "}","-o", out_file]
+        utils.write2log(work_dir," ".join(salmon_merge),"Salmon merge quant files: ")
+        try:    
+            subprocess.run(salmon_merge)
+        except:
+            print("WARNING: Merging of Salmon quant files failed.")
+
 def plotBar(df,y_label,save_file):
     sns.set_style("white")
     sns.set_style("ticks")
@@ -216,7 +229,7 @@ def plotVolcano(work_dir):
         if not utils.file_exists(out_file):
             print("Generating volcano plot for: "+base_name)
             df=pd.read_csv(file)
-            df["log.p.value"]=-np.log(df["padj"])
+            df["log.p.value"]=-np.log10(df["padj"])
             df["label"] = ""
             
             #mark genes are upregulated or downregulated for plotting
