@@ -278,15 +278,17 @@ def checkBowtie(script_dir):
 
 
 def checkBowtie2(script_dir):
-    #check for bowtie1 (exclude bowtie2) in $PATH
-    path = os.environ["PATH"].lower().split(":")
-
+    #check for bowtie2 in $PATH
+    path = os.environ["PATH"]
+    if "bowtie2" in path:
+        print("test")
+        return(None)
+    
+    path = path.os.path.lower().split(":")
     bowtie2 = list(filter(lambda x: "bowtie2" in x, path))
 
-    if len(bowtie2) == 1:
-        bowtie2, = bowtie2 #unpack list
-        return(bowtie2)
-    elif len(bowtie2) > 1:
+    
+    if len(bowtie2) > 1:
         print("ERROR: multiple instances of Bowtie found:")
         print(bowtie2)
         sys.exit()

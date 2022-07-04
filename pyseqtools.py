@@ -361,7 +361,7 @@ def main():
         ##count reads
         #check if bowtie2 index is build for CRISPR library
         crispr_library = args["library"]
-        crispr_utils.check_index(crispr_settings, crispr_library, script_dir, work_dir)
+        #crispr_utils.check_index(crispr_settings, crispr_library, script_dir, work_dir)
 
         #check if file with just guide names exists
         crispr_utils.guide_names(crispr_settings, crispr_library)

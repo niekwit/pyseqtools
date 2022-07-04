@@ -4,6 +4,7 @@ import os
 import subprocess
 import sys
 import glob
+from pathlib import Path
 
 import yaml
 import matplotlib.pyplot as plt
@@ -49,6 +50,11 @@ def bowtie(work_dir, script_dir, threads, cutrun_settings, genome):
 
     #check for bowtie
     bowtie_dir = utils.checkBowtie(script_dir)
+    
+    with open(os.path.join(script_dir, "yaml", "cut-run.yaml")) as f:
+        doc = yaml.safe_load(f)
+
+    bowtie_index = doc["bowtie"][genome]
 
     #check for samtools
     samtools_bin = utils.checkSamtools(script_dir)
@@ -113,7 +119,7 @@ def bowtie(work_dir, script_dir, threads, cutrun_settings, genome):
                 bowtie_command.extend(samtools)
                 bowtie_command.append(out_file)
                 print(os.path.basename(read1) + ":", file = open("align.log", "a"))
-                utils.write2log(work_dir, bowtie_command, "Bowtie alignment: ")
+                utils.write2log(work_dir, " ".join(bowtie_command), "")
                 subprocess.call(bowtie_command)
 
 
@@ -121,6 +127,8 @@ def bowtie(work_dir, script_dir, threads, cutrun_settings, genome):
 def bowtie2(work_dir, script_dir, threads, cutrun_settings, genome):
     #check for bowtie2
     bowtie2_dir = utils.checkBowtie2(script_dir)
+    if not bowtie2_dir:
+        bowtie2_dir = ""
 
     #check for samtools
     samtools_bin = utils.checkSamtools(script_dir)
@@ -195,7 +203,7 @@ def bowtie2(work_dir, script_dir, threads, cutrun_settings, genome):
                 samtools = ["|", samtools_bin, "view", "-q", "15", "-F", "260", "-bS",
                             "-@", threads, "-","|", bedtools_bin, "intersect", "-v", "-a",
                             "stdin", "-b", blacklist, "-nonamecheck", "|", samtools_bin,
-                            "sort", "-@", threads, "-",">"]
+                            "sort", "-@", threads, ">"]
 
                 bowtie2_command.extend(bowtie2_settings)
                 bowtie2_command.extend(samtools)
