@@ -3,6 +3,8 @@
 import glob
 import os
 import sys
+import subprocess
+import tempfile
 
 import pysam
 
@@ -12,7 +14,54 @@ sys.path.append(os.path.join(script_dir, "utils"))
 import utils_general as utils
 
 
-def splitBam(threads, work_dir):
+        
+def STAR(work_dir, threads, script_dir, tt_seq_settings, genome):
+    '''
+    https://github.com/crickbabs/DRB_TT-seq/
+    '''
+
+    file_list = glob.glob(os.path.join(work_dir,"trim","*_val_1.fq.gz"))
+
+    
+    #function for alignment with STAR
+    def align(work_dir,file_list, index, threads, genome):
+        for read1 in file_list:
+            read2 = read1.replace("_R1_001_val_1.fq.gz","_R2_001_val_2.fq.gz")
+            
+            #create sample name
+            sample = os.path.basename(read1).replace("_R1_001_val_1.fq.gz","")
+            
+            #create temp dir for STAR
+            temp_dir = tempfile.gettempdir()
+            
+            #create output dir
+            os.makedirs(os.path.join(work_dir,"bam",genome,sample), exist_ok = True)
+            
+            star = ["STAR", "--runThreadN", threads,"--runMode", "alignReads", "--genomeDir", index,
+                    "--readFilesIn", read1, read2, "--readFilesCommand", "zcat", "--quantMode",
+                    "TranscriptomeSAM", "GeneCounts", "--twopassMode", "Basic", "--outSAMunmapped",
+                    "None", "--outSAMattrRGline","ID:"+sample,"PU:"+sample,"SM:"+sample,"LB:unknown",
+                    "PL:illumina", "outSAMtype","BAM", "unsorted", "--outTmpDir", temp_dir,
+                    "--outFileNamePrefix", os.path.join(work_dir,"bam",genome,sample)]
+            
+            utils.write2log(work_dir, " ".join(star), "" )
+            subprocess.call(star)
+            
+            #remove tempdir
+            os.rmdir(temp_dir)
+        
+    
+    #align trimmed reads to selected genome    
+    index = tt_seq_settings["index"][genome]
+    align(work_dir,file_list, index, threads,genome)
+    
+    #align trimmed reads to yeast genome (spike-in)
+    yeast_index = tt_seq_settings["index-yeast"]
+    align(work_dir,file_list, yeast_index, threads,"R64-1-1")
+        
+        
+        
+def splitBam(threads, work_dir, genome):
     '''
     https://www.biostars.org/p/92935/
     
@@ -21,7 +70,7 @@ def splitBam(threads, work_dir):
     
     file_list = glob.glob(os.path.join(work_dir, "bam", "*.bam"))
     
-    
+        
     for bam in file_list:
         ##forward strand
         fwd1 = bam.replace(".bam","_fwd1.bam")
@@ -62,5 +111,3 @@ def splitBam(threads, work_dir):
         for file in remove:
             os.remove(file)
             os.remove(file.replace(".bam",".bam.bai"))
-        
-        

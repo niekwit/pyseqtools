@@ -288,6 +288,43 @@ def main():
                                action = 'store_true',
                                default = False,
                                help = "Skip FastQC/MultiQC")
+    
+    #create subparser for TT-Seq analysis commands
+    parser_ttseq = subparsers.add_parser('tt-seq',
+                                        description = "Analysis pipeline for TT-Seq experiments",
+                                        help='TT-Seq analysis according to https://github.com/crickbabs/DRB_TT-seq')
+
+    parser_ttseq.add_argument("-t", "--threads",
+                             required = False,
+                             default = "1",
+                             type = str,
+                             help = "<INT> number of CPU threads to use (default is 1). Use max to apply all available CPU threads")
+    parser_ttseq.add_argument("-r", "--rename",
+                             required = False,
+                             action = 'store_true',
+                             help = "Rename fq files")
+    parser_ttseq.add_argument("-g", "--genome",
+                             required = False,
+                             default = 'hg38',
+                             help = "Choose reference genome (default is hg38)")
+    parser_ttseq.add_argument("-d", "--deduplication",
+                             required = False,
+                             action = 'store_true',
+                             help = "Perform deduplication of BAM files")
+    parser_ttseq.add_argument("-b", "--bigwig",
+                             required = False,
+                             action = 'store_true',
+                             help = "Create BigWig files")
+    parser_ttseq.add_argument("--metagene",
+                             required = False,
+                             action = 'store_true',
+                             help = "Generate metagene plots and heatmaps with plotProfile (deepTools)")
+    parser_ttseq.add_argument("--skip-fastqc",
+                               required = False,
+                               action = 'store_true',
+                               default = False,
+                               help = "Skip FastQC/MultiQC")
+    
 
     #create subparser for gene symbol conversion
     parser_conversion = subparsers.add_parser('genesymconv',
@@ -665,6 +702,36 @@ def main():
         utils.trim(script_dir, threads, work_dir)
         damid_utils.damID(script_dir, work_dir, threads, genome, damid_settings)
         damid_utils.bedgraph2BigWig(script_dir, work_dir, damid_settings, genome)
+    
+    
+    def ttSeq(args, script_dir):
+        #set thread count for processing
+        max_threads = str(multiprocessing.cpu_count())
+        threads = args["threads"]
+        if threads == "max":
+            threads = max_threads
+        
+        #get selected genome
+        genome = args["genome"]
+        
+        #Check md5sums
+        utils.checkMd5(work_dir)
+        
+        #quality trim fastq files
+        utils.trim(script_dir, threads, work_dir)
+        
+        #align reads with STAR
+        tt_seq_utils.STAR(work_dir, threads, script_dir, tt_seq_settings, genome)
+        
+        #split bam files into forward and reverse strand files
+        tt_seq_utils.splitBam(threads, work_dir)
+        
+        #perform deduplication
+        dedup = args["deduplication"]
+        if dedup == True:
+            utils.deduplicationBam(script_dir, work_dir, threads, args)
+            utils.indexBam(work_dir, threads)
+        
                 
 
     def geneSymConv(args, script_dir):
@@ -698,6 +765,8 @@ def main():
         rna_seq(args, script_dir)
     elif args["module"] == "chip-seq":
         chip_seq(args, script_dir)
+    elif args["module"] == "tt-seq":
+        ttSeq(args, script_dir)
     elif args["module"] == "cutrun":
         cutrun(args, script_dir)
     elif args["module"] == "damid":
@@ -721,6 +790,7 @@ if __name__ == "__main__":
     import utils_rna_seq as rnaseq_utils
     import utils_chip_seq as chipseq_utils
     import utils_cutrun as cutrun_utils
+    import utils_tt_seq as tt_seq_utils
     import utils_damid as damid_utils
 
     #log all command line arguments to commands.log
@@ -769,6 +839,16 @@ if __name__ == "__main__":
             cutrun_settings = yaml.full_load(file)
     except FileNotFoundError:
         sys.exit("ERROR: cut-run.yaml not found in yaml folder. Please provide this file for further analysis.")
+        
+    ###loads TT-Seq settings
+    try:
+        with open(os.path.join(script_dir,
+                               "yaml",
+                               "tt-seq.yaml")) as file:
+            tt_seq_settings = yaml.full_load(file)
+    except FileNotFoundError:
+        sys.exit("ERROR: tt-seq.yaml not found in yaml folder. Please provide this file for further analysis.")    
+    
         
     ###loads DamID settings
     try:
