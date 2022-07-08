@@ -4,9 +4,13 @@ import glob
 import os
 import sys
 import subprocess
-import tempfile
+import shutil
+import collections
 
+
+from clint.textui import colored, puts
 import pysam
+import HTSeq
 
 script_dir = os.path.abspath(os.path.dirname(__file__))
 script_dir = os.path.dirname(script_dir)
@@ -17,7 +21,7 @@ import utils_general as utils
         
 def STAR(work_dir, threads, script_dir, tt_seq_settings, genome):
     '''
-    https://github.com/crickbabs/DRB_TT-seq/
+    based on https://github.com/crickbabs/DRB_TT-seq/
     '''
 
     file_list = glob.glob(os.path.join(work_dir,"trim","*_val_1.fq.gz"))
@@ -31,26 +35,40 @@ def STAR(work_dir, threads, script_dir, tt_seq_settings, genome):
             #create sample name
             sample = os.path.basename(read1).replace("_R1_001_val_1.fq.gz","")
             
-            #create temp dir for STAR
-            temp_dir = tempfile.gettempdir()
+            #create temp dir path for STAR and make sure it does not exist
+            temp_dir = os.path.join(work_dir,"tmp")
+            if os.path.exists(temp_dir):
+                shutil.rmtree(temp_dir)
             
             #create output dir
             os.makedirs(os.path.join(work_dir,"bam",genome,sample), exist_ok = True)
             
-            star = ["STAR", "--runThreadN", threads,"--runMode", "alignReads", "--genomeDir", index,
-                    "--readFilesIn", read1, read2, "--readFilesCommand", "zcat", "--quantMode",
-                    "TranscriptomeSAM", "GeneCounts", "--twopassMode", "Basic", "--outSAMunmapped",
-                    "None", "--outSAMattrRGline","ID:"+sample,"PU:"+sample,"SM:"+sample,"LB:unknown",
-                    "PL:illumina", "outSAMtype","BAM", "unsorted", "--outTmpDir", temp_dir,
-                    "--outFileNamePrefix", os.path.join(work_dir,"bam",genome,sample)]
+            bam = os.path.join(work_dir,"bam",genome,sample,sample+"Aligned.out.bam")
+            sorted_bam= bam.replace("Aligned.out.bam","_sorted.bam")
             
-            utils.write2log(work_dir, " ".join(star), "" )
-            subprocess.call(star)
+            puts(colored.green("Aligning " +sample + " to " + genome))
+            if not utils.file_exists(sorted_bam):
+                star = ["STAR", "--runThreadN", threads,"--runMode", "alignReads", "--genomeDir", index,
+                        "--readFilesIn", read1, read2, "--readFilesCommand", "zcat", "--quantMode",
+                        "TranscriptomeSAM", "GeneCounts", "--twopassMode", "Basic", "--outSAMunmapped",
+                        "None", "--outSAMattrRGline","ID:"+sample,"PU:"+sample,"SM:"+sample,"LB:unknown",
+                        "PL:illumina", "--outSAMtype","BAM", "Unsorted", "--outTmpDir", temp_dir,
+                        "--outFileNamePrefix", os.path.join(work_dir,"bam",genome,sample,sample)]
+                
+                utils.write2log(work_dir, " ".join(star), "" )
+                subprocess.call(star)
+
+            #sort bam file
+            puts(colored.green("Sorting " + os.path.basename(bam)))
             
-            #remove tempdir
-            os.rmdir(temp_dir)
-        
-    
+            if not utils.file_exists(sorted_bam):
+                pysam.sort("--threads", threads,"-o",sorted_bam,bam)
+            
+            #remove unsorted bam file
+            if os.path.exists(sorted_bam):
+                if os.path.exists(bam):
+                    os.remove(bam)
+             
     #align trimmed reads to selected genome    
     index = tt_seq_settings["index"][genome]
     align(work_dir,file_list, index, threads,genome)
@@ -58,17 +76,19 @@ def STAR(work_dir, threads, script_dir, tt_seq_settings, genome):
     #align trimmed reads to yeast genome (spike-in)
     yeast_index = tt_seq_settings["index-yeast"]
     align(work_dir,file_list, yeast_index, threads,"R64-1-1")
+    
+    #index all bam files
+    utils.indexBam(work_dir, threads, genome)
         
-        
-        
+               
 def splitBam(threads, work_dir, genome):
     '''
     https://www.biostars.org/p/92935/
     
     '''
-    print("Splitting BAM files into forward and reverse")
-    
-    file_list = glob.glob(os.path.join(work_dir, "bam", "*.bam"))
+    puts(colored.green("Creating forward and reverse strand BAM files"))
+
+    file_list = glob.glob(os.path.join(work_dir, "bam", genome, "*", "*_sorted.bam"))
     
         
     for bam in file_list:
@@ -111,3 +131,24 @@ def splitBam(threads, work_dir, genome):
         for file in remove:
             os.remove(file)
             os.remove(file.replace(".bam",".bam.bai"))
+            
+            
+def sizeFactors(work_dir, gtf):
+    #first prepare htseq-count input for DESeq2
+    file_list = os.path.join(work_dir,"bam","R64-1-1","*","*_sorted.bam")
+        
+    for bam in file_list:
+        rc_file = bam.replace("_sorted.bam","") + "_count.txt"
+        
+        
+        if not utils.file_exists(rc_file):
+           htseq_count = ["htseq-count", "--format", "bam", "--stranded", "yes", bam, gtf]
+           utils.write2log(work_dir, " ".join(htseq_count), "" )
+           subprocess.call(htseq_count)
+    
+    
+    
+    
+    
+    
+    

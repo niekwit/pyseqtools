@@ -18,6 +18,7 @@ import gzip
 import shutil
 import re
 
+from clint.textui import colored, puts
 import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
@@ -78,7 +79,7 @@ def logCommandLineArgs(work_dir):
                 print("Command line arguments: " + args,
                       file = open(os.path.join(work_dir,"commands.log"), "a"))
 
-def write2log(work_dir,command,name):
+def write2log(work_dir,command,name=""):
     with open(os.path.join(work_dir,"commands.log"), "a") as file:
         file.write(name)
         print(*command, sep = "", file = file)
@@ -438,9 +439,14 @@ def deduplicationBam(script_dir, work_dir, threads, args):
     plt.savefig(save_file)
 
 
-def indexBam(work_dir, threads):
+def indexBam(work_dir, threads, genome="hg38"):
     print("Indexing BAM files")
     file_list = glob.glob(os.path.join(work_dir,"bam","*.bam"))
+    
+    if len(file_list) == 0:
+        file_list = glob.glob(os.path.join(work_dir, "bam", genome, "*", "*_sorted.bam"))
+        if len(file_list) == 0:
+            return("ERROR: no bam files found to be indexed")
 
     #index bam files
     #also check if bam files have been indexed
@@ -605,7 +611,7 @@ def trim(script_dir, threads, work_dir):
         try:
             trimgalore_file = trimgalore[0].decode("utf-8")
         except:
-            print("WARNING: TrimGalore was not found\nInstalling TrimGalore now")
+            puts(colored.orange("WARNING: TrimGalore was not found\nInstalling TrimGalore now"))
             url = "https://github.com/FelixKrueger/TrimGalore/archive/refs/tags/0.6.7.zip"
             download_file = os.path.join(script_dir,"TrimGalore-0.6.7.zip")
             urllib.request.urlretrieve(url,download_file)
@@ -646,7 +652,7 @@ def trim(script_dir, threads, work_dir):
 
 
     def trimPE(work_dir, threads):
-        print("Trimming paired-end fastq files")
+        puts(colored.green("Trimming paired-end fastq files"))
         extension = get_extension(work_dir)
         fastq_list = glob.glob(os.path.join(work_dir,"raw-data","*R1_001." + extension))
         for read1 in fastq_list:
@@ -666,7 +672,7 @@ def trim(script_dir, threads, work_dir):
                 subprocess.run(trim_galore_command)
 
     def trimSE(work_dir, threads):
-        print("Trimming single-end fastq files")
+        puts(colored.green("Trimming single-end fastq files"))
         extension = get_extension(work_dir)
         fastq_list = glob.glob(os.path.join(work_dir,"raw-data","*." + extension))
 
@@ -686,7 +692,8 @@ def trim(script_dir, threads, work_dir):
                 try:
                     subprocess.run(trim_galore_command)
                 except:
-                    sys.exit("ERROR: trimming error. Check commands log.")
+                    puts(colored.red("ERROR: trimming error. Check commands log."))
+                    sys.exit()
 
     #Run appropriate trim function
     if getEND(work_dir) == "PE":

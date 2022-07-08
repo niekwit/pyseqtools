@@ -302,7 +302,7 @@ def main():
     parser_ttseq.add_argument("-r", "--rename",
                              required = False,
                              action = 'store_true',
-                             help = "Rename fq files")
+                             help = "Rename fastq files")
     parser_ttseq.add_argument("-g", "--genome",
                              required = False,
                              default = 'hg38',
@@ -710,6 +710,11 @@ def main():
         threads = args["threads"]
         if threads == "max":
             threads = max_threads
+        
+        #rename files
+        rename = args["rename"]
+        if rename == True:
+            utils.rename(work_dir)
         
         #get selected genome
         genome = args["genome"]
