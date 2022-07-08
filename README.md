@@ -31,23 +31,28 @@ When running an analysis, `pyseqtools.py` will first check whether the relevant 
 ## Usage:
 
 ```
-usage: pyseqtools.py [-h] {crispr,rna-seq,chip-seq,cutrun,damid,genesymconv,subsetgtf} ...
+usage: pyseqtools.py [-h]
+                     {crispr,rna-seq,chip-seq,cutrun,damid,tt-seq,genesymconv,subsetgtf}
+                     ...
 
 Analysis pipelines for a variety of NGS data, and related tools
 
 positional arguments:
-  {crispr,rna-seq,chip-seq,cutrun,damid,genesymconv,subsetgtf}
+  {crispr,rna-seq,chip-seq,cutrun,damid,tt-seq,genesymconv,subsetgtf}
                         Available pipelines/tools:
     crispr              CRISPR screen analysis
     rna-seq             RNA-Seq analysis
     chip-seq            ChIP-Seq analysis
     cutrun              CUT & RUN analysis
     damid               DamID analysis
+    tt-seq              TT-Seq analysis according to
+                        https://github.com/crickbabs/DRB_TT-seq
     genesymconv         Inter-species gene symbol conversion
     subsetgtf           Subset GTF files for selected genes
 
 optional arguments:
   -h, --help            show this help message and exit
+
 
 
 ```
@@ -184,6 +189,28 @@ optional arguments:
                         Choose reference genome (default is hg19)
   --skip-fastqc         Skip FastQC/MultiQC
 
+```
+
+### TT-Seq analysis
+```
+usage: pyseqtools.py tt-seq [-h] [-t THREADS] [-r] [-g GENOME] [-d] [-b] [--metagene]
+                            [--skip-fastqc]
+
+Analysis pipeline for TT-Seq experiments
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -t THREADS, --threads THREADS
+                        <INT> number of CPU threads to use (default is 1). Use max to
+                        apply all available CPU threads
+  -r, --rename          Rename fastq files
+  -g GENOME, --genome GENOME
+                        Choose reference genome (default is hg38)
+  -d, --deduplication   Perform deduplication of BAM files
+  -b, --bigwig          Create BigWig files
+  --metagene            Generate metagene plots and heatmaps with plotProfile
+                        (deepTools)
+  --skip-fastqc         Skip FastQC/MultiQC
 ```
 
 ### Gene symbol conversion
