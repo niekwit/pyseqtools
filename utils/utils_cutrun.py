@@ -174,7 +174,7 @@ def bowtie2(work_dir, script_dir, threads, cutrun_settings, genome):
         #to be finished
 
     elif paired_end == "PE":
-        print("Aligning reads with Bowtie (paired-end mode):")
+        print("Aligning reads with Bowtie2 (paired-end mode):")
         read1_list = glob.glob(os.path.join(work_dir, "trim","*_R1_001_val_1.fq.gz"))
         read2_list = [x.replace("_R1_001_val_1.fq.gz", "_R2_001_val_2.fq.gz") for x in read1_list]
         output_list = [x.replace("trim", "bam").replace("_R1_001_val_1.fq.gz","-sort-bl.bam") for x in read1_list]

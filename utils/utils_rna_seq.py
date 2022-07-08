@@ -354,8 +354,7 @@ def geneSetEnrichment(work_dir,pvalue,gene_sets):
         
         for i in range(10): #plot GSEA plots for top 10 terms
             GSEA_dir=os.path.join(out_dir,"GSEA",gene_set) 
-            os.makedirs(GSEA_dir,
-                        exist_ok=True)
+            os.makedirs(GSEA_dir, exist_ok=True)
             try:
                 gseaplot(rank_metric=pre_res.ranking,
                          term=terms[i],

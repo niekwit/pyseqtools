@@ -348,7 +348,7 @@ def downsample(script_dir, work_dir, threads):
     for bam in file_list:
           count = pysam.view("-@", str(threads) ,"-c", "-F" "260", bam)
           df.loc[1, bam] = count.replace("\n","")
-    
+          
     #get lowest read count
     df.loc[1] = df.loc[1].astype(int)
     lowest_count = df.min(1).item()
@@ -372,6 +372,15 @@ def downsample(script_dir, work_dir, threads):
                 command = [samtools, "view", "-@", threads,"-bs", str(factor), bam, ">", outfile]
                 utils.write2log(work_dir, " ".join(command), "Downscaling BAM: ")
                 subprocess.run(command)  
+    
+    #export scaling factors
+    names = list(df.columns)
+    names = [os.path.basename(x) for x in names]
+    df.columns = names
+    
+    df.to_csv(os.path.join(work_dir,"BAM_scaling_factors.txt"), 
+              sep = "\t",
+              index = False)
     
 
 
@@ -465,7 +474,7 @@ def peak(work_dir, threads, genome, chip_seq_settings):
     bam_list = sorted(glob.glob(os.path.join(work_dir, "bam", "*.bam")))
     dedup = b_any("dedupl" in x for x in bam_list)
     if dedup == True:
-        bam_list = glob.glob(os.path.join(work_dir, "bam", "*sort-bl-dedupl.bam"))
+        bam_list = glob.glob(os.path.join(work_dir, "bam", "*sort-bl-dedupl*.bam"))
         
     #import sample info
     sample_df = pd.read_csv(os.path.join(work_dir, "peak_samples.csv"))
@@ -474,23 +483,18 @@ def peak(work_dir, threads, genome, chip_seq_settings):
     #run MACS3 for each sample and input combination
     for i in list(conditions):
         df = sample_df[sample_df["condition"] == i]
-        replicates = int(len(df["condition"]) / len(set(df["input"])))
+        replicates = max(set(df["Replicate"]))
         for j in range(1,replicates + 1):
-            pattern = "_" + str(j)
-            df_rep = df[df["sample"].str.contains(pattern)]
+            df_rep = df[df["Replicate"] == j]
+            
             df_input = df_rep[df_rep["input"] == "yes"]
             input_sample = df_input["sample"].values[0]
             df_sample = df_rep[df_rep["input"] == "no"]
             chip_sample = df_sample["sample"].values[0]
             
-            #get bam files for input and sample
-            #input_bam = [k for k in bam_list if input_sample in k]
             input_bam = os.path.join(work_dir,"bam",input_sample)
-            #input_bam, = input_bam #unpack list
-            #sample_bam = [k for k in bam_list if chip_sample in k]
             sample_bam = os.path.join(work_dir,"bam",chip_sample)
-            #sample_bam, = sample_bam #unpack list
-            
+                        
             #run MACS3
             out_dir = os.path.join(work_dir, "peaks", chip_sample)
             os.makedirs(out_dir, exist_ok = True)
@@ -885,7 +889,7 @@ def plotProfile(work_dir, chip_seq_settings, genome, threads):
     if not utils.file_exists(matrix):
         cm = "computeMatrix scale-regions -S " + file_list + " -R " + gtf +\
             " --beforeRegionStartLength 3000 --regionBodyLength 5000 --afterRegionStartLength 3000 -p " + \
-                threads + " -o " + matrix + " --samplesLabel " + samples_label
+                str(threads) + " -o " + matrix + " --samplesLabel " + samples_label
         utils.write2log(work_dir, cm, "Compute matrix generation: ")
         subprocess.run(cm, shell = True)
 

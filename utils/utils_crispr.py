@@ -60,6 +60,12 @@ def csv2fasta(csv,script_dir):
     #exit message
     sys.exit("Fasta file created and added to library.yaml\nPlease provide more CRISPR library information in this file before first run.")
 
+def checkHisat2():
+    pass
+
+def checkHisat2Index():
+    pass
+
 
 def check_index(library, crispr_library, script_dir, work_dir):
     
@@ -481,8 +487,7 @@ def mageck(work_dir,script_dir,cnv,fdr):
         return(None)
 
     #create MAGeCK dir
-    os.makedirs(os.path.join(work_dir,"mageck"),
-                exist_ok = True)
+    os.makedirs(os.path.join(work_dir,"mageck"), exist_ok = True)
 
     #load MAGeCK comparisons and run MAGeCK
     try:
