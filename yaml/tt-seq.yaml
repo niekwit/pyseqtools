@@ -1,0 +1,33 @@
+BigWig:
+  binSize: '50'
+  effectiveGenomeSize: '2827437033'
+  extendReads: '200'
+  normalizeUsing: RPKM
+MACS3:
+  broad-cutoff: 0.1
+  extsize: 200
+  format: AUTO
+  genome: hs
+  genome-size: 2.7e9
+  ip: histone
+  qvalue: 0.05
+blacklist:
+  dm3-ic: /home/niek/Documents/scripts/pyseqtools/blacklist/dm3/dm3-blacklist.v2.bed
+  hg19: /home/niek/Documents/scripts/pyseqtools/blacklist/hg19/wgEncodeDukeMapabilityRegionsExcludable.bed
+  hg38: /home/niek/Documents/scripts/pyseqtools/blacklist/hg38/ENCFF356LFX.bed
+  mm10: /home/niek/Documents/scripts/pyseqtools/blacklist/mm10/mm10-blacklist.v2.bed
+fasta:
+  dm3-ic: /home/niek/Documents/scripts/pyseqtools/fasta/dm3/dm3.fasta
+  hg19: /home/niek/Programs/pyseqtools/fasta/hg19/ucsc.hg19.fasta
+  hg38: /home/niek/Documents/references/fasta/Human/GRCh38.p13.genome/GRCh38.p13.genome.fa
+  mm10: ''
+gtf:
+  hg19: /home/niek/Documents/scripts/pyseqtools/gtf/hg19/gencode.v19.annotation.protein_coding.gtf
+  hg38: /home/niek/Documents/references/gtf/Homo_sapiens.GRCh38.95.gtf
+index:
+  dm3-ic: 
+  hg19: 
+  hg38: /home/niek/Documents/scripts/pyseqtools/index/STAR/hg38
+  mm10: 
+index-yeast: /home/niek/Documents/scripts/pyseqtools/index/STAR/R64-1-1
+
