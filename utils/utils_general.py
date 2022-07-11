@@ -443,6 +443,7 @@ def indexBam(work_dir, threads, genome="hg38"):
     print("Indexing BAM files")
     file_list = glob.glob(os.path.join(work_dir,"bam","*.bam"))
     
+    #directory structure for TT-Seq experiments is different
     if len(file_list) == 0:
         file_list = glob.glob(os.path.join(work_dir, "bam", genome, "*", "*_sorted.bam"))
         if len(file_list) == 0:

@@ -5,12 +5,9 @@ import os
 import sys
 import subprocess
 import shutil
-import collections
-
 
 from clint.textui import colored, puts
 import pysam
-import HTSeq
 
 script_dir = os.path.abspath(os.path.dirname(__file__))
 script_dir = os.path.dirname(script_dir)
@@ -79,6 +76,7 @@ def STAR(work_dir, threads, script_dir, tt_seq_settings, genome):
     
     #index all bam files
     utils.indexBam(work_dir, threads, genome)
+    utils.indexBam(work_dir, threads, "R64-1-1")
         
                
 def splitBam(threads, work_dir, genome):
@@ -133,19 +131,29 @@ def splitBam(threads, work_dir, genome):
             os.remove(file.replace(".bam",".bam.bai"))
             
             
-def sizeFactors(work_dir, gtf):
-    #first prepare htseq-count input for DESeq2
-    file_list = os.path.join(work_dir,"bam","R64-1-1","*","*_sorted.bam")
-        
-    for bam in file_list:
-        rc_file = bam.replace("_sorted.bam","") + "_count.txt"
-        
-        
-        if not utils.file_exists(rc_file):
-           htseq_count = ["htseq-count", "--format", "bam", "--stranded", "yes", bam, gtf]
-           utils.write2log(work_dir, " ".join(htseq_count), "" )
-           subprocess.call(htseq_count)
+def sizeFactors(work_dir, tt_seq_settings):
     
+    puts(colored.green("Generating size factors for normalisation using DESeq2"))
+    #first prepare htseq-count input for DESeq2
+    file_list = glob.glob(os.path.join(work_dir,"bam","R64-1-1","*","*_sorted.bam"))
+    rc_file = [os.path.join(work_dir, "htseq-count", os.path.basename(x.replace("_sorted.bam","_count.txt"))) for x in file_list] 
+    
+    #create output dir
+    os.makedirs(os.path.join(work_dir,"htseq-count"), exist_ok = True)
+    
+    #load yeast gtf file
+    gtf = tt_seq_settings["gtf-yeast"]
+    
+    for bam,count_file in zip(file_list,rc_file):
+                
+        if not utils.file_exists(count_file):
+           htseq_count = ["htseq-count", "--quiet", "--format", "bam", "--stranded", "yes", bam, gtf, ">", count_file]
+           #utils.write2log(work_dir, " ".join(htseq_count), "" )
+           print("Quantifying " + os.path.basename(bam) + " with htseq-count")
+           subprocess.call(htseq_count)
+   
+    #run DESeq2 to obtain size factors for normalisation
+    deseq2 = ["Rscript", os.path.join(script_dir, "R", "tt-seq_sizefactors.R")]
     
     
     

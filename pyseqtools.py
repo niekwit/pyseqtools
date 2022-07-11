@@ -24,7 +24,7 @@ def checkPythonPackages(): #check for required python packages; installs if abse
                 "matplotlib", "seaborn", "multiqc",
                 "cutadapt", "tqdm","gseapy",
                 "matplotlib-venn", "pysam", "deeptools",
-                "macs3", "pybedtools"}
+                "macs3", "pybedtools", "HTSeq"}
     installed = {pkg.key for pkg in pkg_resources.working_set}
     missing = required - installed
     if missing:
@@ -715,11 +715,21 @@ def main():
         rename = args["rename"]
         if rename == True:
             utils.rename(work_dir)
+            
+        #determine file extension raw data
+        file_extension = utils.get_extension(work_dir)
+            
+        #run FastQC/MultiQC
+        skip_fastqc = args["skip_fastqc"]
+        if not skip_fastqc:
+            utils.fastqc(script_dir, work_dir,threads,file_extension)
+        else:
+            print("Skipping FastQC/MultiQC analysis")
         
         #get selected genome
         genome = args["genome"]
         
-        #Check md5sums
+        #check md5sums
         utils.checkMd5(work_dir)
         
         #quality trim fastq files
@@ -736,6 +746,9 @@ def main():
         if dedup == True:
             utils.deduplicationBam(script_dir, work_dir, threads, args)
             utils.indexBam(work_dir, threads)
+        
+        #get scale factors from yeast spike-in
+        tt_seq_utils.sizeFactors(work_dir, tt_seq_settings)
         
                 
 
