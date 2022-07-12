@@ -43,28 +43,36 @@ def STAR(work_dir, threads, script_dir, tt_seq_settings, genome):
             bam = os.path.join(work_dir,"bam",genome,sample,sample+"Aligned.out.bam")
             sorted_bam= bam.replace("Aligned.out.bam","_sorted.bam")
             
-            puts(colored.green("Aligning " +sample + " to " + genome))
-            if not utils.file_exists(sorted_bam):
-                star = ["STAR", "--runThreadN", threads,"--runMode", "alignReads", "--genomeDir", index,
-                        "--readFilesIn", read1, read2, "--readFilesCommand", "zcat", "--quantMode",
-                        "TranscriptomeSAM", "GeneCounts", "--twopassMode", "Basic", "--outSAMunmapped",
-                        "None", "--outSAMattrRGline","ID:"+sample,"PU:"+sample,"SM:"+sample,"LB:unknown",
-                        "PL:illumina", "--outSAMtype","BAM", "Unsorted", "--outTmpDir", temp_dir,
-                        "--outFileNamePrefix", os.path.join(work_dir,"bam",genome,sample,sample)]
-                
-                utils.write2log(work_dir, " ".join(star), "" )
-                subprocess.call(star)
+            #create STAR command
+            star = ["STAR", "--runThreadN", threads,"--runMode", "alignReads", "--genomeDir", index,
+                    "--readFilesIn", read1, read2, "--readFilesCommand", "zcat", "--quantMode",
+                    "TranscriptomeSAM", "GeneCounts", "--twopassMode", "Basic", "--outSAMunmapped",
+                    "None", "--outSAMattrRGline","ID:"+sample,"PU:"+sample,"SM:"+sample,"LB:unknown",
+                    "PL:illumina", "--outSAMtype","BAM", "Unsorted", "--outTmpDir", temp_dir,
+                    "--outFileNamePrefix", os.path.join(work_dir,"bam",genome,sample,sample)]
+            
+            #run STAR
+            puts(colored.green(f"Aligning {sample} to {genome}"))
+            if genome == "hg38": 
+                if not utils.file_exists(sorted_bam):
+                    utils.write2log(work_dir, " ".join(star), "" )
+                    subprocess.call(star)
+            elif genome == "R64-1-1": #it is better for HTSeq to use unsorted BAM files
+                if not utils.file_exists(bam):
+                    utils.write2log(work_dir, " ".join(star), "" )
+                    subprocess.call(star)
 
-            #sort bam file
-            puts(colored.green("Sorting " + os.path.basename(bam)))
-            
-            if not utils.file_exists(sorted_bam):
-                pysam.sort("--threads", threads,"-o",sorted_bam,bam)
-            
-            #remove unsorted bam file
-            if os.path.exists(sorted_bam):
-                if os.path.exists(bam):
-                    os.remove(bam)
+            #only sort hg38 bam files
+            if genome == "hg38":
+                puts(colored.green("Sorting " + os.path.basename(bam)))
+                
+                if not utils.file_exists(sorted_bam):
+                    pysam.sort("--threads", threads,"-o",sorted_bam,bam)
+                
+                #remove unsorted bam file
+                if os.path.exists(sorted_bam):
+                    if os.path.exists(bam):
+                        os.remove(bam)
              
     #align trimmed reads to selected genome    
     index = tt_seq_settings["index"][genome]
@@ -78,21 +86,22 @@ def STAR(work_dir, threads, script_dir, tt_seq_settings, genome):
     utils.indexBam(work_dir, threads, genome)
     utils.indexBam(work_dir, threads, "R64-1-1")
         
-               
+
 def splitBam(threads, work_dir, genome):
     '''
-    https://www.biostars.org/p/92935/
+    based on https://www.biostars.org/p/92935/
     
     '''
-    puts(colored.green("Creating forward and reverse strand BAM files"))
+    puts(colored.green("Creating forward and reverse strand-specific BAM files"))
 
-    file_list = glob.glob(os.path.join(work_dir, "bam", genome, "*", "*_sorted.bam"))
+    file_list = glob.glob(os.path.join(work_dir, "bam", genome, "*", "**_sorted.bam"))
     
         
     for bam in file_list:
+        print(os.path.basename(bam))
         ##forward strand
-        fwd1 = bam.replace(".bam","_fwd1.bam")
-        fwd2 = bam.replace(".bam","_fwd2.bam")
+        fwd1 = bam.replace("*_sorted.bam","_fwd1.bam")
+        fwd2 = bam.replace("*_sorted.bam","_fwd2.bam")
         
         #alignments of the second in pair if they map to the forward strand
         pysam.view("-@",threads,"-b","-f","128","-F","16",bam,"-o",fwd1, catch_stdout=False)
@@ -103,13 +112,13 @@ def splitBam(threads, work_dir, genome):
         pysam.index(fwd2)
         
         #merge all forward reads
-        fwd = bam.replace(".bam","_fwd.bam")
+        fwd = bam.replace("*_sorted.bam","_fwd.bam")
         pysam.merge("-f",fwd,fwd1,fwd2, catch_stdout=False)
         pysam.index(fwd)
         
         ##reverse strand
-        rev1 = bam.replace(".bam","_rev1.bam")
-        rev2 = bam.replace(".bam","_rev2.bam")
+        rev1 = bam.replace("*_sorted.bam","_rev1.bam")
+        rev2 = bam.replace("*_sorted.bam","_rev2.bam")
         
         #alignments of the second in pair if they map to the reverse strand
         pysam.view("-b","-f","144",bam,"-o", rev1, catch_stdout=False)
@@ -120,7 +129,7 @@ def splitBam(threads, work_dir, genome):
         pysam.index(rev2)
         
         #merge all reverse reads
-        rev = bam.replace(".bam","_rev.bam")
+        rev = bam.replace("*_sorted.bam","_rev.bam")
         pysam.merge("-f",rev,rev1,rev2, catch_stdout=False)
         pysam.index(fwd)
         
@@ -156,7 +165,7 @@ def sizeFactors(work_dir, tt_seq_settings):
     deseq2 = ["Rscript", os.path.join(script_dir, "R", "tt-seq_sizefactors.R")]
     
     
-    
-    
+def ttSeqBigWig(work_dir):
+    pass
     
     

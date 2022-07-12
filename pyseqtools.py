@@ -24,7 +24,7 @@ def checkPythonPackages(): #check for required python packages; installs if abse
                 "matplotlib", "seaborn", "multiqc",
                 "cutadapt", "tqdm","gseapy",
                 "matplotlib-venn", "pysam", "deeptools",
-                "macs3", "pybedtools", "HTSeq"}
+                "macs3", "pybedtools"}
     installed = {pkg.key for pkg in pkg_resources.working_set}
     missing = required - installed
     if missing:
@@ -748,7 +748,7 @@ def main():
             utils.indexBam(work_dir, threads)
         
         #get scale factors from yeast spike-in
-        tt_seq_utils.sizeFactors(work_dir, tt_seq_settings)
+        #tt_seq_utils.sizeFactors(work_dir, tt_seq_settings)
         
                 
 
