@@ -299,6 +299,11 @@ def main():
                              default = "1",
                              type = str,
                              help = "<INT> number of CPU threads to use (default is 1). Use max to apply all available CPU threads")
+    parser_ttseq.add_argument("-m", "--memory",
+                             required = False,
+                             default = "12",
+                             type = str,
+                             help = "<INT> GB of RAM to allocate to SLURM job (Default is 12)")
     parser_ttseq.add_argument("-r", "--rename",
                              required = False,
                              action = 'store_true',
@@ -324,6 +329,10 @@ def main():
                                action = 'store_true',
                                default = False,
                                help = "Skip FastQC/MultiQC")
+    parser_ttseq.add_argument("--slurm",
+                             required = False,
+                             action = 'store_true',
+                             help = "Submit jobs to HPC using SLURM")
     
 
     #create subparser for gene symbol conversion
