@@ -14,6 +14,7 @@ import yaml
 import pandas as pd
 import pybedtools
 import pysam
+from clint.textui import colored, puts
 
 script_dir = os.path.abspath(os.path.dirname(__file__))
 script_dir = os.path.dirname(script_dir)
@@ -328,9 +329,6 @@ def hisat2(script_dir, work_dir, threads, chip_seq_settings, genome):
     
     #plot number of reads before deduplication
     
-    
-def bwa():
-    pass
 
 def downsample(script_dir, work_dir, threads):
     #check if bam files have been deduplicated
@@ -338,9 +336,7 @@ def downsample(script_dir, work_dir, threads):
     dedup = b_any("dedupl" in x for x in file_list)
     
     if dedup == True:
-        file_list = sorted(glob.glob(os.path.join(work_dir,
-                                           "bam",
-                                           "*-sort-bl-dedupl.bam")))
+        file_list = sorted(glob.glob(os.path.join(work_dir,"bam","*-sort-bl-dedupl.bam")))
       
     #get counts from bam files
     df = pd.DataFrame(columns = file_list)
@@ -381,8 +377,16 @@ def downsample(script_dir, work_dir, threads):
     df.to_csv(os.path.join(work_dir,"BAM_scaling_factors.txt"), 
               sep = "\t",
               index = False)
-    
 
+    
+def dmSpikeIn(work_dir, threads):
+    file_list = glob.glob(os.path.join(work_dir,"bam","*-downscaled.bam"))
+    dm_file_list = [x.replace("-downscaled.bam","-dm3ic-sort-bl.bam") for x in file_list]
+    
+    if len(file_list) == 0:
+        puts(colored.orange("WARNING: no downscaled bam files found\nDo you want to continue?"))
+        
+        
 
 def ngsplot(work_dir, genome, feature, window):
     

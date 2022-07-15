@@ -194,6 +194,10 @@ def main():
                              required = False,
                              action = 'store_true',
                              help = "Perform downsampling of BAM files to lowest read count")
+    parser_chip.add_argument("-s", "--spike-in",
+                             required = False,
+                             action = 'store_true',
+                             help = "Perform normalisation based on Drosophila chromatin spike-in")
     parser_chip.add_argument("-b", "--bigwig",
                              required = False,
                              action = 'store_true',

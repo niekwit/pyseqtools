@@ -76,24 +76,48 @@ def STAR(work_dir, threads, script_dir, tt_seq_settings, genome):
                         os.remove(bam)
              
     #align trimmed reads to selected genome    
-    index = tt_seq_settings["index"][genome]
+    index = tt_seq_settings["STAR"][genome]
     align(work_dir,file_list, index, threads,genome)
     
     #align trimmed reads to yeast genome (spike-in)
-    yeast_index = tt_seq_settings["index-yeast"]
+    yeast_index = tt_seq_settings["STAR"]["yeast"]
     align(work_dir,file_list, yeast_index, threads,"R64-1-1")
     
     #index all bam files
     utils.indexBam(work_dir, threads, genome)
     utils.indexBam(work_dir, threads, "R64-1-1")
+
+
+def hisat2(work_dir, threads, tt_seq_settings, genome):
+    """
+    Align TT-Seq quality trimmed paired-end files to genome with HISAT2
+    """
+    
+    read1_list = glob.glob(os.path.join(work_dir,"trim","*_R1_001_val_1.fq.gz"))
+    hisat2_index = tt_seq_settings["hisat2"][genome]
+    os.path.makedirs(os.path.join(work_dir,"bam", genome), exist_ok=True)
+    
+    for read1 in read1_list:
+        read2 = read1.replace("_R1_001_val_1.fq.gz","_R2_001_val_1.fq.gz")
+        bam = os.path.join(work_dir,"bam", genome,os.path.basename(read1.replace("_R1_001_val_1.fq.gz","_sort.bam")))
+        sample = os.path.basename(read1.replace("_R1_001_val_1.fq.gz",""))
+        puts(colored.green(f"Aligning {sample} to {genome} with HISAT2"))
         
+        if not utils.file_exists(bam):
+            hisat2 = ["hisat2", "-p", str(threads), "-x", hisat2_index,"-1", read1, "-2", read2,
+                      "2>>", os.path.join(work_dir,"align.log"), "|", "samtools", "view", "-q", "15", "-F", 
+                      "260", "-b", "-@", str(threads), "-", "|", "samtools", "sort", "-@", str(threads), "-",
+                      ">", bam]
+            utils.write2log(work_dir, " ".join(hisat2))
+            subprocess.call(hisat2)
+
 
 def splitBam(threads, work_dir, genome):
     '''
     based on https://www.biostars.org/p/92935/
     
     '''
-    puts(colored.green("Creating forward and reverse strand-specific BAM files"))
+    puts(colored.green("Creating forward and reverse strand-specific BAM files with samtools"))
 
     file_list = glob.glob(os.path.join(work_dir, "bam", genome, "*", "**_sorted.bam"))
     
@@ -275,7 +299,8 @@ def metaProfiles(work_dir, threads, tt_seq_settings, genome):
         subprocess.call(grep)
         
     #create compute matrix with deepTools
-    matrix = os.path.join(work_dir, "bigwig", )
+    file_list = glob.glob(os.path.join(work_dir,"bigwig","*_mean.bigwig"))
+    matrix = os.path.join(work_dir, "deeptools",  "matrix.npz")
 
 
 def trxReadThrough(work_dir, threads):
