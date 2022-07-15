@@ -281,9 +281,21 @@ def plotPCA(work_dir,script_dir):
         return(None)
   
     
-def hisat2():
-    print("Mapping reads with HISAT2 (UNDER CONSTRUCTION)")
-    sys.exit()
+def hisat2(work_dir, rna_seq_settings, threads, genome):
+    read1_list = glob.glob(os.path.join(work_dir,"trim","*_R1_001_val_1.fq.gz"))
+    hisat2_index = rna_seq_settings["HISAT2_index"][genome]
+    
+    for read1 in read1_list:
+        read2 = read1.replace("_R1_001_val_1.fq.gz","_R2_001_val_1.fq.gz")
+        bam = os.path.join(work_dir,"bam",os.path.basename(read1.replace("_R1_001_val_1.fq.gz","_sort.bam")))
+        if not utils.file_exists(bam):
+            hisat2 = ["hisat2", "-p", str(threads), "--dta", "-x", hisat2_index,"-1", read1, "-2", read2,
+                      "2>>", os.path.join(work_dir,"align.log"), "|", "samtools", "view", "-q", "15", "-F", 
+                      "260", "-b", "-@", str(threads), "-", "|", "samtools", "sort", "-@", threads, "-",
+                      ">", bam]
+            utils.write2log(work_dir, " ".join(hisat2))
+            subprocess.call(hisat2)
+    
 
 
 def diff_expr(work_dir,gtf,script_dir,species,pvalue):
