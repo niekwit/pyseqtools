@@ -7,8 +7,8 @@ import argparse
 import multiprocessing
 import timeit
 import time
-import pkg_resources
-from platform import python_version
+#import pkg_resources
+#from platform import python_version
 
 def checkPythonPackages(): #check for required python packages; installs if absent
     #check if Python >= 3.7 (required for GitPython)
@@ -832,7 +832,7 @@ if __name__ == "__main__":
     utils.logCommandLineArgs(work_dir)
 
     #check if required Python packages are available
-    checkPythonPackages()
+    #checkPythonPackages()
 
     ###loads available CRISPR libraries from library.yaml
     import yaml
