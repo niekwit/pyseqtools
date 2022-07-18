@@ -23,7 +23,11 @@ from clint.textui import colored, puts
 import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
-import pysam
+try: 
+    import pysam
+except ModuleNotFoundError:
+    pass
+    
 import yaml
 try:
     import git #module name is GitPython
