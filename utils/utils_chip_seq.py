@@ -12,8 +12,17 @@ from itertools import compress
 
 import yaml
 import pandas as pd
-import pybedtools
-import pysam
+
+try:
+    import pybedtools
+except ImportError:
+    pass
+
+try:
+    import pysam
+except ImportError:
+    pass
+
 from clint.textui import colored, puts
 
 script_dir = os.path.abspath(os.path.dirname(__file__))

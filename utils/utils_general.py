@@ -11,7 +11,7 @@ import hashlib
 import urllib.request
 from zipfile import ZipFile
 import stat
-from  builtins import any as b_any
+from builtins import any as b_any
 import tarfile
 from shutil import copy
 import gzip
@@ -767,6 +767,11 @@ def trimSLURM(script_dir, work_dir):
     script.write("#SBATCH --mem=" + trim_mem + "\n")
     script.write("#SBATCH -J " + "Trim_galore" + "\n")
     script.write("#SBATCH -a " + "1-" + str(len(read1_list)) + "\n")
+    script.write("\n")
+    script.write("module load python/3.8.1-icl\n")
+    script.write("module load cutadapt/1.8.1\n")
+    script.write("module load fastqc/0.11.4\n")
+    script.write("module load trim-galore/0.4.0\n")
     script.write("\n")
     script.write("sed -n %ap slurm/slurm_trim.csv | bash")
     script.close()

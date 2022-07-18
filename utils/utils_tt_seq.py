@@ -8,7 +8,10 @@ import shutil
 import pandas as pd
 
 from clint.textui import colored, puts
-import pysam
+try:
+    import pysam
+except ImportError:
+    pass
 
 script_dir = os.path.abspath(os.path.dirname(__file__))
 script_dir = os.path.dirname(script_dir)
@@ -113,6 +116,7 @@ def hisat2(work_dir, threads, tt_seq_settings, genome):
 
 
 def splitBam(threads, work_dir, genome):
+    
     '''
     based on https://www.biostars.org/p/92935/
     
