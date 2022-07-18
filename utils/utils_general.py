@@ -18,6 +18,7 @@ import gzip
 import shutil
 import re
 
+
 from clint.textui import colored, puts
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -581,6 +582,11 @@ def fastqc(script_dir, work_dir, threads, file_extension):
     else:
         print("Skipping FastQC/MultiQC (already performed)")
 
+
+def fastqcSLURM(work_dir):
+    pass
+
+
 def getEND(work_dir):
     '''
     Determine whether samples are single-end of paired-end
@@ -702,6 +708,73 @@ def trim(script_dir, threads, work_dir):
     elif getEND(work_dir) == "SE":
         trimSE(work_dir, threads)
 
+
+def trimSLURM(script_dir, work_dir):
+    """
+    Creates SLURM bash script for PE-end quality trimming using Trim_galore
+
+    """
+    
+    #create output directories
+    extension = get_extension(work_dir)
+    read1_list = glob.glob(os.path.join(work_dir,"raw-data","*R1_001." + extension))
+    os.makedirs(os.path.join(work_dir, "trim"), exist_ok=True)
+    os.makedirs(os.path.join(work_dir, "slurm"), exist_ok=True)
+    
+    #load slurm settings
+    with open(os.path.join(script_dir,
+                               "yaml",
+                               "slurm.yaml")) as file:
+            slurm_settings = yaml.full_load(file)
+    
+    #load slurm parameters
+    threads = str(slurm_settings["Trim_galore_CPU"])
+    trim_mem = str(slurm_settings["Trim_galore_mem"])
+    trim_time = str(slurm_settings["Trim_galore_time"])
+    account = slurm_settings["groupname"]
+    partition = slurm_settings["partition"]
+    email = slurm_settings["email"]
+    
+    
+    #write trim commands to file for slurm job array
+    #trim_galore should be in $PATH
+    for read1 in read1_list:
+        read2 = read1.replace("R1_001." + extension,"R2_001." + extension)
+        out_file1 = read1.split(".",1)[0] + "_val_1.fq.gz"
+        out_file1 = out_file1.replace("raw-data", "trim")
+        
+        trim_galore = ["trim_galore","-j", str(threads), "-o",
+                       os.path.join(work_dir,"trim"), "--paired", read1, read2, "\n"]
+        trim_galore = " ".join(trim_galore)
+        csv = open(os.path.join(work_dir,"slurm","slurm_trim.csv"), "a")  
+        csv.write(trim_galore)
+        csv.close()
+    
+    #generate slurm bash script
+    script = os.path.join(work_dir,"slurm","slurm_trim.sh")
+    script = open(script, "w")  
+    script.write("#!/bin/bash" + "\n")
+    script.write("\n")
+    script.write("#SBATCH -A " + account + "\n")
+    script.write("#SBATCH ---mail-user=" + email + "\n")
+    script.write("#SBATCH --mail-type=FAIL" + "\n")
+    script.write("#SBATCH --mail-type=END" + "\n")
+    script.write("#SBATCH -p " + partition + "\n")
+    script.write("#SBATCH -D " + work_dir + "\n")
+    script.write("#SBATCH -o slurm/slurm_%a.log" + "\n")
+    script.write("#SBATCH -c " + threads + "\n")
+    script.write("#SBATCH -t " + trim_time + "\n")
+    script.write("#SBATCH --mem=" + trim_mem + "\n")
+    script.write("#SBATCH -J " + "Trim_galore" + "\n")
+    script.write("#SBATCH -a " + "1-" + str(len(read1_list)) + "\n")
+    script.write("\n")
+    script.write("sed -n %ap slurm/slurm_trim.csv | bash")
+    script.close()
+    
+    #run slurm bash script
+    slurm = ["sbatch", script]
+    subprocess.call(slurm)
+        
 
 def blackList(script_dir, genome):
     with open(os.path.join(script_dir, "yaml", "chip-seq.yaml")) as f:

@@ -746,7 +746,11 @@ def main():
         utils.checkMd5(work_dir)
         
         #quality trim fastq files
-        utils.trim(script_dir, threads, work_dir)
+        slurm = args["slurm"]
+        if slurm == True:
+            utils.trimSLURM(script_dir, work_dir)
+        else:
+            utils.trim(script_dir, threads, work_dir)
         
         #align reads with STAR
         tt_seq_utils.STAR(work_dir, threads, script_dir, tt_seq_settings, genome)
