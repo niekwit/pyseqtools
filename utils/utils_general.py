@@ -732,12 +732,12 @@ def trimSLURM(script_dir, work_dir):
             slurm_settings = yaml.full_load(file)
     
     #load slurm parameters
-    threads = str(slurm_settings["Trim_galore_CPU"])
-    trim_mem = str(slurm_settings["Trim_galore_mem"])
-    trim_time = str(slurm_settings["Trim_galore_time"])
-    account = slurm_settings["groupname"]
-    partition = slurm_settings["partition"]
-    email = slurm_settings["email"]
+    threads = str(slurm_settings["TT-Seq"]["Trim_galore_CPU"])
+    trim_mem = str(slurm_settings["TT-Seq"]["Trim_galore_mem"])
+    trim_time = str(slurm_settings["TT-Seq"]["Trim_galore_time"])
+    account = slurm_settings["TT-Seq"]["groupname"]
+    partition = slurm_settings["TT-Seq"]["partition"]
+    email = slurm_settings["TT-Seq"]["email"]
     
     
     #write trim commands to file for slurm job array
@@ -765,14 +765,14 @@ def trimSLURM(script_dir, work_dir):
     script.write("#SBATCH --mail-type=END" + "\n")
     script.write("#SBATCH -p " + partition + "\n")
     script.write("#SBATCH -D " + work_dir + "\n")
-    script.write("#SBATCH -o slurm/slurm_%a.log" + "\n")
+    script.write("#SBATCH -o slurm/slurm_trim%a.log" + "\n")
     script.write("#SBATCH -c " + threads + "\n")
     script.write("#SBATCH -t " + trim_time + "\n")
     script.write("#SBATCH --mem=" + trim_mem + "\n")
     script.write("#SBATCH -J " + "Trim_galore" + "\n")
     script.write("#SBATCH -a " + "1-" + str(len(read1_list)) + "\n")
     script.write("\n")
-    script.write("module load python/3.8.1-icl\n")
+    script.write("conda activate ttseq")
     script.write("module load cutadapt/1.8.1\n")
     script.write("module load fastqc/0.11.4\n")
     script.write("module load trim-galore/0.4.0\n")

@@ -10,7 +10,7 @@ import pandas as pd
 from clint.textui import colored, puts
 try:
     import pysam
-except ImportError:
+except ModuleNotFoundError:
     pass
 
 script_dir = os.path.abspath(os.path.dirname(__file__))
@@ -123,7 +123,7 @@ def splitBam(threads, work_dir, genome):
     '''
     puts(colored.green("Creating forward and reverse strand-specific BAM files with samtools"))
 
-    file_list = glob.glob(os.path.join(work_dir, "bam", genome, "*", "**_sorted.bam"))
+    file_list = glob.glob(os.path.join(work_dir, "bam", genome, "*", "*_sorted.bam"))
     
         
     for bam in file_list:
@@ -168,7 +168,133 @@ def splitBam(threads, work_dir, genome):
             os.remove(file)
             os.remove(file.replace(".bam",".bam.bai"))
             
-            
+
+def splitBamSLURM(threads, work_dir, genome):
+    '''
+    based on https://www.biostars.org/p/92935/
+    SLURM job version
+    
+    '''
+    #get sorted bam files
+    file_list = glob.glob(os.path.join(work_dir, "bam", genome, "*", "*_sorted.bam"))
+    
+    #load slurm settings    
+    threads = str(slurm_settings["TT-Seq"]["splitBAM_CPU"])
+    mem = str(slurm_settings["TT-Seq"]["splitBAM_mem"])
+    time = str(slurm_settings["TT-Seq"]["splitBAM_time"])
+    account = slurm_settings["TT-Seq"]["groupname"]
+    partition = slurm_settings["TT-Seq"]["partition"]
+    email = slurm_settings["TT-Seq"]["email"]
+    
+    #create csv file with samtools view commands for slurm bash script
+    for bam in file_list:
+        ##forward strand
+        fwd1 = bam.replace("*_sorted.bam","_fwd1.bam")
+        fwd2 = bam.replace("*_sorted.bam","_fwd2.bam")
+        
+        #alignments of the second in pair if they map to the forward strand
+        samtools_fwd1 = ["samtools", "view", "-@", threads, "-b", "-f", "128", "-F", "16", bam, "-o", fwd1]
+        samtools_fwd1 = " ".join(samtools_fwd1)
+        #alignments of the first in pair if they map to the reverse  strand
+        samtools_fwd2 = ["samtools", "view", "-@", threads, "-b", "-f", "80", bam, "-o", fwd2]
+        samtools_fwd2 = " ".join(samtools_fwd2)
+        
+        ##reverse strand
+        rev1 = bam.replace("*_sorted.bam","_rev1.bam")
+        rev2 = bam.replace("*_sorted.bam","_rev2.bam")
+        
+        #alignments of the second in pair if they map to the reverse strand
+        samtools_rev1 = ["samtools", "view", "-b", "-f", "144", bam, "-o", rev1]
+        samtools_rev1 = " ".join(samtools_rev1)
+        #alignments of the first in pair if they map to the forward strand
+        samtools_rev2 = ["samtools", "view", "-@", threads, "-b", "-f", "64", "-F", "16", bam, "-o", rev2]
+        samtools_rev2 = " ".join(samtools_rev2)
+        
+        csv = open(os.path.join(work_dir,"slurm","slurm_splitBAM.csv"), "a")  
+        csv.write(samtools_fwd1)
+        csv.write(samtools_fwd2)
+        csv.write(samtools_rev1)
+        csv.write(samtools_rev2)
+        csv.close()
+    
+    #create slurm bash script for splitting bam files
+    script = os.path.join(work_dir,"slurm","slurm_splitBAM.sh")
+    script = open(script, "w")  
+    script.write("#!/bin/bash" + "\n")
+    script.write("\n")
+    script.write("#SBATCH -A " + account + "\n")
+    script.write("#SBATCH ---mail-user=" + email + "\n")
+    script.write("#SBATCH --mail-type=FAIL" + "\n")
+    script.write("#SBATCH --mail-type=END" + "\n")
+    script.write("#SBATCH -p " + partition + "\n")
+    script.write("#SBATCH -D " + work_dir + "\n")
+    script.write("#SBATCH -o slurm/slurm_split_BAM_%a.log" + "\n")
+    script.write("#SBATCH -c " + threads + "\n")
+    script.write("#SBATCH -t " + time + "\n")
+    script.write("#SBATCH --mem=" + mem + "\n")
+    script.write("#SBATCH -J " + "Trim_galore" + "\n")
+    script.write("#SBATCH -a " + "1-" + str(len(file_list) * 4) + "\n")
+    script.write("\n")
+    script.write("conda activate ttseq")
+    script.write("module load samtools/1.10\n")
+    script.write("\n")
+    script.write("sed -n %ap slurm/slurm_splitBAM.csv | bash")
+    script.close()
+    
+    #run slurm script and get job id
+    job_id = subprocess.check_output("sbatch slurm/slurm_splitBAM.sh | cut -d " " -f 4", shell = True)
+    job_id = job_id.decode("utf-8")
+    
+    #load slurm settings for samtools index
+    threads = str(slurm_settings["TT-Seq"]["samtools-index_CPU"])
+    mem = str(slurm_settings["TT-Seq"]["samtools-index_mem"])
+    time = str(slurm_settings["TT-Seq"]["samtools-index_time"])
+    
+    #create csv file with bam files to be indexed
+    extensions = ["*_fwd1.bam", "*_fwd2.bam", "*_rev1.bam", "*_rev2.bam"]
+    csv = os.path.join(work_dir,"slurm","slurm_indexBAM.csv"
+    os.remove(csv) #delete a preexisting file                   
+    
+    for extension in extensions:
+        file_list = glob.glob(os.path.join(work_dir, "bam", genome, "*", extension))
+        for bam in file_list:
+            csv = open(csv, "a")
+            index = ["samtools","index", "-@", threads]
+            csv.write(index)
+            csv.close()
+    
+    #create bash script indexing splitted bam files
+    script = os.path.join(work_dir,"slurm","slurm_indexBAM.sh")
+    script = open(script, "w")  
+    script.write("#!/bin/bash" + "\n")
+    script.write("\n")
+    script.write("#SBATCH -A " + account + "\n")
+    script.write("#SBATCH ---mail-user=" + email + "\n")
+    script.write("#SBATCH --mail-type=FAIL" + "\n")
+    script.write("#SBATCH --mail-type=END" + "\n")
+    script.write("#SBATCH -p " + partition + "\n")
+    script.write("#SBATCH -D " + work_dir + "\n")
+    script.write("#SBATCH -o slurm/slurm_index_BAM_%a.log" + "\n")
+    script.write("#SBATCH -c " + threads + "\n")
+    script.write("#SBATCH -t " + time + "\n")
+    script.write("#SBATCH --mem=" + mem + "\n")
+    script.write("#SBATCH -J " + "samtools_index" + "\n")
+    script.write("#SBATCH -a " + "1-" + str(len(file_list) * 4) + "\n")
+    script.write("#SBATCH --dependency=afterok:" + job_id)
+    script.write("\n")
+    script.write("conda activate ttseq")
+    script.write("module load samtools/1.10\n")
+    script.write("\n")
+    script.write("sed -n %ap slurm/slurm_indexBAM.csv | bash")
+    script.close()
+    
+    #run slurm script and get job id
+    job_id = subprocess.check_output("sbatch slurm/slurm_indexBAM.sh | cut -d " " -f 4", shell = True)
+    job_id = job_id.decode("utf-8")
+    
+    #merge all forward and reverse reads
+    
+        
 def sizeFactors(work_dir, tt_seq_settings):
     """
     Based on https://github.com/crickbabs/DRB_TT-seq/blob/master/bigwig.md with modifications

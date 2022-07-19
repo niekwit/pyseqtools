@@ -1,9 +1,19 @@
 groupname: XXX
 email: XXX
-partition: cclake
-Trim_galore_CPU: 4
-Trim_galore_mem: 12G
-Trim_galore_time: 01:00:00
-STAR_CPUs: 48
-STAR_mem: 40GB
-STAR_time: 07:00:00
+TT-Seq:
+  partition: cclake
+  Trim_galore_CPU: 4
+  Trim_galore_mem: 3G
+  Trim_galore_time: 01:00:00
+  STAR_CPUs: 48
+  STAR_mem: 1GB
+  STAR_time: 07:00:00
+  splitBAM_CPU: 12
+  splitBAM_mem: 1G
+  splitBAM_time: 00:15:00
+  samtools-index_CPU: 12
+  samtools-index: 1G
+  samtools-index: 00:15:00
+  samtools-merge_CPU: 12
+  samtools-merge: 1G
+  samtools-merge: 00:15:00

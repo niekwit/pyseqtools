@@ -15,12 +15,12 @@ import pandas as pd
 
 try:
     import pybedtools
-except ImportError:
+except ModuleNotFoundError:
     pass
 
 try:
     import pysam
-except ImportError:
+except ModuleNotFoundError:
     pass
 
 from clint.textui import colored, puts
