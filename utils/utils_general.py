@@ -735,9 +735,9 @@ def trimSLURM(script_dir, work_dir):
     threads = str(slurm_settings["TT-Seq"]["Trim_galore_CPU"])
     trim_mem = str(slurm_settings["TT-Seq"]["Trim_galore_mem"])
     trim_time = str(slurm_settings["TT-Seq"]["Trim_galore_time"])
-    account = slurm_settings["TT-Seq"]["groupname"]
+    account = slurm_settings["groupname"]
     partition = slurm_settings["TT-Seq"]["partition"]
-    email = slurm_settings["TT-Seq"]["email"]
+    email = slurm_settings["email"]
     
     
     #write trim commands to file for slurm job array
