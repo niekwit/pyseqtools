@@ -92,7 +92,12 @@ def STAR(work_dir, threads, script_dir, tt_seq_settings, genome):
     utils.indexBam(work_dir, threads, "R64-1-1")
 
 def STAR_SLURM(work_dir, threads, script_dir, tt_seq_settings, genome):
-    pass
+    '''
+    based on https://github.com/crickbabs/DRB_TT-seq/
+    '''
+
+    file_list = glob.glob(os.path.join(work_dir,"trim","*_val_1.fq.gz"))
+
 
 
 def hisat2(work_dir, threads, tt_seq_settings, genome):
@@ -173,7 +178,7 @@ def splitBam(threads, work_dir, genome):
             os.remove(file.replace(".bam",".bam.bai"))
             
 
-def splitBamSLURM(threads, work_dir, genome):
+def splitBamSLURM(threads, work_dir, genome, job_id):
     '''
     based on https://www.biostars.org/p/92935/
     SLURM job version
@@ -253,7 +258,7 @@ def splitBamSLURM(threads, work_dir, genome):
     script.write("conda activate ttseq")
     script.write("module load samtools/1.10\n")
     script.write("\n")
-    script.write("sed -n %ap slurm/slurm_splitBAM.csv | bash")
+    script.write("sed -n ${SLURM_ARRAY_TASK_ID}p slurm/slurm_splitBAM.csv | bash")
     script.close()
     
     #run slurm script and get job id
