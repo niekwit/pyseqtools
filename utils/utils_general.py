@@ -775,9 +775,6 @@ def trimSLURM(script_dir, work_dir):
     script.write("#SBATCH -J " + "Trim_galore" + "\n")
     script.write("#SBATCH -a " + "1-" + str(len(read1_list)) + "\n")
     script.write("\n")
-    script.write("module load cutadapt/1.8.1\n")
-    script.write("module load fastqc/0.11.4\n")
-    script.write("\n")
     script.write("sed -n ${SLURM_ARRAY_TASK_ID}p slurm/slurm_trim.csv | bash\n")
     script.close()
     
