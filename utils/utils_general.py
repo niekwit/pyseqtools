@@ -771,7 +771,6 @@ def trimSLURM(script_dir, work_dir):
     script.write("#SBATCH -J " + "Trim_galore" + "\n")
     script.write("#SBATCH -a " + "1-" + str(len(read1_list)) + "\n")
     script.write("\n")
-    script.write("conda activate ttseq\n")
     script.write("module load cutadapt/1.8.1\n")
     script.write("module load fastqc/0.11.4\n")
     script.write("module load trim-galore/0.4.0\n")
@@ -780,11 +779,11 @@ def trimSLURM(script_dir, work_dir):
     script.close()
     
     #run slurm bash script
-    #script = os.path.join(work_dir,"slurm","slurm_trim.sh")
+    script = os.path.join(work_dir,"slurm","slurm_trim.sh")
     #slurm = ["sbatch", script]
     #subprocess.call(slurm)
     
-    job_id = subprocess.check_output("sbatch slurm/slurm_trim.sh | cut -d " " -f 4", shell = True)
+    job_id = subprocess.check_output(f"sbatch {script} | cut -d " " -f 4", shell = True)
     job_id = job_id.decode("utf-8")
     return(job_id)
 
