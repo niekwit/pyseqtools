@@ -745,10 +745,12 @@ def main():
         #quality trim fastq files
         slurm = args["slurm"]
         if slurm == True:
-            utils.trimSLURM(script_dir, work_dir)
+            job_id = utils.trimSLURM(script_dir, work_dir)
+            print(f"Trim_galore job id: {job_id}")
         else:
             utils.trim(script_dir, threads, work_dir)
         
+        '''
         #align reads with STAR
         if slurm == True:
             tt_seq_utils.STAR_SLURM(work_dir, threads, script_dir, tt_seq_settings, genome)
@@ -769,7 +771,7 @@ def main():
         
         #get scale factors from yeast spike-in
         #tt_seq_utils.sizeFactors(work_dir, tt_seq_settings)
-        
+        '''
                 
 
     def geneSymConv(args, script_dir):

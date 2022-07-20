@@ -780,10 +780,13 @@ def trimSLURM(script_dir, work_dir):
     script.close()
     
     #run slurm bash script
-    script = os.path.join(work_dir,"slurm","slurm_trim.sh")
-    slurm = ["sbatch", script]
-    subprocess.call(slurm)
-        
+    #script = os.path.join(work_dir,"slurm","slurm_trim.sh")
+    #slurm = ["sbatch", script]
+    #subprocess.call(slurm)
+    
+    job_id = subprocess.check_output("sbatch slurm/slurm_trim.sh | cut -d " " -f 4", shell = True)
+    job_id = job_id.decode("utf-8")
+    return(job_id)
 
 def blackList(script_dir, genome):
     with open(os.path.join(script_dir, "yaml", "chip-seq.yaml")) as f:
