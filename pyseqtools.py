@@ -759,7 +759,7 @@ def main():
         
         #split bam files into forward and reverse strand files
         if slurm == True:
-            tt_seq_utils.splitBamSLURM(threads, work_dir, genome)
+            tt_seq_utils.splitBamSLURM(threads, work_dir, genome, job_id)
         else:
             tt_seq_utils.splitBam(threads, work_dir)
         

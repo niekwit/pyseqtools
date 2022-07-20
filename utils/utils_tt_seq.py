@@ -21,7 +21,7 @@ import utils_general as utils
 
 
         
-def STAR(work_dir, threads, script_dir, tt_seq_settings, genome):
+def STAR(work_dir, threads, script_dir, tt_seq_settings, genome, slurm):
     '''
     based on https://github.com/crickbabs/DRB_TT-seq/
     '''

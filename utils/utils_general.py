@@ -463,6 +463,10 @@ def indexBam(work_dir, threads, genome="hg38"):
             pysam.index("-@", str(threads), bam)
 
 
+def indexBamSLURM(work_dir, threads, genome="hg38"):
+    pass
+
+
 def createBigWig(work_dir, threads):
     #creates BigWig files for all existing BAM files
     print("Generating BigWig files")
