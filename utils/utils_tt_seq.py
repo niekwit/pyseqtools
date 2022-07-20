@@ -196,9 +196,9 @@ def splitBamSLURM(threads, work_dir, genome):
     threads = str(slurm_settings["TT-Seq"]["splitBAM_CPU"])
     mem = str(slurm_settings["TT-Seq"]["splitBAM_mem"])
     time = str(slurm_settings["TT-Seq"]["splitBAM_time"])
-    account = slurm_settings["TT-Seq"]["groupname"]
+    account = slurm_settings["groupname"]
     partition = slurm_settings["TT-Seq"]["partition"]
-    email = slurm_settings["TT-Seq"]["email"]
+    email = slurm_settings["email"]
     
     #create csv file with samtools view commands for slurm bash script
     for bam in file_list:
