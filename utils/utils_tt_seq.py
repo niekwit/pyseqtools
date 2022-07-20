@@ -6,6 +6,7 @@ import sys
 import subprocess
 import shutil
 import pandas as pd
+import yaml
 
 from clint.textui import colored, puts
 try:
@@ -89,6 +90,9 @@ def STAR(work_dir, threads, script_dir, tt_seq_settings, genome):
     #index all bam files
     utils.indexBam(work_dir, threads, genome)
     utils.indexBam(work_dir, threads, "R64-1-1")
+
+def STAR_SLURM(work_dir, threads, script_dir, tt_seq_settings, genome):
+    pass
 
 
 def hisat2(work_dir, threads, tt_seq_settings, genome):
@@ -175,10 +179,20 @@ def splitBamSLURM(threads, work_dir, genome):
     SLURM job version
     
     '''
+    puts(colored.green("Generating strand-specific BAM files with samtools"))
+    
     #get sorted bam files
     file_list = glob.glob(os.path.join(work_dir, "bam", genome, "*", "*_sorted.bam"))
     
-    #load slurm settings    
+    if len(file_list) == 0:
+        return(puts(colored.red("ERROR: No BAM files found to split")))
+    
+    #load slurm settings  
+    with open(os.path.join(script_dir,
+                               "yaml",
+                               "slurm.yaml")) as file:
+            slurm_settings = yaml.full_load(file)
+    
     threads = str(slurm_settings["TT-Seq"]["splitBAM_CPU"])
     mem = str(slurm_settings["TT-Seq"]["splitBAM_mem"])
     time = str(slurm_settings["TT-Seq"]["splitBAM_time"])
@@ -218,6 +232,7 @@ def splitBamSLURM(threads, work_dir, genome):
         csv.close()
     
     #create slurm bash script for splitting bam files
+    print("Generating slurm_splitBAM.sh")
     script = os.path.join(work_dir,"slurm","slurm_splitBAM.sh")
     script = open(script, "w")  
     script.write("#!/bin/bash" + "\n")
@@ -242,6 +257,7 @@ def splitBamSLURM(threads, work_dir, genome):
     script.close()
     
     #run slurm script and get job id
+    print("Submitting slurm_splitBAM.sh to cluster")
     job_id = subprocess.check_output("sbatch slurm/slurm_splitBAM.sh | cut -d " " -f 4", shell = True)
     job_id = job_id.decode("utf-8")
     
@@ -252,7 +268,7 @@ def splitBamSLURM(threads, work_dir, genome):
     
     #create csv file with bam files to be indexed
     extensions = ["*_fwd1.bam", "*_fwd2.bam", "*_rev1.bam", "*_rev2.bam"]
-    csv = os.path.join(work_dir,"slurm","slurm_indexBAM.csv"
+    csv = os.path.join(work_dir,"slurm","slurm_indexBAM.csv")
     os.remove(csv) #delete a preexisting file                   
     
     for extension in extensions:

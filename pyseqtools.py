@@ -10,6 +10,7 @@ import time
 #import pkg_resources
 #from platform import python_version
 
+'''
 def checkPythonPackages(): #check for required python packages; installs if absent
     #check if Python >= 3.7 (required for GitPython)
     try:
@@ -37,6 +38,7 @@ def checkPythonPackages(): #check for required python packages; installs if abse
             sys.exit("ERROR: package installation failed")
     else:
         pass
+'''
 
 def main():
 
@@ -748,10 +750,16 @@ def main():
             utils.trim(script_dir, threads, work_dir)
         
         #align reads with STAR
-        tt_seq_utils.STAR(work_dir, threads, script_dir, tt_seq_settings, genome)
+        if slurm == True:
+            tt_seq_utils.STAR_SLURM(work_dir, threads, script_dir, tt_seq_settings, genome)
+        else:
+            tt_seq_utils.STAR(work_dir, threads, script_dir, tt_seq_settings, genome)
         
         #split bam files into forward and reverse strand files
-        tt_seq_utils.splitBam(threads, work_dir)
+        if slurm == True:
+            tt_seq_utils.splitBamSLURM(threads, work_dir, genome)
+        else:
+            tt_seq_utils.splitBam(threads, work_dir)
         
         #perform deduplication
         dedup = args["deduplication"]
