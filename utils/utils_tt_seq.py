@@ -58,27 +58,33 @@ def STAR(work_dir, threads, script_dir, tt_seq_settings, genome, slurm):
             
             #run STAR
             puts(colored.green(f"Aligning {sample} to {genome}"))
-            if genome == "hg38": 
+            
+            if slurm == False:
                 if not utils.file_exists(sorted_bam):
                     utils.write2log(work_dir, " ".join(star), "" )
                     subprocess.call(star)
-            elif genome == "R64-1-1": #it is better for HTSeq to use unsorted BAM files
-                if not utils.file_exists(bam):
-                    utils.write2log(work_dir, " ".join(star), "" )
-                    subprocess.call(star)
+            else:
+                #create csv files with STAR commands for slurm job
+                csv = open(os.path.join(work_dir,"slurm","slurm_STAR.csv"), "w")  
+                csv.write(star)
+                csv.close()               
+            
 
-            #only sort hg38 bam files
-            if genome == "hg38":
-                puts(colored.green("Sorting " + os.path.basename(bam)))
-                
-                if not utils.file_exists(sorted_bam):
-                    pysam.sort("--threads", threads,"-o",sorted_bam,bam)
-                
-                #remove unsorted bam file
-                if os.path.exists(sorted_bam):
-                    if os.path.exists(bam):
-                        os.remove(bam)
-             
+            #only sort hg38 bam files (it is better for HTSeq to use unsorted BAM files)
+            if slurm == False:
+                if genome == "hg38":
+                    puts(colored.green("Sorting " + os.path.basename(bam)))
+                    
+                    if not utils.file_exists(sorted_bam):
+                        pysam.sort("--threads", threads,"-o",sorted_bam,bam)
+                    
+                    #remove unsorted bam file
+                    if os.path.exists(sorted_bam):
+                        if os.path.exists(bam):
+                            os.remove(bam)
+            else:
+                pass #to do
+                 
     #align trimmed reads to selected genome    
     index = tt_seq_settings["STAR"][genome]
     align(work_dir,file_list, index, threads,genome)
@@ -90,13 +96,6 @@ def STAR(work_dir, threads, script_dir, tt_seq_settings, genome, slurm):
     #index all bam files
     utils.indexBam(work_dir, threads, genome)
     utils.indexBam(work_dir, threads, "R64-1-1")
-
-def STAR_SLURM(work_dir, threads, script_dir, tt_seq_settings, genome):
-    '''
-    based on https://github.com/crickbabs/DRB_TT-seq/
-    '''
-
-    file_list = glob.glob(os.path.join(work_dir,"trim","*_val_1.fq.gz"))
 
 
 
@@ -243,7 +242,6 @@ def splitBamSLURM(threads, work_dir, genome, job_id):
     script.write("#!/bin/bash" + "\n")
     script.write("\n")
     script.write("#SBATCH -A " + account + "\n")
-    script.write("#SBATCH ---mail-user=" + email + "\n")
     script.write("#SBATCH --mail-type=FAIL" + "\n")
     script.write("#SBATCH --mail-type=END" + "\n")
     script.write("#SBATCH -p " + partition + "\n")
