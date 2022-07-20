@@ -783,7 +783,7 @@ def trimSLURM(script_dir, work_dir):
     #slurm = ["sbatch", script]
     #subprocess.call(slurm)
     
-    job_id = subprocess.check_output(f"sbatch {script} | cut -d " " -f 4", shell = True)
+    job_id = subprocess.check_output(f"sbatch {script} | cut -d ' ' -f 4", shell = True)
     job_id = job_id.decode("utf-8")
     return(job_id)
 
