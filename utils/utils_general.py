@@ -737,7 +737,7 @@ def trimSLURM(script_dir, work_dir):
     trim_time = str(slurm_settings["TT-Seq"]["Trim_galore_time"])
     account = slurm_settings["groupname"]
     partition = slurm_settings["TT-Seq"]["partition"]
-    email = slurm_settings["email"]
+    #email = slurm_settings["email"]
     
     
     #write trim commands to file for slurm job array
@@ -760,7 +760,6 @@ def trimSLURM(script_dir, work_dir):
     script.write("#!/bin/bash" + "\n")
     script.write("\n")
     script.write("#SBATCH -A " + account + "\n")
-    script.write("#SBATCH ---mail-user=" + email + "\n")
     script.write("#SBATCH --mail-type=FAIL" + "\n")
     script.write("#SBATCH --mail-type=END" + "\n")
     script.write("#SBATCH -p " + partition + "\n")
