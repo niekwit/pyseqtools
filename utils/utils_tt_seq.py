@@ -113,7 +113,7 @@ def STAR(work_dir, threads, script_dir, tt_seq_settings, genome, slurm, job_id_t
         script.write("#SBATCH -J " + "STAR" + "\n")
         script.write("#SBATCH -a " + "1-" + str(len(file_list)) + "\n")
         script.write("\n")
-        script.write("sed -n ${SLURM_ARRAY_TASK_ID}p slurm/slurm_STAR.sh | bash")
+        script.write("sed -n ${SLURM_ARRAY_TASK_ID}p slurm/slurm_STAR.csv | bash")
         script.close()
                 
         #run slurm script
