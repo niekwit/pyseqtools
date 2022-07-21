@@ -309,6 +309,12 @@ def main():
                              required = False,
                              action = 'store_true',
                              help = "Rename fastq files")
+    parser_ttseq.add_argument("-a", "--aligner",
+                             required = False,
+                             choices = ["hisat2",
+                                        "star"]
+                             default = 'star',
+                             help = "Choose reference genome (default is hg38)")
     parser_ttseq.add_argument("-g", "--genome",
                              required = False,
                              default = 'hg38',
@@ -750,13 +756,11 @@ def main():
         else:
             utils.trim(script_dir, threads, work_dir)
         
-        '''
-        #align reads with STAR
-        if slurm == True:
-            tt_seq_utils.STAR_SLURM(work_dir, threads, script_dir, tt_seq_settings, genome)
-        else:
-            tt_seq_utils.STAR(work_dir, threads, script_dir, tt_seq_settings, genome)
         
+        #align reads with STAR
+        tt_seq_utils.STAR(work_dir, threads, script_dir, tt_seq_settings, genome)
+        
+        '''
         #split bam files into forward and reverse strand files
         if slurm == True:
             tt_seq_utils.splitBamSLURM(threads, work_dir, genome, job_id)
