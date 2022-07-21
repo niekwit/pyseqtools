@@ -25,9 +25,14 @@ def STAR(work_dir, threads, script_dir, tt_seq_settings, genome, slurm, job_id_t
     '''
     based on https://github.com/crickbabs/DRB_TT-seq/
     '''
-
-    file_list = glob.glob(os.path.join(work_dir,"trim","*_val_1.fq.gz"))
-
+    if slurm == False:
+        file_list = glob.glob(os.path.join(work_dir,"trim","*_val_1.fq.gz"))
+    else:
+        extension = utils.get_extension(work_dir)
+        file_list = glob.glob(os.path.join(work_dir, "raw-data","*R1_001." + extension))
+        file_list = [x.split(".",1)[0] + "_val_1.fq.gz" for x in file_list]
+        file_list = [x.replace("raw-data", "trim") for x in file_list]
+        
     
     #function for alignment with STAR
     def align(work_dir,file_list, index, threads, genome, slurm):

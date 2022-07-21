@@ -799,7 +799,7 @@ def trimSLURM(script_dir, work_dir):
     print("Submitting slurm_trim.sh to cluster")
     job_id = subprocess.check_output(f"sbatch {script} | cut -d ' ' -f 4", shell = True)
     job_id = job_id.decode("utf-8")
-    print(f"Quality trimming completed (job id {job_id}")
+    print(f"Quality trimming completed (job id {job_id})")
     return(job_id)
 
 def blackList(script_dir, genome):
