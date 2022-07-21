@@ -760,6 +760,7 @@ def trimSLURM(script_dir, work_dir):
             trim_galore = ["trim_galore","-j", str(threads), "-o",
                            os.path.join(work_dir,"trim"), "--paired", read1, read2, "\n"]
             trim_galore = " ".join(trim_galore)
+            csv = os.path.join(work_dir,"slurm","slurm_trim.csv")
             csv = open(csv, "a")  
             csv.write(trim_galore)
             csv.close()
