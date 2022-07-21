@@ -312,9 +312,9 @@ def main():
     parser_ttseq.add_argument("-a", "--aligner",
                              required = False,
                              choices = ["hisat2",
-                                        "star"]
+                                        "star"],
                              default = 'star',
-                             help = "Choose reference genome (default is hg38)")
+                             help = "Choose alignment program (Default is STAR")
     parser_ttseq.add_argument("-g", "--genome",
                              required = False,
                              default = 'hg38',

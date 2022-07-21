@@ -30,7 +30,7 @@ def STAR(work_dir, threads, script_dir, tt_seq_settings, genome, slurm):
 
     
     #function for alignment with STAR
-    def align(work_dir,file_list, index, threads, genome):
+    def align(work_dir,file_list, index, threads, genome, slurm):
         for read1 in file_list:
             read2 = read1.replace("_R1_001_val_1.fq.gz","_R2_001_val_2.fq.gz")
             
