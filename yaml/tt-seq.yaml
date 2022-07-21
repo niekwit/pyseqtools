@@ -24,10 +24,17 @@ fasta:
 gtf:
   hg19: /home/niek/Documents/scripts/pyseqtools/gtf/hg19/gencode.v19.annotation.protein_coding.gtf
   hg38: /home/niek/Documents/references/gtf/Homo_sapiens.GRCh38.95.gtf
-index:
+  yeast: /home/niek/Documents/scripts/pyseqtools/gtf/R64-1-1/Saccharomyces_cerevisiae.R64-1-1.106.gtf
+STAR:
   dm3-ic: 
   hg19: 
   hg38: /home/niek/Documents/scripts/pyseqtools/index/STAR/hg38
-  mm10: 
-index-yeast: /home/niek/Documents/scripts/pyseqtools/index/STAR/R64-1-1
+  mm10:
+  yeast: /home/niek/Documents/scripts/pyseqtools/index/STAR/R64-1-1
+hisat2:
+  dm3-ic: /home/niek/Documents/scripts/pyseqtools/index/hisat2/dm3/dm3-index
+  hg19: /home/niek/Documents/scripts/pyseqtools/index/hisat2/hg19/hg19-index
+  hg38: /home/niek/Documents/scripts/pyseqtools/index/hisat2/hg38/GRCh38.p13.genome
+  mm10: /home/niek/Documents/scripts/pyseqtools/index/hisat2/mm10/mm10/genome
+  yeast: /home/niek/Documents/scripts/pyseqtools/index/hisat2/R64-1-1/R64-1-1
 
