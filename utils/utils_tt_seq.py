@@ -132,7 +132,9 @@ def STAR(work_dir, threads, script_dir, tt_seq_settings, genome, slurm, job_id_t
             '''     
     #align trimmed reads to selected genome    
     index = tt_seq_settings["STAR"][genome]
+    print("Submitting slurm_STAR.sh to cluster")
     job_id_align = align(work_dir,file_list, index, threads, genome, slurm)
+    print(f"Alignment completed (Job id {job_id_align})")
     return(job_id_align)
     
     #align trimmed reads to yeast genome (spike-in)

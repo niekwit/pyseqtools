@@ -748,7 +748,7 @@ def trimSLURM(script_dir, work_dir):
     #write trim commands to file for slurm job array
     #trim_galore should be in $PATH
     csv = os.path.join(work_dir,"slurm","slurm_trim.csv")
-    if not os.path.exists(csv):
+    if os.path.exists(csv):
         os.remove(csv)
     
     for read1 in read1_list:
@@ -766,10 +766,7 @@ def trimSLURM(script_dir, work_dir):
             
     #if trimming has already been done return none
     csv = os.path.join(work_dir,"slurm","slurm_trim.csv")
-    with open(csv) as f:
-        count = sum(1 for _ in f)
-    
-    if count == 0:
+    if not os.path.exists(csv):
         print("Skipping trimming (already performed for all files)")
         return(None)
     
@@ -798,8 +795,10 @@ def trimSLURM(script_dir, work_dir):
     #slurm = ["sbatch", script]
     #subprocess.call(slurm)
     
+    print("Submitting slurm_trim.sh to cluster")
     job_id = subprocess.check_output(f"sbatch {script} | cut -d ' ' -f 4", shell = True)
     job_id = job_id.decode("utf-8")
+    print(f"Quality trimming completed (job id {job_id}")
     return(job_id)
 
 def blackList(script_dir, genome):
