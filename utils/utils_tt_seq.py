@@ -65,11 +65,51 @@ def STAR(work_dir, threads, script_dir, tt_seq_settings, genome, slurm):
                     subprocess.call(star)
             else:
                 #create csv files with STAR commands for slurm job
-                csv = open(os.path.join(work_dir,"slurm","slurm_STAR.csv"), "w")  
-                csv.write(star)
-                csv.close()               
-            
-
+                if not utils.file_exists(bam):
+                    csv = open(os.path.join(work_dir,"slurm","slurm_STAR.csv"), "w")  
+                    csv.write(" ".join(star))
+                    csv.close()    
+                
+                #load slurm settings  
+                with open(os.path.join(script_dir,
+                                           "yaml",
+                                           "slurm.yaml")) as file:
+                        slurm_settings = yaml.full_load(file)
+                
+                threads = str(slurm_settings["TT-Seq"]["STAR_CPU"])
+                mem = str(slurm_settings["TT-Seq"]["STAR_mem"])
+                time = str(slurm_settings["TT-Seq"]["STAR_time"])
+                account = slurm_settings["groupname"]
+                partition = slurm_settings["TT-Seq"]["partition"]
+                #email = slurm_settings["email"]
+                
+                #create slurm bash script for splitting bam files
+                                
+                print("Generating slurm_STAR.sh")
+                script = os.path.join(work_dir,"slurm","slurm_STAR.sh")
+                script = open(script, "w")  
+                script.write("#!/bin/bash" + "\n")
+                script.write("\n")
+                script.write("#SBATCH -A " + account + "\n")
+                script.write("#SBATCH --mail-type=FAIL" + "\n")
+                script.write("#SBATCH --mail-type=END" + "\n")
+                script.write("#SBATCH -p " + partition + "\n")
+                script.write("#SBATCH -D " + work_dir + "\n")
+                script.write("#SBATCH -o slurm/slurm_STAR_%a.log" + "\n")
+                script.write("#SBATCH -c " + threads + "\n")
+                script.write("#SBATCH -t " + time + "\n")
+                script.write("#SBATCH --mem=" + mem + "\n")
+                script.write("#SBATCH -J " + "STAR" + "\n")
+                script.write("#SBATCH -a " + "1-" + str(len(file_list) * 4) + "\n")
+                script.write("\n")
+                script.write("sed -n ${SLURM_ARRAY_TASK_ID}p slurm/slurm_STAR.sh | bash")
+                script.close()
+                
+                #run slurm script
+                job_id = subprocess.check_output(f"sbatch {script} | cut -d ' ' -f 4", shell = True)
+                return(job_id)
+            '''
+            CREATE SEPARATE FUNCTION FOR SORTING BAM FILES
             #only sort hg38 bam files (it is better for HTSeq to use unsorted BAM files)
             if slurm == False:
                 if genome == "hg38":
@@ -84,18 +124,18 @@ def STAR(work_dir, threads, script_dir, tt_seq_settings, genome, slurm):
                             os.remove(bam)
             else:
                 pass #to do
-                 
+            '''     
     #align trimmed reads to selected genome    
     index = tt_seq_settings["STAR"][genome]
-    align(work_dir,file_list, index, threads,genome)
+    job_id_align = align(work_dir,file_list, index, threads,genome)
     
     #align trimmed reads to yeast genome (spike-in)
-    yeast_index = tt_seq_settings["STAR"]["yeast"]
-    align(work_dir,file_list, yeast_index, threads,"R64-1-1")
+    #yeast_index = tt_seq_settings["STAR"]["yeast"]
+    #align(work_dir,file_list, yeast_index, threads,"R64-1-1")
     
     #index all bam files
-    utils.indexBam(work_dir, threads, genome)
-    utils.indexBam(work_dir, threads, "R64-1-1")
+    #utils.indexBam(work_dir, threads, genome)
+    #utils.indexBam(work_dir, threads, "R64-1-1")
 
 
 
@@ -250,11 +290,8 @@ def splitBamSLURM(threads, work_dir, genome, job_id):
     script.write("#SBATCH -c " + threads + "\n")
     script.write("#SBATCH -t " + time + "\n")
     script.write("#SBATCH --mem=" + mem + "\n")
-    script.write("#SBATCH -J " + "Trim_galore" + "\n")
+    script.write("#SBATCH -J " + "split_bam" + "\n")
     script.write("#SBATCH -a " + "1-" + str(len(file_list) * 4) + "\n")
-    script.write("\n")
-    script.write("conda activate ttseq")
-    script.write("module load samtools/1.10\n")
     script.write("\n")
     script.write("sed -n ${SLURM_ARRAY_TASK_ID}p slurm/slurm_splitBAM.csv | bash")
     script.close()
