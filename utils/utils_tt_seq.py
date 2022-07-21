@@ -89,7 +89,7 @@ def STAR(work_dir, threads, script_dir, tt_seq_settings, genome, slurm, job_id_t
         
         #load slurm settings  
         mem = str(slurm_settings["TT-Seq"]["STAR_mem"])
-        time = str(slurm_settings["TT-Seq"]["STAR_time"])
+        slurm_time = str(slurm_settings["TT-Seq"]["STAR_time"])
         account = slurm_settings["groupname"]
         partition = slurm_settings["TT-Seq"]["partition"]
         #email = slurm_settings["email"]
@@ -108,7 +108,7 @@ def STAR(work_dir, threads, script_dir, tt_seq_settings, genome, slurm, job_id_t
         script.write("#SBATCH -D " + work_dir + "\n")
         script.write("#SBATCH -o slurm/slurm_STAR_%a.log" + "\n")
         script.write("#SBATCH -c " + threads + "\n")
-        script.write("#SBATCH -t " + time + "\n")
+        script.write("#SBATCH -t " + slurm_time + "\n")
         script.write("#SBATCH --mem=" + mem + "\n")
         script.write("#SBATCH -J " + "STAR" + "\n")
         script.write("#SBATCH -a " + "1-" + str(len(file_list)) + "\n")
@@ -119,9 +119,11 @@ def STAR(work_dir, threads, script_dir, tt_seq_settings, genome, slurm, job_id_t
         #run slurm script
         if job_id_trim is None:
             script = os.path.join(work_dir,"slurm","slurm_STAR.sh")
+            print("Submitting slurm script to cluster")
             job_id_align = subprocess.check_output(f"sbatch {script} | cut -d ' ' -f 4", shell = True)
             return(job_id_align)
         else:
+            print("Submitting slurm script to cluster")
             job_id_align = subprocess.check_output(f"sbatch --dependency=afterok:{job_id_trim} {script} | cut -d ' ' -f 4", shell = True)  
             return(job_id_align)
             '''
@@ -143,8 +145,9 @@ def STAR(work_dir, threads, script_dir, tt_seq_settings, genome, slurm, job_id_t
             '''     
     #align trimmed reads to selected genome    
     index = tt_seq_settings["STAR"][genome]
-    print("Submitting slurm_STAR.sh to cluster")
+    puts(colored.green(f"Aligning fastq files to {genome} with STAR"))
     job_id_align = align(work_dir,file_list, index, threads, genome, slurm)
+    job_id_align = job_id_align.decode("utf-8").relpace("\n","")
     print(f"Alignment completed (Job id {job_id_align})")
     return(job_id_align)
     
