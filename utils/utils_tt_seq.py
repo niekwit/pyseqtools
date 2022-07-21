@@ -7,6 +7,7 @@ import subprocess
 import shutil
 import pandas as pd
 import yaml
+from pathlib import Path
 
 from clint.textui import colored, puts
 try:
@@ -36,6 +37,9 @@ def STAR(work_dir, threads, script_dir, tt_seq_settings, genome, slurm, job_id_t
     
     #function for alignment with STAR
     def align(work_dir,file_list, index, threads, genome, slurm):
+        #create empty csv file for commands
+        Path(os.path.join(work_dir,"slurm",f"slurm_STAR_{genome}.csv")).touch()
+        
         for read1 in file_list:
             read2 = read1.replace("_R1_001_val_1.fq.gz","_R2_001_val_2.fq.gz")
             
@@ -67,8 +71,6 @@ def STAR(work_dir, threads, script_dir, tt_seq_settings, genome, slurm, job_id_t
                     "--outFileNamePrefix", os.path.join(work_dir,"bam",genome,sample,sample)]
             
             #run STAR
-            
-            
             if slurm == False:
                 puts(colored.green(f"Aligning {sample} to {genome}"))
                 if not utils.file_exists(sorted_bam):
@@ -77,13 +79,15 @@ def STAR(work_dir, threads, script_dir, tt_seq_settings, genome, slurm, job_id_t
             else:
                 #create csv files with STAR commands for slurm job
                 if not utils.file_exists(bam):
-                    csv = open(os.path.join(work_dir,"slurm","slurm_STAR.csv"), "a")  
+                    csv = open(os.path.join(work_dir,"slurm",f"slurm_STAR_{genome}.csv"), "a")  
                     csv.write(" ".join(star) +"\n")
                     csv.close()    
         
         #if alignment has already been done return none
-        csv = os.path.join(work_dir,"slurm","slurm_STAR.csv")
-        if not os.path.exists(csv):
+        csv = os.path.join(work_dir,"slurm",f"slurm_STAR_{genome}.csv")
+        command_number = subprocess.check_output(f'cat {csv} | wc -l', shell = True).decode("utf-8").replace("\n","")
+
+        if len(command_number) == 0:
             print("Skipping STAR alignment (already performed for all files)")
             return(None)        
         
@@ -97,8 +101,8 @@ def STAR(work_dir, threads, script_dir, tt_seq_settings, genome, slurm, job_id_t
         #create slurm bash script for splitting bam files
                         
         print("Generating slurm_STAR.sh")
-        script = os.path.join(work_dir,"slurm","slurm_STAR.sh")
-        script = open(script, "w")  
+        script_ = os.path.join(work_dir,"slurm",f"slurm_STAR_{genome}.sh")
+        script = open(script_, "w")  
         script.write("#!/bin/bash" + "\n")
         script.write("\n")
         script.write("#SBATCH -A " + account + "\n")
@@ -110,7 +114,7 @@ def STAR(work_dir, threads, script_dir, tt_seq_settings, genome, slurm, job_id_t
         script.write("#SBATCH -c " + threads + "\n")
         script.write("#SBATCH -t " + slurm_time + "\n")
         script.write("#SBATCH --mem=" + mem + "\n")
-        script.write("#SBATCH -J " + "STAR" + "\n")
+        script.write("#SBATCH -J " + "STAR_"+genome + "\n")
         script.write("#SBATCH -a " + "1-" + str(len(file_list)) + "\n")
         script.write("\n")
         script.write("sed -n ${SLURM_ARRAY_TASK_ID}p slurm/slurm_STAR.csv | bash")
@@ -118,7 +122,7 @@ def STAR(work_dir, threads, script_dir, tt_seq_settings, genome, slurm, job_id_t
                 
         #run slurm script
         if job_id_trim is None:
-            script = os.path.join(work_dir,"slurm","slurm_STAR.sh")
+            script = os.path.join(work_dir,"slurm",f"slurm_STAR_{genome}.sh")
             print("Submitting slurm script to cluster")
             job_id_align = subprocess.check_output(f"sbatch {script} | cut -d ' ' -f 4", shell = True)
             return(job_id_align)
@@ -146,18 +150,19 @@ def STAR(work_dir, threads, script_dir, tt_seq_settings, genome, slurm, job_id_t
     #align trimmed reads to selected genome    
     index = tt_seq_settings["STAR"][genome]
     puts(colored.green(f"Aligning fastq files to {genome} with STAR"))
-    job_id_align = align(work_dir,file_list, index, threads, genome, slurm)
-    job_id_align = job_id_align.decode("utf-8").replace("\n","")
-    print(f"Alignment completed (Job id {job_id_align})")
-    return(job_id_align)
-    
+    align(work_dir,file_list, index, threads, genome, slurm)
+       
     #align trimmed reads to yeast genome (spike-in)
-    #yeast_index = tt_seq_settings["STAR"]["yeast"]
-    #align(work_dir,file_list, yeast_index, threads,"R64-1-1")
+    puts(colored.green("Aligning fastq files to R64-1-1 (spike-in) with STAR"))
+    yeast_index = tt_seq_settings["STAR"]["yeast"]
+    align(work_dir,file_list, yeast_index, threads,"R64-1-1", slurm)
     
     #index all bam files
-    #utils.indexBam(work_dir, threads, genome)
-    #utils.indexBam(work_dir, threads, "R64-1-1")
+    if slurm == False:
+        utils.indexBam(work_dir, threads, genome)
+        utils.indexBam(work_dir, threads, "R64-1-1")
+
+
 
 
 
@@ -238,13 +243,8 @@ def splitBam(threads, work_dir, genome):
             os.remove(file)
             os.remove(file.replace(".bam",".bam.bai"))
             
+'''
 
-def splitBamSLURM(threads, work_dir, genome, job_id):
-    '''
-    based on https://www.biostars.org/p/92935/
-    SLURM job version
-    
-    '''
     puts(colored.green("Generating strand-specific BAM files with samtools"))
     
     #get sorted bam files
@@ -371,9 +371,9 @@ def splitBamSLURM(threads, work_dir, genome, job_id):
     job_id = job_id.decode("utf-8")
     
     #merge all forward and reverse reads
-    
+   ''' 
         
-def sizeFactors(work_dir, tt_seq_settings):
+def sizeFactors(work_dir, tt_seq_settings, slurm):
     """
     Based on https://github.com/crickbabs/DRB_TT-seq/blob/master/bigwig.md with modifications
 
@@ -381,7 +381,7 @@ def sizeFactors(work_dir, tt_seq_settings):
     puts(colored.green("Generating size factors for normalisation using DESeq2"))
     #first prepare htseq-count input for DESeq2
     print("Quantifying reads with HTSeq for DESeq2 input")
-    file_list = glob.glob(os.path.join(work_dir,"bam","R64-1-1","*","*_sorted.bam"))
+    file_list = glob.glob(os.path.join(work_dir,"bam","R64-1-1","*","*Aligned.out.bam"))
     rc_file = [os.path.join(work_dir, "htseq-count", os.path.basename(x.replace("_sorted.bam","_count.txt"))) for x in file_list] 
     
     #create output dir
@@ -476,8 +476,7 @@ def ttSeqBigWig(work_dir, threads, tt_seq_settings, genome):
     
     #convert Wig to BigWig
     file_list = glob.glob(os.path.join(work_dir,"bigwig","*_mean.wig"))
-    
-    
+        
     for wig in file_list:
         bw = wig.replace("*_mean.wig","_mean.bigwig")
         if not utils.file_exists(bw):

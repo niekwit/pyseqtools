@@ -309,16 +309,23 @@ def main():
                              required = False,
                              action = 'store_true',
                              help = "Rename fastq files")
-    parser_ttseq.add_argument("-a", "--aligner",
+    parser_ttseq.add_argument("-a", "--align",
+                             const = None,
+                             nargs = "?",
                              required = False,
-                             choices = ["hisat2",
-                                        "star"],
-                             default = 'star',
-                             help = "Choose alignment program (Default is STAR")
+                             help = "Alignment of fastq files (default is STAR")
     parser_ttseq.add_argument("-g", "--genome",
                              required = False,
                              default = 'hg38',
                              help = "Choose reference genome (default is hg38)")
+    parser_ttseq.add_argument("--splitBAM",
+                             required = False,
+                             action = 'store_true',
+                             help = "Generate forward and reverse strand specific BAM files")
+    parser_ttseq.add_argument("-f", "--sizeFactors",
+                             required = False,
+                             action = 'store_true',
+                             help = "Calculate size factors from yeast spike-in RNA with DESeq2")
     parser_ttseq.add_argument("-d", "--deduplication",
                              required = False,
                              action = 'store_true',
@@ -748,34 +755,42 @@ def main():
         #check md5sums
         utils.checkMd5(work_dir)
         
-        #quality trim fastq files
-        slurm = args["slurm"]
-        if slurm == True:
-            job_id_trim = utils.trimSLURM(script_dir, work_dir)
-            #print(f"Trim_galore job id: {job_id_trim}")
-        else:
-            utils.trim(script_dir, threads, work_dir)
+        #quality trim fastq files and align
+        align=args["align"]
+        
+        if align != None:
+            slurm = args["slurm"]
+            if slurm == True:
+                job_id_trim = utils.trimSLURM(script_dir, work_dir)
+                #print(f"Trim_galore job id: {job_id_trim}")
+            else:
+                utils.trim(script_dir, threads, work_dir)
+            
+            
+            tt_seq_utils.STAR(work_dir, threads, script_dir, tt_seq_settings, genome, slurm, job_id_trim)
         
         
-        #align reads with STAR
-        tt_seq_utils.STAR(work_dir, threads, script_dir, tt_seq_settings, genome, slurm, job_id_trim)
-        
-        '''
         #split bam files into forward and reverse strand files
-        if slurm == True:
-            tt_seq_utils.splitBamSLURM(threads, work_dir, genome, job_id)
-        else:
-            tt_seq_utils.splitBam(threads, work_dir)
-        
+        splitBAM = args["splitBAM"]
+        if splitBAM == True:
+            if slurm == False:
+                tt_seq_utils.splitBam(threads, work_dir)
+            
         #perform deduplication
         dedup = args["deduplication"]
-        if dedup == True:
-            utils.deduplicationBam(script_dir, work_dir, threads, args)
-            utils.indexBam(work_dir, threads)
+        if slurm == False:
+            if dedup == True:
+                utils.deduplicationBam(script_dir, work_dir, threads, args)
+                utils.indexBam(work_dir, threads)
         
         #get scale factors from yeast spike-in
-        #tt_seq_utils.sizeFactors(work_dir, tt_seq_settings)
-        '''
+        sizeFactors = args["sizeFactors"]
+        if sizeFactors == True:
+            if slurm == False:
+                tt_seq_utils.sizeFactors(work_dir, tt_seq_settings)
+            else:
+                pass ##to do
+        
                 
 
     def geneSymConv(args, script_dir):
