@@ -722,6 +722,7 @@ def trimSLURM(script_dir, work_dir):
     Creates SLURM bash script for PE-end quality trimming using Trim_galore
 
     """
+    puts(colored.green("Trimming paired-end fastq files"))
     
     #create output directories
     extension = get_extension(work_dir)
@@ -751,12 +752,21 @@ def trimSLURM(script_dir, work_dir):
         out_file1 = read1.split(".",1)[0] + "_val_1.fq.gz"
         out_file1 = out_file1.replace("raw-data", "trim")
         
-        trim_galore = ["trim_galore","-j", str(threads), "-o",
-                       os.path.join(work_dir,"trim"), "--paired", read1, read2, "\n"]
-        trim_galore = " ".join(trim_galore)
-        csv = open(os.path.join(work_dir,"slurm","slurm_trim.csv"), "a")  
-        csv.write(trim_galore)
-        csv.close()
+        if not file_exists(out_file1):
+            trim_galore = ["trim_galore","-j", str(threads), "-o",
+                           os.path.join(work_dir,"trim"), "--paired", read1, read2, "\n"]
+            trim_galore = " ".join(trim_galore)
+            csv = open(os.path.join(work_dir,"slurm","slurm_trim.csv"), "a")  
+            csv.write(trim_galore)
+            csv.close()
+            
+    #if trimming has already been done return none
+    with open(csv) as f:
+        count = sum(1 for _ in f)
+    
+    if count == 0:
+        print("Skipping trimming (already performed for all files)")
+        return(None)
     
     #generate slurm bash script
     script = os.path.join(work_dir,"slurm","slurm_trim.sh")

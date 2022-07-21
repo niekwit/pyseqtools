@@ -21,7 +21,7 @@ import utils_general as utils
 
 
         
-def STAR(work_dir, threads, script_dir, tt_seq_settings, genome, slurm):
+def STAR(work_dir, threads, script_dir, tt_seq_settings, genome, slurm, job_id_trim):
     '''
     based on https://github.com/crickbabs/DRB_TT-seq/
     '''
@@ -66,7 +66,7 @@ def STAR(work_dir, threads, script_dir, tt_seq_settings, genome, slurm):
             else:
                 #create csv files with STAR commands for slurm job
                 if not utils.file_exists(bam):
-                    csv = open(os.path.join(work_dir,"slurm","slurm_STAR.csv"), "w")  
+                    csv = open(os.path.join(work_dir,"slurm","slurm_STAR.csv"), "a")  
                     csv.write(" ".join(star))
                     csv.close()    
                 
@@ -106,8 +106,12 @@ def STAR(work_dir, threads, script_dir, tt_seq_settings, genome, slurm):
                 script.close()
                 
                 #run slurm script
-                job_id = subprocess.check_output(f"sbatch {script} | cut -d ' ' -f 4", shell = True)
-                return(job_id)
+                if job_id_trim is None:
+                    job_id_align = subprocess.check_output(f"sbatch {script} | cut -d ' ' -f 4", shell = True)
+                    return(job_id_align)
+                else:
+                    job_id_align = subprocess.check_output(f"sbatch --dependency=afterok:{job_id_trim} {script} | cut -d ' ' -f 4", shell = True)  
+                    return(job_id_align)
             '''
             CREATE SEPARATE FUNCTION FOR SORTING BAM FILES
             #only sort hg38 bam files (it is better for HTSeq to use unsorted BAM files)
@@ -128,6 +132,7 @@ def STAR(work_dir, threads, script_dir, tt_seq_settings, genome, slurm):
     #align trimmed reads to selected genome    
     index = tt_seq_settings["STAR"][genome]
     job_id_align = align(work_dir,file_list, index, threads,genome)
+    return(job_id_align)
     
     #align trimmed reads to yeast genome (spike-in)
     #yeast_index = tt_seq_settings["STAR"]["yeast"]

@@ -751,14 +751,14 @@ def main():
         #quality trim fastq files
         slurm = args["slurm"]
         if slurm == True:
-            job_id = utils.trimSLURM(script_dir, work_dir)
-            print(f"Trim_galore job id: {job_id}")
+            job_id_trim = utils.trimSLURM(script_dir, work_dir)
+            #print(f"Trim_galore job id: {job_id_trim}")
         else:
             utils.trim(script_dir, threads, work_dir)
         
         
         #align reads with STAR
-        tt_seq_utils.STAR(work_dir, threads, script_dir, tt_seq_settings, genome)
+        tt_seq_utils.STAR(work_dir, threads, script_dir, tt_seq_settings, genome, slurm, job_id_trim)
         
         '''
         #split bam files into forward and reverse strand files
