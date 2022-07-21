@@ -57,9 +57,10 @@ def STAR(work_dir, threads, script_dir, tt_seq_settings, genome, slurm, job_id_t
                     "--outFileNamePrefix", os.path.join(work_dir,"bam",genome,sample,sample)]
             
             #run STAR
-            puts(colored.green(f"Aligning {sample} to {genome}"))
+            
             
             if slurm == False:
+                puts(colored.green(f"Aligning {sample} to {genome}"))
                 if not utils.file_exists(sorted_bam):
                     utils.write2log(work_dir, " ".join(star), "" )
                     subprocess.call(star)
@@ -70,48 +71,48 @@ def STAR(work_dir, threads, script_dir, tt_seq_settings, genome, slurm, job_id_t
                     csv.write(" ".join(star))
                     csv.close()    
                 
-                #load slurm settings  
-                with open(os.path.join(script_dir,
-                                           "yaml",
-                                           "slurm.yaml")) as file:
-                        slurm_settings = yaml.full_load(file)
+        #load slurm settings  
+        with open(os.path.join(script_dir,
+                                   "yaml",
+                                   "slurm.yaml")) as file:
+                slurm_settings = yaml.full_load(file)
+        
+        threads = str(slurm_settings["TT-Seq"]["STAR_CPU"])
+        mem = str(slurm_settings["TT-Seq"]["STAR_mem"])
+        time = str(slurm_settings["TT-Seq"]["STAR_time"])
+        account = slurm_settings["groupname"]
+        partition = slurm_settings["TT-Seq"]["partition"]
+        #email = slurm_settings["email"]
+        
+        #create slurm bash script for splitting bam files
+                        
+        print("Generating slurm_STAR.sh")
+        script = os.path.join(work_dir,"slurm","slurm_STAR.sh")
+        script = open(script, "w")  
+        script.write("#!/bin/bash" + "\n")
+        script.write("\n")
+        script.write("#SBATCH -A " + account + "\n")
+        script.write("#SBATCH --mail-type=FAIL" + "\n")
+        script.write("#SBATCH --mail-type=END" + "\n")
+        script.write("#SBATCH -p " + partition + "\n")
+        script.write("#SBATCH -D " + work_dir + "\n")
+        script.write("#SBATCH -o slurm/slurm_STAR_%a.log" + "\n")
+        script.write("#SBATCH -c " + threads + "\n")
+        script.write("#SBATCH -t " + time + "\n")
+        script.write("#SBATCH --mem=" + mem + "\n")
+        script.write("#SBATCH -J " + "STAR" + "\n")
+        script.write("#SBATCH -a " + "1-" + str(len(file_list) * 4) + "\n")
+        script.write("\n")
+        script.write("sed -n ${SLURM_ARRAY_TASK_ID}p slurm/slurm_STAR.sh | bash")
+        script.close()
                 
-                threads = str(slurm_settings["TT-Seq"]["STAR_CPU"])
-                mem = str(slurm_settings["TT-Seq"]["STAR_mem"])
-                time = str(slurm_settings["TT-Seq"]["STAR_time"])
-                account = slurm_settings["groupname"]
-                partition = slurm_settings["TT-Seq"]["partition"]
-                #email = slurm_settings["email"]
-                
-                #create slurm bash script for splitting bam files
-                                
-                print("Generating slurm_STAR.sh")
-                script = os.path.join(work_dir,"slurm","slurm_STAR.sh")
-                script = open(script, "w")  
-                script.write("#!/bin/bash" + "\n")
-                script.write("\n")
-                script.write("#SBATCH -A " + account + "\n")
-                script.write("#SBATCH --mail-type=FAIL" + "\n")
-                script.write("#SBATCH --mail-type=END" + "\n")
-                script.write("#SBATCH -p " + partition + "\n")
-                script.write("#SBATCH -D " + work_dir + "\n")
-                script.write("#SBATCH -o slurm/slurm_STAR_%a.log" + "\n")
-                script.write("#SBATCH -c " + threads + "\n")
-                script.write("#SBATCH -t " + time + "\n")
-                script.write("#SBATCH --mem=" + mem + "\n")
-                script.write("#SBATCH -J " + "STAR" + "\n")
-                script.write("#SBATCH -a " + "1-" + str(len(file_list) * 4) + "\n")
-                script.write("\n")
-                script.write("sed -n ${SLURM_ARRAY_TASK_ID}p slurm/slurm_STAR.sh | bash")
-                script.close()
-                
-                #run slurm script
-                if job_id_trim is None:
-                    job_id_align = subprocess.check_output(f"sbatch {script} | cut -d ' ' -f 4", shell = True)
-                    return(job_id_align)
-                else:
-                    job_id_align = subprocess.check_output(f"sbatch --dependency=afterok:{job_id_trim} {script} | cut -d ' ' -f 4", shell = True)  
-                    return(job_id_align)
+        #run slurm script
+        if job_id_trim is None:
+            job_id_align = subprocess.check_output(f"sbatch {script} | cut -d ' ' -f 4", shell = True)
+            return(job_id_align)
+        else:
+            job_id_align = subprocess.check_output(f"sbatch --dependency=afterok:{job_id_trim} {script} | cut -d ' ' -f 4", shell = True)  
+            return(job_id_align)
             '''
             CREATE SEPARATE FUNCTION FOR SORTING BAM FILES
             #only sort hg38 bam files (it is better for HTSeq to use unsorted BAM files)
