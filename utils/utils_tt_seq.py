@@ -53,6 +53,11 @@ def STAR(work_dir, threads, script_dir, tt_seq_settings, genome, slurm, job_id_t
             bam = os.path.join(work_dir,"bam",genome,sample,sample+"Aligned.out.bam")
             sorted_bam= bam.replace("Aligned.out.bam","_sorted.bam")
             
+            if slurm == True:
+                with open(os.path.join(script_dir,"yaml","slurm.yaml")) as file:
+                    slurm_settings = yaml.full_load(file)
+                threads = str(slurm_settings["TT-Seq"]["STAR_CPU"])
+            
             #create STAR command
             star = ["STAR", "--runThreadN", threads,"--runMode", "alignReads", "--genomeDir", index,
                     "--readFilesIn", read1, read2, "--readFilesCommand", "zcat", "--quantMode",
@@ -73,16 +78,16 @@ def STAR(work_dir, threads, script_dir, tt_seq_settings, genome, slurm, job_id_t
                 #create csv files with STAR commands for slurm job
                 if not utils.file_exists(bam):
                     csv = open(os.path.join(work_dir,"slurm","slurm_STAR.csv"), "a")  
-                    csv.write(" ".join(star))
+                    csv.write(" ".join(star) +"\n")
                     csv.close()    
-                
-        #load slurm settings  
-        with open(os.path.join(script_dir,
-                                   "yaml",
-                                   "slurm.yaml")) as file:
-                slurm_settings = yaml.full_load(file)
         
-        threads = str(slurm_settings["TT-Seq"]["STAR_CPU"])
+        #if alignment has already been done return none
+        csv = os.path.join(work_dir,"slurm","slurm_STAR.csv")
+        if not os.path.exists(csv):
+            print("Skipping STAR alignment (already performed for all files)")
+            return(None)        
+        
+        #load slurm settings  
         mem = str(slurm_settings["TT-Seq"]["STAR_mem"])
         time = str(slurm_settings["TT-Seq"]["STAR_time"])
         account = slurm_settings["groupname"]
