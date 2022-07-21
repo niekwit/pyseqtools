@@ -747,6 +747,10 @@ def trimSLURM(script_dir, work_dir):
     
     #write trim commands to file for slurm job array
     #trim_galore should be in $PATH
+    csv = os.path.join(work_dir,"slurm","slurm_trim.csv")
+    if not os.path.exists(csv):
+        os.remove(csv)
+    
     for read1 in read1_list:
         read2 = read1.replace("R1_001." + extension,"R2_001." + extension)
         out_file1 = read1.split(".",1)[0] + "_val_1.fq.gz"
@@ -756,11 +760,12 @@ def trimSLURM(script_dir, work_dir):
             trim_galore = ["trim_galore","-j", str(threads), "-o",
                            os.path.join(work_dir,"trim"), "--paired", read1, read2, "\n"]
             trim_galore = " ".join(trim_galore)
-            csv = open(os.path.join(work_dir,"slurm","slurm_trim.csv"), "a")  
+            csv = open(csv, "a")  
             csv.write(trim_galore)
             csv.close()
             
     #if trimming has already been done return none
+    csv = os.path.join(work_dir,"slurm","slurm_trim.csv")
     with open(csv) as f:
         count = sum(1 for _ in f)
     
