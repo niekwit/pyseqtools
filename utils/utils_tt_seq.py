@@ -111,13 +111,14 @@ def STAR(work_dir, threads, script_dir, tt_seq_settings, genome, slurm, job_id_t
         script.write("#SBATCH -t " + time + "\n")
         script.write("#SBATCH --mem=" + mem + "\n")
         script.write("#SBATCH -J " + "STAR" + "\n")
-        script.write("#SBATCH -a " + "1-" + str(len(file_list) * 4) + "\n")
+        script.write("#SBATCH -a " + "1-" + str(len(file_list)) + "\n")
         script.write("\n")
         script.write("sed -n ${SLURM_ARRAY_TASK_ID}p slurm/slurm_STAR.sh | bash")
         script.close()
                 
         #run slurm script
         if job_id_trim is None:
+            script = os.path.join(work_dir,"slurm","slurm_STAR.sh")
             job_id_align = subprocess.check_output(f"sbatch {script} | cut -d ' ' -f 4", shell = True)
             return(job_id_align)
         else:
