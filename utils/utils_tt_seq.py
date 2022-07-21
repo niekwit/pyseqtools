@@ -147,7 +147,7 @@ def STAR(work_dir, threads, script_dir, tt_seq_settings, genome, slurm, job_id_t
     index = tt_seq_settings["STAR"][genome]
     puts(colored.green(f"Aligning fastq files to {genome} with STAR"))
     job_id_align = align(work_dir,file_list, index, threads, genome, slurm)
-    job_id_align = job_id_align.decode("utf-8").relpace("\n","")
+    job_id_align = job_id_align.decode("utf-8").replace("\n","")
     print(f"Alignment completed (Job id {job_id_align})")
     return(job_id_align)
     
