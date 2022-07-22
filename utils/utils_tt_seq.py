@@ -168,7 +168,10 @@ def STAR(work_dir, threads, script_dir, tt_seq_settings, genome, slurm, job_id_t
                 bam_number = len(glob.glob(os.path.join(work_dir,"bam","R64-1-1", "*", "*Aligned.out.bam")))
             
             #get number of align commands
-            csv = script_ = os.path.join(work_dir,"slurm",f"slurm_STAR_{genome}.csv")
+            csv = os.path.join(work_dir,"slurm",f"slurm_STAR_{genome}.csv")
+            if os.path.isfile(csv) == False: #if the slurm csv file does not exist, then no alignment has previously been run
+                return(False)
+            
             commands = int(subprocess.check_output(f"cat {csv} | wc -l", shell = True).decode("utf-8"))
             
             #check if number of bam files is the same as align commands number:

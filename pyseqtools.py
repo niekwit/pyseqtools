@@ -759,7 +759,6 @@ def main():
         
         #quality trim fastq files and align
         align=args["align"]
-        
         if align != None:
             slurm = args["slurm"]
             if slurm == True:
