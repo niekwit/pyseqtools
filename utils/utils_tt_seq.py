@@ -11,33 +11,32 @@ from pathlib import Path
 import tempfile
 
 from clint.textui import colored, puts
-try:
-    import pysam
-except ModuleNotFoundError:
-    pass
+import pysam
 
 script_dir = os.path.abspath(os.path.dirname(__file__))
 script_dir = os.path.dirname(script_dir)
 sys.path.append(os.path.join(script_dir, "utils"))
 import utils_general as utils
 
-
         
-def STAR(work_dir, threads, script_dir, tt_seq_settings, genome, slurm, job_id_trim=None):
+def STAR(work_dir, threads, script_dir, tt_seq_settings, genome, slurm=False, job_id_trim=None):
     '''
-    based on https://github.com/crickbabs/DRB_TT-seq/
+    Alignment of trimmed fastq files with STAR.
+    Based on https://github.com/crickbabs/DRB_TT-seq/
+    If running on the HPC, this function will generate the SLURM script for parallel alignments
     '''
-    if slurm == False:
-        file_list = glob.glob(os.path.join(work_dir,"trim","*_val_1.fq.gz"))
-    else:
-        extension = utils.get_extension(work_dir)
-        file_list = glob.glob(os.path.join(work_dir, "raw-data","*R1_001." + extension))
-        file_list = [x.split(".",1)[0] + "_val_1.fq.gz" for x in file_list]
-        file_list = [x.replace("raw-data", "trim") for x in file_list]
-        
     
     #function for alignment with STAR
-    def align(work_dir,file_list, index, threads, genome, slurm):
+    def align(work_dir, index, threads, genome, slurm):
+        #get list of trimmed fastq files
+        if slurm == False:
+            file_list = glob.glob(os.path.join(work_dir,"trim","*_val_1.fq.gz"))
+        else:
+            extension = utils.get_extension(work_dir)
+            file_list = glob.glob(os.path.join(work_dir, "raw-data","*R1_001." + extension))
+            file_list = [x.split(".",1)[0] + "_val_1.fq.gz" for x in file_list]
+            file_list = [x.replace("raw-data", "trim") for x in file_list]
+        
         #create empty csv file for commands
         Path(os.path.join(work_dir,"slurm",f"slurm_STAR_{genome}.csv")).touch()
         
@@ -55,7 +54,7 @@ def STAR(work_dir, threads, script_dir, tt_seq_settings, genome, slurm, job_id_t
             else: 
                 #each dir should have a unique name otherwise parallel alignments cannot be run
                 temp_dir = tempfile.mkdtemp()
-                os.remove(temp_dir)
+                shutil.rmtree(temp_dir)
             
             #create output dir
             os.makedirs(os.path.join(work_dir,"bam",genome,sample), exist_ok = True)
@@ -77,8 +76,8 @@ def STAR(work_dir, threads, script_dir, tt_seq_settings, genome, slurm, job_id_t
                     "PL:illumina", "--outSAMtype","BAM", "Unsorted", "--outTmpDir", temp_dir,
                     "--outFileNamePrefix", os.path.join(work_dir,"bam",genome,sample,sample)]
             
-            #run STAR
             if slurm == False:
+                #run STAR locally
                 puts(colored.green(f"Aligning {sample} to {genome}"))
                 if not utils.file_exists(sorted_bam):
                     utils.write2log(work_dir, " ".join(star), "" )
@@ -157,44 +156,45 @@ def STAR(work_dir, threads, script_dir, tt_seq_settings, genome, slurm, job_id_t
                 pass #to do
             '''     
     
-        def alignCheckCluster(work_dir,genome):
-            '''
-            check if alignment has already been done on cluster
-            '''
-            #get number of output bam files
-            if genome != "R64-1-1":
-                bam_number = len(glob.glob(os.path.join(work_dir,"bam",genome, "*", "*_sorted.bam")))
-            else:
-                bam_number = len(glob.glob(os.path.join(work_dir,"bam","R64-1-1", "*", "*Aligned.out.bam")))
-            
-            #get number of align commands
-            csv = os.path.join(work_dir,"slurm",f"slurm_STAR_{genome}.csv")
-            if os.path.isfile(csv) == False: #if the slurm csv file does not exist, then no alignment has previously been run
-                return(False)
-            
-            commands = int(subprocess.check_output(f"cat {csv} | wc -l", shell = True).decode("utf-8"))
-            
-            #check if number of bam files is the same as align commands number:
-            if bam_number == commands:
-                return(True)
-            else:
-                return(False)
-            
-        #align trimmed reads to selected genome
-        index = tt_seq_settings["STAR"][genome]
-        puts(colored.green(f"Aligning fastq files to {genome} with STAR"))
-        if alignCheckCluster(work_dir, genome) == False:
-            align(work_dir,file_list, index, threads, genome, slurm)
+    def alignPerformedCluster(work_dir,genome):
+        '''
+        To check if alignment has already been done on cluster
+        '''
+        #get number of output bam files
+        if genome != "R64-1-1":
+            bam_number = len(glob.glob(os.path.join(work_dir,"bam",genome, "*", "*_sorted.bam")))
         else:
-            print(f"Skipping STAR alignment, output BAM files for {genome} already detected")
-           
-        #align trimmed reads to yeast genome (spike-in)
-        puts(colored.green("Aligning fastq files to R64-1-1 (spike-in) with STAR"))
-        yeast_index = tt_seq_settings["STAR"]["yeast"]
-        if alignCheckCluster(work_dir, "R64-1-1") == False:
-            align(work_dir,file_list, yeast_index, threads,"R64-1-1", slurm)
+            bam_number = len(glob.glob(os.path.join(work_dir,"bam","R64-1-1", "*", "*Aligned.out.bam")))
+        
+        #get number of align commands
+        csv = os.path.join(work_dir,"slurm",f"slurm_STAR_{genome}.csv")
+        if not os.path.isfile(csv): #if the slurm csv file does not exist, then no alignments have previously been run at all 
+            return(False)
+        
+        commands = int(subprocess.check_output(f"cat {csv} | wc -l", shell = True).decode("utf-8"))
+        
+        #check if number of bam files is the same as align commands number:
+        if bam_number == commands:
+            return(True)
         else:
-            print("Skipping STAR alignment, output BAM files for R64-1-1 already detected")
+            return(False)
+            
+    #align trimmed reads to selected genome
+    index = tt_seq_settings["STAR"][genome]
+    puts(colored.green(f"Aligning fastq files to {genome} with STAR"))
+    if alignPerformedCluster(work_dir, genome) == False:
+        print("test")
+        align(work_dir, index, threads, genome, slurm)
+    else:
+        print(f"Skipping STAR alignment, output BAM files for {genome} already detected")
+       
+    #align trimmed reads to yeast genome (spike-in)
+    puts(colored.green("Aligning fastq files to R64-1-1 (spike-in) with STAR"))
+    yeast_index = tt_seq_settings["STAR"]["yeast"]
+    if alignPerformedCluster(work_dir, "R64-1-1") == False:
+        align(work_dir, yeast_index, threads,"R64-1-1", slurm)
+    else:
+        print("Skipping STAR alignment, output BAM files for R64-1-1 already detected")
     
     #index all bam files
     if slurm == False:

@@ -766,7 +766,7 @@ def main():
                 tt_seq_utils.STAR(work_dir, threads, script_dir, tt_seq_settings, genome, slurm, job_id_trim)
             else:
                 utils.trim(script_dir, threads, work_dir)
-                tt_seq_utils.STAR(work_dir, threads, script_dir, tt_seq_settings, genome, slurm)
+                tt_seq_utils.STAR(work_dir, threads, script_dir, tt_seq_settings, genome)
             
         #perform deduplication
         dedup = args["deduplication"]
