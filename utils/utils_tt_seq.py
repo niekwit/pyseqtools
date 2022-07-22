@@ -8,6 +8,7 @@ import shutil
 import pandas as pd
 import yaml
 from pathlib import Path
+import tempfile
 
 from clint.textui import colored, puts
 try:
@@ -47,9 +48,14 @@ def STAR(work_dir, threads, script_dir, tt_seq_settings, genome, slurm, job_id_t
             sample = os.path.basename(read1).replace("_R1_001_val_1.fq.gz","")
             
             #create temp dir path for STAR and make sure it does not exist
-            temp_dir = os.path.join(work_dir,"tmp")
-            if os.path.exists(temp_dir):
-                shutil.rmtree(temp_dir)
+            if slurm == False:
+                temp_dir = os.path.join(work_dir,"tmp")
+                if os.path.exists(temp_dir):
+                    shutil.rmtree(temp_dir)
+            else: 
+                #each dir should have a unique name otherwise parallel alignments cannot be created
+                temp_dir = tempfile.mkdtemp()
+                os.remove(temp_dir)
             
             #create output dir
             os.makedirs(os.path.join(work_dir,"bam",genome,sample), exist_ok = True)
@@ -163,7 +169,8 @@ def STAR(work_dir, threads, script_dir, tt_seq_settings, genome, slurm, job_id_t
         utils.indexBam(work_dir, threads, "R64-1-1")
 
 
-
+def bamSortSTAR():
+    pass
 
 
 def hisat2(work_dir, threads, tt_seq_settings, genome):
