@@ -110,6 +110,7 @@ def STAR(work_dir, threads, script_dir, tt_seq_settings, genome, slurm=False, jo
             #create slurm bash script for splitting bam files
                             
             print(f"Generating slurm_STAR_{genome}.sh")
+            commands = int(subprocess.check_output(f"cat {csv} | wc -l", shell = True).decode("utf-8"))
             script_ = os.path.join(work_dir,"slurm",f"slurm_STAR_{genome}.sh")
             script = open(script_, "w")  
             script.write("#!/bin/bash" + "\n")
@@ -124,7 +125,7 @@ def STAR(work_dir, threads, script_dir, tt_seq_settings, genome, slurm=False, jo
             script.write("#SBATCH -t " + slurm_time + "\n")
             script.write("#SBATCH --mem=" + mem + "\n")
             script.write("#SBATCH -J " + "STAR_"+genome + "\n")
-            script.write("#SBATCH -a " + "1-" + str(len(file_list)) + "\n")
+            script.write("#SBATCH -a " + "1-" + str(commands) + "\n")
             script.write("\n")
             script.write("sed -n ${SLURM_ARRAY_TASK_ID}p slurm/slurm_STAR.csv | bash")
             script.close()
