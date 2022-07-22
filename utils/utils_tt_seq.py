@@ -85,6 +85,7 @@ def STAR(work_dir, threads, script_dir, tt_seq_settings, genome, slurm=False, jo
             else:
                 #create csv files with STAR commands for slurm job
                 if not utils.file_exists(bam):
+                    print(star)
                     csv = open(os.path.join(work_dir,"slurm",f"slurm_STAR_{genome}.csv"), "a")  
                     csv.write(" ".join(star) +"\n")
                     csv.close()    
