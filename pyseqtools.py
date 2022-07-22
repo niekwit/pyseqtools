@@ -728,6 +728,8 @@ def main():
     
     
     def ttSeq(args, script_dir):
+        slurm = args["slurm"]
+        
         #set thread count for processing
         max_threads = str(multiprocessing.cpu_count())
         threads = args["threads"]
