@@ -188,7 +188,7 @@ def STAR(work_dir, threads, script_dir, tt_seq_settings, genome, slurm, job_id_t
         #align trimmed reads to yeast genome (spike-in)
         puts(colored.green("Aligning fastq files to R64-1-1 (spike-in) with STAR"))
         yeast_index = tt_seq_settings["STAR"]["yeast"]
-        if alignCheckCluster(work_dir, genome) == False:
+        if alignCheckCluster(work_dir, "R64-1-1") == False:
             align(work_dir,file_list, yeast_index, threads,"R64-1-1", slurm)
         else:
             print("Skipping STAR alignment, output BAM files for R64-1-1 already detected")
