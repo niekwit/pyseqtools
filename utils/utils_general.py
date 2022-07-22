@@ -444,27 +444,31 @@ def deduplicationBam(script_dir, work_dir, threads, args):
     plt.savefig(save_file)
 
 
-def indexBam(work_dir, threads, genome="hg38"):
-    print("Indexing BAM files")
-    file_list = glob.glob(os.path.join(work_dir,"bam","*.bam"))
+def indexBam(work_dir, threads, genome="hg38", slurm=False):
+    '''
+    Index BAM files in bam/ directory using samtools
+
+    '''
     
-    #directory structure for TT-Seq experiments is different
-    if len(file_list) == 0:
-        file_list = glob.glob(os.path.join(work_dir, "bam", genome, "*", "*_sorted.bam"))
+    if slurm == False:
+        print("Indexing BAM files")
+        file_list = glob.glob(os.path.join(work_dir,"bam","*.bam"))
+        
+        #directory structure for TT-Seq experiments is different
         if len(file_list) == 0:
-            return("ERROR: no bam files found to be indexed")
-
-    #index bam files
-    #also check if bam files have been indexed
-    index_file_list = [bam + ".bai" for bam in file_list]
-
-    for bai, bam in zip(index_file_list, file_list):
-        if not file_exists(bai):
-            pysam.index("-@", str(threads), bam)
-
-
-def indexBamSLURM(work_dir, threads, genome="hg38"):
-    pass
+            file_list = glob.glob(os.path.join(work_dir, "bam", genome, "*", "*_sorted.bam"))
+            if len(file_list) == 0:
+                return("ERROR: no bam files found to be indexed")
+    
+        #index bam files
+        #also check if bam files have been indexed
+        index_file_list = [bam + ".bai" for bam in file_list]
+    
+        for bai, bam in zip(index_file_list, file_list):
+            if not file_exists(bai):
+                pysam.index("-@", str(threads), bam)
+    else:
+        pass #to do
 
 
 def createBigWig(work_dir, threads):

@@ -764,19 +764,10 @@ def main():
             slurm = args["slurm"]
             if slurm == True:
                 job_id_trim = utils.trimSLURM(script_dir, work_dir)
-                #print(f"Trim_galore job id: {job_id_trim}")
+                tt_seq_utils.STAR(work_dir, threads, script_dir, tt_seq_settings, genome, slurm, job_id_trim)
             else:
                 utils.trim(script_dir, threads, work_dir)
-            
-            
-            tt_seq_utils.STAR(work_dir, threads, script_dir, tt_seq_settings, genome, slurm, job_id_trim)
-        
-        
-        #split bam files into forward and reverse strand files
-        splitBAM = args["splitBAM"]
-        if splitBAM == True:
-            if slurm == False:
-                tt_seq_utils.splitBam(threads, work_dir)
+                tt_seq_utils.STAR(work_dir, threads, script_dir, tt_seq_settings, genome, slurm)
             
         #perform deduplication
         dedup = args["deduplication"]
@@ -785,6 +776,12 @@ def main():
                 utils.deduplicationBam(script_dir, work_dir, threads, args)
                 utils.indexBam(work_dir, threads)
         
+        #split bam files into forward and reverse strand files
+        splitBAM = args["splitBAM"]
+        if splitBAM == True:
+            if slurm == False:
+                tt_seq_utils.splitBam(threads, work_dir)
+            
         #get scale factors from yeast spike-in
         sizeFactors = args["sizeFactors"]
         if sizeFactors == True:

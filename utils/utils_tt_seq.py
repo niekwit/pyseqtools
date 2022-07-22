@@ -23,7 +23,7 @@ import utils_general as utils
 
 
         
-def STAR(work_dir, threads, script_dir, tt_seq_settings, genome, slurm, job_id_trim):
+def STAR(work_dir, threads, script_dir, tt_seq_settings, genome, slurm, job_id_trim=None):
     '''
     based on https://github.com/crickbabs/DRB_TT-seq/
     '''
@@ -53,7 +53,7 @@ def STAR(work_dir, threads, script_dir, tt_seq_settings, genome, slurm, job_id_t
                 if os.path.exists(temp_dir):
                     shutil.rmtree(temp_dir)
             else: 
-                #each dir should have a unique name otherwise parallel alignments cannot be created
+                #each dir should have a unique name otherwise parallel alignments cannot be run
                 temp_dir = tempfile.mkdtemp()
                 os.remove(temp_dir)
             
@@ -63,6 +63,7 @@ def STAR(work_dir, threads, script_dir, tt_seq_settings, genome, slurm, job_id_t
             bam = os.path.join(work_dir,"bam",genome,sample,sample+"Aligned.out.bam")
             sorted_bam= bam.replace("Aligned.out.bam","_sorted.bam")
             
+            #if running on cluster, get thread count from cluster.yaml
             if slurm == True:
                 with open(os.path.join(script_dir,"yaml","slurm.yaml")) as file:
                     slurm_settings = yaml.full_load(file)
@@ -89,6 +90,7 @@ def STAR(work_dir, threads, script_dir, tt_seq_settings, genome, slurm, job_id_t
                     csv.write(" ".join(star) +"\n")
                     csv.close()    
         
+        '''
         #if alignment has already been done return none
         csv = os.path.join(work_dir,"slurm",f"slurm_STAR_{genome}.csv")
         command_number = subprocess.check_output(f'cat {csv} | wc -l', shell = True).decode("utf-8").replace("\n","")
@@ -96,46 +98,47 @@ def STAR(work_dir, threads, script_dir, tt_seq_settings, genome, slurm, job_id_t
         if len(command_number) == 0:
             print("Skipping STAR alignment (already performed for all files)")
             return(None)        
-        
-        #load slurm settings  
-        mem = str(slurm_settings["TT-Seq"]["STAR_mem"])
-        slurm_time = str(slurm_settings["TT-Seq"]["STAR_time"])
-        account = slurm_settings["groupname"]
-        partition = slurm_settings["TT-Seq"]["partition"]
-        #email = slurm_settings["email"]
-        
-        #create slurm bash script for splitting bam files
-                        
-        print("Generating slurm_STAR.sh")
-        script_ = os.path.join(work_dir,"slurm",f"slurm_STAR_{genome}.sh")
-        script = open(script_, "w")  
-        script.write("#!/bin/bash" + "\n")
-        script.write("\n")
-        script.write("#SBATCH -A " + account + "\n")
-        script.write("#SBATCH --mail-type=FAIL" + "\n")
-        script.write("#SBATCH --mail-type=END" + "\n")
-        script.write("#SBATCH -p " + partition + "\n")
-        script.write("#SBATCH -D " + work_dir + "\n")
-        script.write("#SBATCH -o slurm/slurm_STAR_%a.log" + "\n")
-        script.write("#SBATCH -c " + threads + "\n")
-        script.write("#SBATCH -t " + slurm_time + "\n")
-        script.write("#SBATCH --mem=" + mem + "\n")
-        script.write("#SBATCH -J " + "STAR_"+genome + "\n")
-        script.write("#SBATCH -a " + "1-" + str(len(file_list)) + "\n")
-        script.write("\n")
-        script.write("sed -n ${SLURM_ARRAY_TASK_ID}p slurm/slurm_STAR.csv | bash")
-        script.close()
-                
-        #run slurm script
-        if job_id_trim is None:
-            script = os.path.join(work_dir,"slurm",f"slurm_STAR_{genome}.sh")
-            print("Submitting slurm script to cluster")
-            job_id_align = subprocess.check_output(f"sbatch {script} | cut -d ' ' -f 4", shell = True)
-            return(job_id_align)
-        else:
-            print("Submitting slurm script to cluster")
-            job_id_align = subprocess.check_output(f"sbatch --dependency=afterok:{job_id_trim} {script} | cut -d ' ' -f 4", shell = True)  
-            return(job_id_align)
+        '''
+        if slurm == True:
+            #load slurm settings  
+            mem = str(slurm_settings["TT-Seq"]["STAR_mem"])
+            slurm_time = str(slurm_settings["TT-Seq"]["STAR_time"])
+            account = slurm_settings["groupname"]
+            partition = slurm_settings["TT-Seq"]["partition"]
+            #email = slurm_settings["email"]
+            
+            #create slurm bash script for splitting bam files
+                            
+            print("Generating slurm_STAR.sh")
+            script_ = os.path.join(work_dir,"slurm",f"slurm_STAR_{genome}.sh")
+            script = open(script_, "w")  
+            script.write("#!/bin/bash" + "\n")
+            script.write("\n")
+            script.write("#SBATCH -A " + account + "\n")
+            script.write("#SBATCH --mail-type=FAIL" + "\n")
+            script.write("#SBATCH --mail-type=END" + "\n")
+            script.write("#SBATCH -p " + partition + "\n")
+            script.write("#SBATCH -D " + work_dir + "\n")
+            script.write("#SBATCH -o slurm/slurm_STAR_%a.log" + "\n")
+            script.write("#SBATCH -c " + threads + "\n")
+            script.write("#SBATCH -t " + slurm_time + "\n")
+            script.write("#SBATCH --mem=" + mem + "\n")
+            script.write("#SBATCH -J " + "STAR_"+genome + "\n")
+            script.write("#SBATCH -a " + "1-" + str(len(file_list)) + "\n")
+            script.write("\n")
+            script.write("sed -n ${SLURM_ARRAY_TASK_ID}p slurm/slurm_STAR.csv | bash")
+            script.close()
+                    
+            #run slurm script
+            if job_id_trim is None:
+                script = os.path.join(work_dir,"slurm",f"slurm_STAR_{genome}.sh")
+                print("Submitting slurm script to cluster")
+                job_id_align = subprocess.check_output(f"sbatch {script} | cut -d ' ' -f 4", shell = True)
+                return(job_id_align)
+            else:
+                print("Submitting slurm script to cluster")
+                job_id_align = subprocess.check_output(f"sbatch --dependency=afterok:{job_id_trim} {script} | cut -d ' ' -f 4", shell = True)  
+                return(job_id_align)
             '''
             CREATE SEPARATE FUNCTION FOR SORTING BAM FILES
             #only sort hg38 bam files (it is better for HTSeq to use unsorted BAM files)
@@ -153,15 +156,42 @@ def STAR(work_dir, threads, script_dir, tt_seq_settings, genome, slurm, job_id_t
             else:
                 pass #to do
             '''     
-    #align trimmed reads to selected genome    
-    index = tt_seq_settings["STAR"][genome]
-    puts(colored.green(f"Aligning fastq files to {genome} with STAR"))
-    align(work_dir,file_list, index, threads, genome, slurm)
-       
-    #align trimmed reads to yeast genome (spike-in)
-    puts(colored.green("Aligning fastq files to R64-1-1 (spike-in) with STAR"))
-    yeast_index = tt_seq_settings["STAR"]["yeast"]
-    align(work_dir,file_list, yeast_index, threads,"R64-1-1", slurm)
+    
+        def alignCheckCluster(work_dir,genome):
+            '''
+            check if alignment has already been done on cluster
+            '''
+            #get number of output bam files
+            if genome != "R64-1-1":
+                bam_number = len(glob.glob(os.path.join(work_dir,"bam",genome, "*", "*_sorted.bam")))
+            else:
+                bam_number = len(glob.glob(os.path.join(work_dir,"bam","R64-1-1", "*", "*Aligned.out.bam")))
+            
+            #get number of align commands
+            csv = script_ = os.path.join(work_dir,"slurm",f"slurm_STAR_{genome}.csv")
+            commands = int(subprocess.check_output(f"cat {csv} | wc -l", shell = True).decode("utf-8"))
+            
+            #check if number of bam files is the same as align commands number:
+            if bam_number == commands:
+                return(True)
+            else:
+                return(False)
+            
+        #align trimmed reads to selected genome
+        index = tt_seq_settings["STAR"][genome]
+        puts(colored.green(f"Aligning fastq files to {genome} with STAR"))
+        if alignCheckCluster(work_dir, genome) == False:
+            align(work_dir,file_list, index, threads, genome, slurm)
+        else:
+            print(f"Skipping STAR alignment, output BAM files for {genome} already detected")
+           
+        #align trimmed reads to yeast genome (spike-in)
+        puts(colored.green("Aligning fastq files to R64-1-1 (spike-in) with STAR"))
+        yeast_index = tt_seq_settings["STAR"]["yeast"]
+        if alignCheckCluster(work_dir, genome) == False:
+            align(work_dir,file_list, yeast_index, threads,"R64-1-1", slurm)
+        else:
+            print("Skipping STAR alignment, output BAM files for R64-1-1 already detected")
     
     #index all bam files
     if slurm == False:
@@ -173,28 +203,30 @@ def bamSortSTAR():
     pass
 
 
-def hisat2(work_dir, threads, tt_seq_settings, genome):
+def hisat2(work_dir, threads, tt_seq_settings, genome, slurm, job_id_trim):
     """
     Align TT-Seq quality trimmed paired-end files to genome with HISAT2
     """
-    
-    read1_list = glob.glob(os.path.join(work_dir,"trim","*_R1_001_val_1.fq.gz"))
-    hisat2_index = tt_seq_settings["hisat2"][genome]
-    os.path.makedirs(os.path.join(work_dir,"bam", genome), exist_ok=True)
-    
-    for read1 in read1_list:
-        read2 = read1.replace("_R1_001_val_1.fq.gz","_R2_001_val_1.fq.gz")
-        bam = os.path.join(work_dir,"bam", genome,os.path.basename(read1.replace("_R1_001_val_1.fq.gz","_sort.bam")))
-        sample = os.path.basename(read1.replace("_R1_001_val_1.fq.gz",""))
-        puts(colored.green(f"Aligning {sample} to {genome} with HISAT2"))
+    if slurm is False:
+        read1_list = glob.glob(os.path.join(work_dir,"trim","*_R1_001_val_1.fq.gz"))
+        hisat2_index = tt_seq_settings["hisat2"][genome]
+        os.path.makedirs(os.path.join(work_dir,"bam", genome), exist_ok=True)
         
-        if not utils.file_exists(bam):
-            hisat2 = ["hisat2", "-p", str(threads), "-x", hisat2_index,"-1", read1, "-2", read2,
-                      "2>>", os.path.join(work_dir,"align.log"), "|", "samtools", "view", "-q", "15", "-F", 
-                      "260", "-b", "-@", str(threads), "-", "|", "samtools", "sort", "-@", str(threads), "-",
-                      ">", bam]
-            utils.write2log(work_dir, " ".join(hisat2))
-            subprocess.call(hisat2)
+        for read1 in read1_list:
+            read2 = read1.replace("_R1_001_val_1.fq.gz","_R2_001_val_1.fq.gz")
+            bam = os.path.join(work_dir,"bam", genome,os.path.basename(read1.replace("_R1_001_val_1.fq.gz","_sort.bam")))
+            sample = os.path.basename(read1.replace("_R1_001_val_1.fq.gz",""))
+            puts(colored.green(f"Aligning {sample} to {genome} with HISAT2"))
+            
+            if not utils.file_exists(bam):
+                hisat2 = ["hisat2", "-p", str(threads), "-x", hisat2_index,"-1", read1, "-2", read2,
+                          "2>>", os.path.join(work_dir,"align.log"), "|", "samtools", "view", "-q", "15", "-F", 
+                          "260", "-b", "-@", str(threads), "-", "|", "samtools", "sort", "-@", str(threads), "-",
+                          ">", bam]
+                utils.write2log(work_dir, " ".join(hisat2))
+                subprocess.call(hisat2)
+    else:
+        pass #to do
 
 
 def splitBam(threads, work_dir, genome):
