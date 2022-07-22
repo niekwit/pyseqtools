@@ -32,6 +32,7 @@ def STAR(work_dir, threads, script_dir, tt_seq_settings, genome, slurm=False, jo
         if slurm == False:
             file_list = glob.glob(os.path.join(work_dir,"trim","*_val_1.fq.gz"))
         else:
+            #create trim output file list
             extension = utils.get_extension(work_dir)
             file_list = glob.glob(os.path.join(work_dir, "raw-data","*R1_001." + extension))
             file_list = [x.split(".",1)[0] + "_val_1.fq.gz" for x in file_list]
@@ -85,30 +86,18 @@ def STAR(work_dir, threads, script_dir, tt_seq_settings, genome, slurm=False, jo
             else:
                 #create csv files with STAR commands for slurm job
                 if not utils.file_exists(bam):
-                    print(star)
                     csv = open(os.path.join(work_dir,"slurm",f"slurm_STAR_{genome}.csv"), "a")  
                     csv.write(" ".join(star) +"\n")
-                    csv.close()    
-        
-        '''
-        #if alignment has already been done return none
-        csv = os.path.join(work_dir,"slurm",f"slurm_STAR_{genome}.csv")
-        command_number = subprocess.check_output(f'cat {csv} | wc -l', shell = True).decode("utf-8").replace("\n","")
+                    csv.close()   
 
-        if len(command_number) == 0:
-            print("Skipping STAR alignment (already performed for all files)")
-            return(None)        
-        '''
         if slurm == True:
             #load slurm settings  
             mem = str(slurm_settings["TT-Seq"]["STAR_mem"])
             slurm_time = str(slurm_settings["TT-Seq"]["STAR_time"])
             account = slurm_settings["groupname"]
             partition = slurm_settings["TT-Seq"]["partition"]
-            #email = slurm_settings["email"]
             
             #create slurm bash script for splitting bam files
-                            
             print(f"Generating slurm_STAR_{genome}.sh")
             csv = os.path.join(work_dir,"slurm",f"slurm_STAR_{genome}.csv")
             commands = int(subprocess.check_output(f"cat {csv} | wc -l", shell = True).decode("utf-8"))
@@ -117,8 +106,7 @@ def STAR(work_dir, threads, script_dir, tt_seq_settings, genome, slurm=False, jo
             script.write("#!/bin/bash" + "\n")
             script.write("\n")
             script.write("#SBATCH -A " + account + "\n")
-            script.write("#SBATCH --mail-type=FAIL" + "\n")
-            script.write("#SBATCH --mail-type=END" + "\n")
+            script.write("#SBATCH --mail-type=BEGIN,FAIL,END" + "\n")
             script.write("#SBATCH -p " + partition + "\n")
             script.write("#SBATCH -D " + work_dir + "\n")
             script.write("#SBATCH -o slurm/slurm_STAR_%a.log" + "\n")
@@ -128,7 +116,7 @@ def STAR(work_dir, threads, script_dir, tt_seq_settings, genome, slurm=False, jo
             script.write("#SBATCH -J " + "STAR_"+genome + "\n")
             script.write("#SBATCH -a " + "1-" + str(commands) + "\n")
             script.write("\n")
-            script.write("sed -n ${SLURM_ARRAY_TASK_ID}p slurm/slurm_STAR.csv | bash")
+            script.write("sed -n ${SLURM_ARRAY_TASK_ID}p slurm/slurm_STAR.csv | bash\n")
             script.close()
                     
             #run slurm script
@@ -209,7 +197,7 @@ def bamSortSTAR():
     pass
 
 
-def hisat2(work_dir, threads, tt_seq_settings, genome, slurm, job_id_trim):
+def hisat2(work_dir, threads, tt_seq_settings, genome, slurm=False, job_id_trim=None):
     """
     Align TT-Seq quality trimmed paired-end files to genome with HISAT2
     """
@@ -232,7 +220,24 @@ def hisat2(work_dir, threads, tt_seq_settings, genome, slurm, job_id_trim):
                 utils.write2log(work_dir, " ".join(hisat2))
                 subprocess.call(hisat2)
     else:
-        pass #to do
+        #if running on cluster, get thread count from cluster.yaml
+        if slurm == True:
+            with open(os.path.join(script_dir,"yaml","slurm.yaml")) as file:
+                slurm_settings = yaml.full_load(file)
+            threads = str(slurm_settings["TT-Seq"]["STAR_CPU"])
+        
+        #create file list of trimming output
+        extension = utils.get_extension(work_dir)
+        file_list = glob.glob(os.path.join(work_dir, "raw-data","*R1_001." + extension))
+        file_list = [x.split(".",1)[0] + "_val_1.fq.gz" for x in file_list]
+        file_list = [x.replace("raw-data", "trim") for x in file_list]
+        
+        #create empty csv file for commands
+        Path(os.path.join(work_dir,"slurm",f"slurm_STAR_{genome}.csv")).touch()
+        
+        for read1 in file_list:
+            read1 = read1.replace("_R1_001_val_1.fq.gz","_R2_001_val_2.fq.gz")
+            
 
 
 def splitBam(threads, work_dir, genome):
