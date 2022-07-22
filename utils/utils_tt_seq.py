@@ -108,7 +108,7 @@ def STAR(work_dir, threads, script_dir, tt_seq_settings, genome, slurm=False, jo
             
             #create slurm bash script for splitting bam files
                             
-            print("Generating slurm_STAR.sh")
+            print(f"Generating slurm_STAR_{genome}.sh")
             script_ = os.path.join(work_dir,"slurm",f"slurm_STAR_{genome}.sh")
             script = open(script_, "w")  
             script.write("#!/bin/bash" + "\n")
