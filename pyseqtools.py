@@ -318,6 +318,10 @@ def main():
                              required = False,
                              default = 'hg38',
                              help = "Choose reference genome (default is hg38)")
+    parser_ttseq.add_argument("--indexBAM",
+                             required = False,
+                             action = 'store_true',
+                             help = "Generate indeces for all available BAM files (for HPC only)")
     parser_ttseq.add_argument("--splitBAM",
                              required = False,
                              action = 'store_true',
@@ -767,7 +771,13 @@ def main():
             else:
                 utils.trim(script_dir, threads, work_dir)
                 tt_seq_utils.STAR(work_dir, threads, script_dir, tt_seq_settings, genome)
-            
+        
+        #index BAM files
+        indexBAM = args["indexBAM"]
+        if indexBAM == True:
+            if slurm == True:
+                utils.indexBam(work_dir, threads, slurm, script_dir)
+        
         #perform deduplication
         dedup = args["deduplication"]
         if slurm == False:

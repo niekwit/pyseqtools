@@ -17,6 +17,8 @@ from shutil import copy
 import gzip
 import shutil
 import re
+from pathlib import Path
+
 
 
 from clint.textui import colored, puts
@@ -444,14 +446,14 @@ def deduplicationBam(script_dir, work_dir, threads, args):
     plt.savefig(save_file)
 
 
-def indexBam(work_dir, threads, genome="hg38", slurm=False):
+def indexBam(work_dir, threads, genome="hg38", slurm=False, script_dir=None):
     '''
     Index BAM files in bam/ directory using samtools
 
     '''
     
     if slurm == False:
-        print("Indexing BAM files")
+        puts(colored.green("Indexing BAM files"))
         file_list = glob.glob(os.path.join(work_dir,"bam","*.bam"))
         
         #directory structure for TT-Seq experiments is different
@@ -466,10 +468,65 @@ def indexBam(work_dir, threads, genome="hg38", slurm=False):
     
         for bai, bam in zip(index_file_list, file_list):
             if not file_exists(bai):
+                print(os.path.basename(bam))
                 pysam.index("-@", str(threads), bam)
     else:
-        pass #to do
-
+        puts(colored.green("Indexing BAM files (SLURM)"))
+        #find all BAM files in working directory
+        file_list = list(Path(work_dir).rglob("*.bam"))
+        file_list = [x.as_posix() for x in file_list]
+        index_list = [x + ".bai" for x in file_list]
+        
+        #load slurm settings
+        with open(os.path.join(script_dir,"yaml","slurm.yaml")) as file:
+            slurm_settings = yaml.full_load(file)
+        threads = str(slurm_settings["samtools-index_CPU"])
+        mem = str(slurm_settings["samtools-index_mem"])
+        slurm_time = str(slurm_settings["samtools-index_time"])
+        account = slurm_settings["groupname"]
+        partition = slurm_settings["partition"]
+        
+        #set path for csv file that contains index commands and delete pre-existing one
+        csv = os.path.join(work_dir,"slurm","slurm_indexBAM.csv")
+        os.remove(csv)
+        
+        #create csv file with all index commands 
+        for bam,index in zip(file_list,index_list):
+            samtools = ["samtools", "index","-@", threads, bam]
+            if not file_exists(index):
+                csv = open(csv, "a")  
+                csv.write(" ".join(samtools) +"\n")
+                csv.close()
+        
+        #create slurm bash script
+        csv = os.path.join(work_dir,"slurm","slurm_indexBAM.csv")
+        commands = int(subprocess.check_output(f"cat {csv} | wc -l", shell = True).decode("utf-8"))
+        if commands == 0:
+            print("All BAM files have already been indexed")
+            return()
+        script_ = os.path.join(work_dir,"slurm","slurm_indexBAM.sh")
+        script = open(script_, "w")  
+        script.write("#!/bin/bash" + "\n")
+        script.write("\n")
+        script.write("#SBATCH -A " + account + "\n")
+        script.write("#SBATCH --mail-type=BEGIN,FAIL,END" + "\n")
+        script.write("#SBATCH -p " + partition + "\n")
+        script.write("#SBATCH -D " + work_dir + "\n")
+        script.write("#SBATCH -o slurm/slurm_indexBAM_%a.log" + "\n")
+        script.write("#SBATCH -c " + threads + "\n")
+        script.write("#SBATCH -t " + slurm_time + "\n")
+        script.write("#SBATCH --mem=" + mem + "\n")
+        script.write("#SBATCH -J " + "index" + "\n")
+        script.write("#SBATCH -a " + "1-" + str(commands) + "\n")
+        script.write("\n")
+        script.write("sed -n ${SLURM_ARRAY_TASK_ID}p " + csv +" | bash\n")
+        script.close()
+        
+        #run slurm script
+        script = os.path.join(work_dir,"slurm","slurm_indexBAM.sh")
+        print("Submitting SLURM script to cluster")
+        job_id_index = subprocess.check_output(f"sbatch {script} | cut -d ' ' -f 4", shell = True)
+        print(f"SLURM job submitted {job_id_index}")
 
 def createBigWig(work_dir, threads):
     #creates BigWig files for all existing BAM files

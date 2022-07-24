@@ -191,6 +191,8 @@ def STAR(work_dir, threads, script_dir, tt_seq_settings, genome, slurm=False, jo
     if slurm == False:
         utils.indexBam(work_dir, threads, genome)
         utils.indexBam(work_dir, threads, "R64-1-1")
+    else:
+        pass
 
 
 def bamSortSTAR():
