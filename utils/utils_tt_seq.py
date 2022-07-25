@@ -478,33 +478,85 @@ def splitBam(threads, work_dir, genome):
         
 def sizeFactors(work_dir, tt_seq_settings, slurm):
     """
+    Creates size factors based on yeast RNA spike-in for generating BigWig files
     Based on https://github.com/crickbabs/DRB_TT-seq/blob/master/bigwig.md with modifications
 
     """
-    puts(colored.green("Generating size factors for normalisation using DESeq2"))
-    #first prepare htseq-count input for DESeq2
-    print("Quantifying reads with HTSeq for DESeq2 input")
-    file_list = glob.glob(os.path.join(work_dir,"bam","R64-1-1","*","*Aligned.out.bam"))
-    rc_file = [os.path.join(work_dir, "htseq-count", os.path.basename(x.replace("_sorted.bam","_count.txt"))) for x in file_list] 
-    
+    puts(colored.green("Generating size factors for normalisation using HTSeq and DESeq2"))
     #create output dir
     os.makedirs(os.path.join(work_dir,"htseq-count"), exist_ok = True)
+    print("Quantifying reads with HTSeq")
     
+        
+    #first prepare htseq-count input for DESeq2    
+    file_list = glob.glob(os.path.join(work_dir,"bam","R64-1-1","*","*Aligned.out.bam"))
+    rc_file = [os.path.join(work_dir, "htseq-count", os.path.basename(x.replace("Aligned.out.bam","_count.txt"))) for x in file_list] 
+     
     #load yeast gtf file
-    gtf = tt_seq_settings["gtf-yeast"]
+    gtf = tt_seq_settings["gtf"]["yeast"]
     
     for bam,count_file in zip(file_list,rc_file):
                 
         if not utils.file_exists(count_file):
            htseq_count = ["htseq-count", "--quiet", "--format", "bam", "--stranded", "yes", bam, gtf, ">", count_file]
-           #utils.write2log(work_dir, " ".join(htseq_count), "" )
            print("Quantifying " + os.path.basename(bam) + " with htseq-count")
-           subprocess.call(htseq_count)
-   
-    #run DESeq2 to obtain size factors for normalisation
-    print("Creating size factors with DESeq2 with HTSeq files")
-    deseq2 = ["Rscript", os.path.join(script_dir, "R", "tt-seq_sizefactors.R")]
-    subprocess.call(deseq2)
+           if slurm == False:
+               utils.write2log(work_dir, " ".join(htseq_count), "" )
+               subprocess.call(htseq_count)
+           else:
+                #create csv file with htseq-count commands
+                csv = os.path.join(work_dir,"slurm","slurm_htseq.csv")
+                if os.path.exists(csv):
+                    os.remove(csv)
+    
+                for bam, count_file in zip(file_list,rc_file):
+                    if not utils.file_exists(count_file):
+                        csv = open(os.path.join(work_dir,"slurm","slurm_htseq.csv"), "a")  
+                        csv.write(" ".join(htseq_count) +"\n")
+                        csv.close() 
+    
+    if slurm == True:
+        #load SLURM settings
+        with open(os.path.join(script_dir,"yaml","slurm.yaml")) as file:
+            slurm_settings = yaml.full_load(file)
+        threads = str(slurm_settings["TT-Seq"]["htseq_CPU"])
+        
+        mem = str(slurm_settings["TT-Seq"]["htseq_mem"])
+        slurm_time = str(slurm_settings["htseq_time"])
+        account = slurm_settings["groupname"]
+        partition = slurm_settings["TT-Seq"]["partition"]
+         
+        
+        print("Generating slurm_htseq.sh")
+        csv = os.path.join(work_dir,"slurm","slurm_htseq.csv")
+        commands = int(subprocess.check_output(f"cat {csv} | wc -l", shell = True).decode("utf-8"))
+        script_ = os.path.join(work_dir,"slurm","slurm_htseq.sh")
+        script = open(script_, "w")  
+        script.write("#!/bin/bash" + "\n")
+        script.write("\n")
+        script.write("#SBATCH -A " + account + "\n")
+        script.write("#SBATCH --mail-type=BEGIN,FAIL,END" + "\n")
+        script.write("#SBATCH -p " + partition + "\n")
+        script.write("#SBATCH -D " + work_dir + "\n")
+        script.write("#SBATCH -o slurm/slurm_htseq_%a.log" + "\n")
+        script.write("#SBATCH -c " + threads + "\n")
+        script.write("#SBATCH -t " + slurm_time + "\n")
+        script.write("#SBATCH --mem=" + mem + "\n")
+        script.write("#SBATCH -J " + "htseq-count" +"\n")
+        script.write("#SBATCH -a " + "1-" + str(commands) + "\n")
+        script.write("\n")
+        script.write("sed -n ${SLURM_ARRAY_TASK_ID}p " + csv +" | bash\n")
+        script.close()
+       
+        #submit SLURM bash script to cluster
+        print("Submitting slurm_slurm_htseq to cluster")
+        script_ = os.path.join(work_dir,"slurm","slurm_htseq.sh")
+        job_id_htseq = subprocess.check_output(f"sbatch {script} | cut -d ' ' -f 4", shell = True)  
+        
+        #run DESeq2 to obtain size factors for normalisation
+        print("Submitting SLURM job for creating size factors with DESeq2 with HTSeq files")
+        deseq2 = ["sbatch", f"--dependency=afterok:{job_id_htseq}", "Rscript", os.path.join(script_dir, "R", "tt-seq_sizefactors.R")]
+        subprocess.call(deseq2)
     
     
 def ttSeqBigWig(work_dir, threads, tt_seq_settings, genome):
