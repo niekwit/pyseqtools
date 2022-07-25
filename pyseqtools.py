@@ -774,7 +774,8 @@ def main():
         
         #sort BAM files for SLURM job
         if slurm == True:
-                tt_seq_utils.bamSortSLURM(work_dir, job_id_align, genome="hg38")
+            pass    
+            #tt_seq_utils.bamSortSLURM(work_dir, job_id_align, genome="hg38")
         
         #index BAM files
         indexBAM = args["indexBAM"]

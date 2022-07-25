@@ -203,7 +203,7 @@ def bamSortSLURM(work_dir, job_id_align, genome="hg38"):
     #load SLURM settings
     with open(os.path.join(script_dir,"yaml","slurm.yaml")) as file:
         slurm_settings = yaml.full_load(file)
-    threads = str(slurm_settings["TT-Seq"]["STAR_CPU"])
+    threads = str(slurm_settings["samtools-sort_CPU"])
     
     mem = str(slurm_settings["samtools-sort_mem"])
     slurm_time = str(slurm_settings["samtools-sort_time"])
@@ -222,7 +222,7 @@ def bamSortSLURM(work_dir, job_id_align, genome="hg38"):
             csv.write(" ".join(samtools) +"\n")
             csv.close() 
     
-    #create slurm bash script for splitting bam files
+    #create slurm bash script 
     print("Generating slurm_sortBAM.sh")
     csv = os.path.join(work_dir,"slurm","slurm_sortBAM.csv")
     commands = int(subprocess.check_output(f"cat {csv} | wc -l", shell = True).decode("utf-8"))
