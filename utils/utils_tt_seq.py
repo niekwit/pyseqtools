@@ -109,7 +109,7 @@ def STAR(work_dir, threads, script_dir, tt_seq_settings, genome, slurm=False, jo
             script.write("#SBATCH --mail-type=BEGIN,FAIL,END" + "\n")
             script.write("#SBATCH -p " + partition + "\n")
             script.write("#SBATCH -D " + work_dir + "\n")
-            script.write("#SBATCH -o slurm/slurm_STAR_%a.log" + "\n")
+            script.write(f"#SBATCH -o slurm/slurm_STAR_%a_{genome}.log" + "\n")
             script.write("#SBATCH -c " + threads + "\n")
             script.write("#SBATCH -t " + slurm_time + "\n")
             script.write("#SBATCH --mem=" + mem + "\n")
