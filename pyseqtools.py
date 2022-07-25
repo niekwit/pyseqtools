@@ -767,10 +767,14 @@ def main():
             slurm = args["slurm"]
             if slurm == True:
                 job_id_trim = utils.trimSLURM(script_dir, work_dir)
-                tt_seq_utils.STAR(work_dir, threads, script_dir, tt_seq_settings, genome, slurm, job_id_trim)
+                job_id_align = tt_seq_utils.STAR(work_dir, threads, script_dir, tt_seq_settings, genome, slurm, job_id_trim)
             else:
                 utils.trim(script_dir, threads, work_dir)
                 tt_seq_utils.STAR(work_dir, threads, script_dir, tt_seq_settings, genome)
+        
+        #sort BAM files for SLURM job
+        if slurm == True:
+                tt_seq_utils.bamSortSLURM(work_dir, job_id_align, genome="hg38")
         
         #index BAM files
         indexBAM = args["indexBAM"]
@@ -784,6 +788,9 @@ def main():
             if dedup == True:
                 utils.deduplicationBam(script_dir, work_dir, threads, args)
                 utils.indexBam(work_dir, threads)
+        else:
+            if dedup == False:
+                pass #to do
         
         #split bam files into forward and reverse strand files
         splitBAM = args["splitBAM"]

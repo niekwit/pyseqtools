@@ -83,6 +83,16 @@ def STAR(work_dir, threads, script_dir, tt_seq_settings, genome, slurm=False, jo
                 if not utils.file_exists(sorted_bam):
                     utils.write2log(work_dir, " ".join(star), "" )
                     subprocess.call(star)
+                    #only sort non-R64-1-1 bam files (it is better for HTSeq to use unsorted BAM files) 
+                    if genome != "R64-1-1":
+                        puts(colored.green("Sorting " + os.path.basename(bam)))
+                        if not utils.file_exists(sorted_bam):
+                            pysam.sort("--threads", threads,"-o",sorted_bam,bam)
+                        
+                        #remove unsorted bam file
+                        if os.path.exists(sorted_bam):
+                            if os.path.exists(bam):
+                                os.remove(bam)
             else:
                 #create csv files with STAR commands for slurm job
                 if not utils.file_exists(bam):
@@ -129,23 +139,10 @@ def STAR(work_dir, threads, script_dir, tt_seq_settings, genome, slurm=False, jo
                 print("Submitting slurm script to cluster")
                 job_id_align = subprocess.check_output(f"sbatch --dependency=afterok:{job_id_trim} {script} | cut -d ' ' -f 4", shell = True)  
                 return(job_id_align)
-            '''
-            CREATE SEPARATE FUNCTION FOR SORTING BAM FILES
-            #only sort hg38 bam files (it is better for HTSeq to use unsorted BAM files)
-            if slurm == False:
-                if genome == "hg38":
-                    puts(colored.green("Sorting " + os.path.basename(bam)))
-                    
-                    if not utils.file_exists(sorted_bam):
-                        pysam.sort("--threads", threads,"-o",sorted_bam,bam)
-                    
-                    #remove unsorted bam file
-                    if os.path.exists(sorted_bam):
-                        if os.path.exists(bam):
-                            os.remove(bam)
-            else:
-                pass #to do
-            '''     
+            
+            #sort BAM files
+            bamSortSLURM(work_dir, job_id_align, genome)
+              
     
     def alignPerformedCluster(work_dir,genome):
         '''
@@ -177,28 +174,82 @@ def STAR(work_dir, threads, script_dir, tt_seq_settings, genome, slurm=False, jo
         print("test")
         align(work_dir, index, threads, genome, slurm)
     else:
-        print(f"Skipping STAR alignment, output BAM files for {genome} already detected")
+        print(f"Skipping STAR alignment, all output BAM files for {genome} already detected")
        
     #align trimmed reads to yeast genome (spike-in)
     puts(colored.green("Aligning fastq files to R64-1-1 (spike-in) with STAR"))
     yeast_index = tt_seq_settings["STAR"]["yeast"]
     if alignPerformedCluster(work_dir, "R64-1-1") == False:
-        align(work_dir, yeast_index, threads,"R64-1-1", slurm)
+        job_id_align = align(work_dir, yeast_index, threads,"R64-1-1", slurm)
+        return(job_id_align)
     else:
-        print("Skipping STAR alignment, output BAM files for R64-1-1 already detected")
+        print("Skipping STAR alignment, all output BAM files for R64-1-1 already detected")
     
     #index all bam files
     if slurm == False:
         utils.indexBam(work_dir, threads, genome)
         utils.indexBam(work_dir, threads, "R64-1-1")
-    else:
-        pass
+    
 
-
-def bamSortSTAR():
-    pass
-
-
+def bamSortSLURM(work_dir, job_id_align, genome="hg38"):
+    puts(colored.green("Sorting BAM files on cluster"))
+    #create BAM file list (files might not exist yet)
+    extension = utils.get_extension(work_dir)
+    file_list = glob.glob(os.path.join(work_dir, "raw-data","*R1_001." + extension))
+    file_list = [os.path.basename(x.split(".",1)[0].replace("_R1_001","")) for x in file_list]
+    file_list = [os.path.join(work_dir,"bam",genome,x, x  + "Aligned.out.bam") for x in file_list]
+    file_list_index = [x + ".bai" for x in file_list]
+    
+    #load SLURM settings
+    with open(os.path.join(script_dir,"yaml","slurm.yaml")) as file:
+        slurm_settings = yaml.full_load(file)
+    threads = str(slurm_settings["TT-Seq"]["STAR_CPU"])
+    
+    mem = str(slurm_settings["samtools-sort_mem"])
+    slurm_time = str(slurm_settings["samtools-sort_time"])
+    account = slurm_settings["groupname"]
+    partition = slurm_settings["partition"]
+    
+    #create csv file with samtools index commands
+    csv = os.path.join(work_dir,"slurm","slurm_sortBAM.csv")
+    if os.path.exists(csv):
+        os.remove(csv)
+    
+    for bam, index in zip(file_list,file_list_index):
+        if not utils.file_exists(index):
+            samtools = ["samtools","sort","-@", threads, "-o", index, bam]
+            csv = open(os.path.join(work_dir,"slurm","slurm_sortBAM.csv"), "a")  
+            csv.write(" ".join(samtools) +"\n")
+            csv.close() 
+    
+    #create slurm bash script for splitting bam files
+    print("Generating slurm_sortBAM.sh")
+    csv = os.path.join(work_dir,"slurm","slurm_sortBAM.csv")
+    commands = int(subprocess.check_output(f"cat {csv} | wc -l", shell = True).decode("utf-8"))
+    script_ = os.path.join(work_dir,"slurm","slurm_sortBAM.sh")
+    script = open(script_, "w")  
+    script.write("#!/bin/bash" + "\n")
+    script.write("\n")
+    script.write("#SBATCH -A " + account + "\n")
+    script.write("#SBATCH --mail-type=BEGIN,FAIL,END" + "\n")
+    script.write("#SBATCH -p " + partition + "\n")
+    script.write("#SBATCH -D " + work_dir + "\n")
+    script.write("#SBATCH -o slurm/slurm_sortBAM_%a.log" + "\n")
+    script.write("#SBATCH -c " + threads + "\n")
+    script.write("#SBATCH -t " + slurm_time + "\n")
+    script.write("#SBATCH --mem=" + mem + "\n")
+    script.write("#SBATCH -J " + "sortBAM" +"\n")
+    script.write("#SBATCH -a " + "1-" + str(commands) + "\n")
+    script.write("\n")
+    script.write("sed -n ${SLURM_ARRAY_TASK_ID}p " + csv +" | bash\n")
+    script.close()
+   
+    #submit SLURM bash script to cluster
+    print("Submitting slurm_sortBAM.sh to cluster")
+    script_ = os.path.join(work_dir,"slurm","slurm_sortBAM.sh")
+    subprocess.call(["sbatch", f"--dependency=afterok:{job_id_align}", script])
+    
+    
 def hisat2(work_dir, threads, tt_seq_settings, genome, slurm=False, job_id_trim=None):
     """
     Align TT-Seq quality trimmed paired-end files to genome with HISAT2
