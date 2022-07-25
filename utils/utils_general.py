@@ -130,6 +130,9 @@ def get_extension(work_dir):
 
 
 def file_exists(file): #check if file exists/is not size zero
+    '''Check if file exists or has file size >0.
+    '''    
+
     if os.path.exists(file):
             if os.path.getsize(file) > 0:
                 print("Skipping "+file+" (already exists/analysed)")

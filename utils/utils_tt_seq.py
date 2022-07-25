@@ -564,8 +564,7 @@ def ttSeqBigWig(work_dir, threads, tt_seq_settings, genome):
     Create BigWig files for TT-Seq with scaling factors derived from DESeq2
 
     """
-    
-    
+        
     #load scaling factors
     try:
         scaling_factors = pd.read_csv(os.path.join(work_dir, "sizeFactors.csv"))
@@ -641,8 +640,7 @@ def ttSeqBigWig(work_dir, threads, tt_seq_settings, genome):
 
 
 def bwQC(work_dir, threads):
-    """
-    Quality control for BigWig files using deepTools
+    """Quality control for BigWig files using deepTools
     """
     #samples = pd.read_csv(os.path.join(work_dir,"samples.csv"))
     bigwig_all = glob.glob(os.path.join(work_dir,"bigwig","*[!_mean].bigwig"))
@@ -651,6 +649,10 @@ def bwQC(work_dir, threads):
     
 
 def metaProfiles(work_dir, threads, tt_seq_settings, genome):
+    '''Generate meta plots using DeepTools for TT-Seq data
+    '''
+    bigwig_mean = glob.glob(os.path.join(work_dir,"bigwig","*_mean.bigwig"))
+        
     #subset GTF for protein coding genes
     gtf = tt_seq_settings["gtf"][genome]
     gtf_pc = gtf.replace(".gtf", "_pc.gtf")
@@ -659,11 +661,26 @@ def metaProfiles(work_dir, threads, tt_seq_settings, genome):
         grep = ["grep", "protein_coding", gtf, ">", gtf_pc]
         utils.write2log(work_dir, " ".join(grep), "Subset GTF file for only protein coding genes: ")
         subprocess.call(grep)
-        
+    
+    os.makedirs(os.path.join(work_dir,"deeptools"), exist_ok=True)
+    
     #create compute matrix with deepTools
-    file_list = glob.glob(os.path.join(work_dir,"bigwig","*_mean.bigwig"))
+    sample_names = [os.path.basename(x).replace("_mean.bigwig","") for x in bigwig_mean]
+    sample_names = " ".join(sample_names)
+    bigwig_mean = " ".join(bigwig_mean)
     matrix = os.path.join(work_dir, "deeptools",  "matrix.npz")
+    if not utils.file_exists(matrix):
+        computematrix = ["computeMatrix", "scale-regions", "-S", bigwig_mean, 
+                         "-R", gtf, "-b", "5000","-a", "20000", "--samplesLabel",
+                         sample_names, "-p", threads, "-o", matrix]
+        utils.write2log(work_dir, " ".join(computematrix))
+        subprocess.cal(computematrix)
+    
+    #plot meta profiles
+    ###TO DO###
+    
+   
 
 
-def trxReadThrough(work_dir, threads):
+def txReadThrough(work_dir, threads):
     pass

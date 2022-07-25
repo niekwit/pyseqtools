@@ -802,13 +802,14 @@ def main():
         #get scale factors from yeast spike-in
         sizeFactors = args["sizeFactors"]
         if sizeFactors == True:
-            if slurm == False:
-                tt_seq_utils.sizeFactors(work_dir, tt_seq_settings)
-            else:
-                pass ##to do
-        
+            tt_seq_utils.sizeFactors(work_dir, tt_seq_settings, slurm)
+            
+        #create BigWig files
+        bigwig = args["bigwig"]
+        if bigwig == True:
+            tt_seq_utils.ttSeqBigWig(work_dir, threads, tt_seq_settings, genome, slurm)
+                   
                 
-
     def geneSymConv(args, script_dir):
         conversion = args["conversion"]
         gene_list = args["input"]
