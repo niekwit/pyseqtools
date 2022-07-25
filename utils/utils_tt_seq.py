@@ -27,7 +27,7 @@ def STAR(work_dir, threads, script_dir, tt_seq_settings, genome, slurm=False, jo
     '''
     
     #function for alignment with STAR
-    def align(work_dir, index, threads, genome, slurm):
+    def align(work_dir, index, threads, genome, slurm=False):
         #get list of trimmed fastq files
         if slurm == False:
             file_list = glob.glob(os.path.join(work_dir,"trim","*_val_1.fq.gz"))
@@ -38,8 +38,8 @@ def STAR(work_dir, threads, script_dir, tt_seq_settings, genome, slurm=False, jo
             file_list = [x.split(".",1)[0] + "_val_1.fq.gz" for x in file_list]
             file_list = [x.replace("raw-data", "trim") for x in file_list]
         
-        #create empty csv file for commands
-        Path(os.path.join(work_dir,"slurm",f"slurm_STAR_{genome}.csv")).touch()
+            #create empty csv file for commands
+            Path(os.path.join(work_dir,"slurm",f"slurm_STAR_{genome}.csv")).touch()
         
         for read1 in file_list:
             read2 = read1.replace("_R1_001_val_1.fq.gz","_R2_001_val_2.fq.gz")
@@ -94,12 +94,17 @@ def STAR(work_dir, threads, script_dir, tt_seq_settings, genome, slurm=False, jo
                             if os.path.exists(bam):
                                 os.remove(bam)
             else:
-                #create csv files with STAR commands for slurm job
+                #create csv files with STAR commands for SLURM job
                 if not utils.file_exists(bam):
                     csv = open(os.path.join(work_dir,"slurm",f"slurm_STAR_{genome}.csv"), "a")  
                     csv.write(" ".join(star) +"\n")
                     csv.close()   
-
+                    
+        #index all bam files
+        if slurm == False:
+            utils.indexBam(work_dir, threads, genome)
+            utils.indexBam(work_dir, threads, "R64-1-1")
+        
         if slurm == True:
             #load slurm settings  
             mem = str(slurm_settings["TT-Seq"]["STAR_mem"])
@@ -166,29 +171,34 @@ def STAR(work_dir, threads, script_dir, tt_seq_settings, genome, slurm=False, jo
             return(True)
         else:
             return(False)
-            
+                
     #align trimmed reads to selected genome
     index = tt_seq_settings["STAR"][genome]
     puts(colored.green(f"Aligning fastq files to {genome} with STAR"))
-    if alignPerformedCluster(work_dir, genome) == False:
-        print("test")
-        align(work_dir, index, threads, genome, slurm)
+    
+    if slurm == True:
+        if alignPerformedCluster(work_dir, genome) == False:
+            align(work_dir, index, threads, genome, slurm)
+        else:
+            print(f"Skipping STAR alignment, all output BAM files for {genome} already detected")
     else:
-        print(f"Skipping STAR alignment, all output BAM files for {genome} already detected")
+        align(work_dir, index, threads, genome)
+        
        
     #align trimmed reads to yeast genome (spike-in)
     puts(colored.green("Aligning fastq files to R64-1-1 (spike-in) with STAR"))
     yeast_index = tt_seq_settings["STAR"]["yeast"]
-    if alignPerformedCluster(work_dir, "R64-1-1") == False:
-        job_id_align = align(work_dir, yeast_index, threads,"R64-1-1", slurm)
-        return(job_id_align)
-    else:
-        print("Skipping STAR alignment, all output BAM files for R64-1-1 already detected")
     
-    #index all bam files
-    if slurm == False:
-        utils.indexBam(work_dir, threads, genome)
-        utils.indexBam(work_dir, threads, "R64-1-1")
+    if slurm == True:
+        if alignPerformedCluster(work_dir, "R64-1-1") == False:
+            job_id_align = align(work_dir, yeast_index, threads,"R64-1-1", slurm)
+            return(job_id_align)
+        else:
+            print("Skipping STAR alignment, all output BAM files for R64-1-1 already detected")
+    else:
+        align(work_dir, yeast_index, threads, "R64-1-1")
+    
+    
     
 
 def bamSortSLURM(work_dir, job_id_align, genome="hg38"):
@@ -677,7 +687,12 @@ def metaProfiles(work_dir, threads, tt_seq_settings, genome):
         subprocess.cal(computematrix)
     
     #plot meta profiles
-    ###TO DO###
+    out_file = os.path.jnoi(work_dir,"deeptools","meta_profile_whole_genome.pdf")
+    plotProfile = ["plotProfile","-m", matrix, "-o", out_file, "--plotType", "se",
+                   "-z", "'Protein coding genes'", "--perGroup", ""]
+    if not utils.file_exists(out_file):
+        utils.write2log(work_dir, plotProfile)
+        subprocess.call(plotProfile)
     
    
 

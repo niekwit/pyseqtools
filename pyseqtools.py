@@ -313,7 +313,7 @@ def main():
                              const = None,
                              nargs = "?",
                              required = False,
-                             help = "Alignment of fastq files (default is STAR")
+                             help = "Alignment of fastq files (default is STAR)")
     parser_ttseq.add_argument("-g", "--genome",
                              required = False,
                              default = 'hg38',
@@ -763,7 +763,7 @@ def main():
         
         #quality trim fastq files and align
         align=args["align"]
-        if align != None:
+        if align == "star":
             slurm = args["slurm"]
             if slurm == True:
                 job_id_trim = utils.trimSLURM(script_dir, work_dir)
@@ -774,14 +774,13 @@ def main():
         
         #sort BAM files for SLURM job
         if slurm == True:
-            pass    
             tt_seq_utils.bamSortSLURM(work_dir, job_id_align, genome="hg38")
         
         #index BAM files
-        indexBAM = args["indexBAM"]
-        if indexBAM == True:
-            if slurm == True:
-                utils.indexBam(work_dir, threads, slurm, script_dir)
+        #indexBAM = args["indexBAM"]
+        #if indexBAM == True:
+        #    if slurm == True:
+        #        utils.indexBam(work_dir, threads, slurm, script_dir)
         
         #perform deduplication
         dedup = args["deduplication"]
