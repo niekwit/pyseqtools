@@ -264,43 +264,59 @@ def hisat2(work_dir, threads, tt_seq_settings, genome, slurm=False, job_id_trim=
     """
     Align TT-Seq quality trimmed paired-end files to genome with HISAT2
     """
-    if slurm is False:
-        read1_list = glob.glob(os.path.join(work_dir,"trim","*_R1_001_val_1.fq.gz"))
-        hisat2_index = tt_seq_settings["hisat2"][genome]
-        os.path.makedirs(os.path.join(work_dir,"bam", genome), exist_ok=True)
-        
-        for read1 in read1_list:
-            read2 = read1.replace("_R1_001_val_1.fq.gz","_R2_001_val_1.fq.gz")
-            bam = os.path.join(work_dir,"bam", genome,os.path.basename(read1.replace("_R1_001_val_1.fq.gz","_sort.bam")))
-            sample = os.path.basename(read1.replace("_R1_001_val_1.fq.gz",""))
-            puts(colored.green(f"Aligning {sample} to {genome} with HISAT2"))
+    #function for aligning
+    def align(work_dir,threads, tt_seq_settings,genome, slurm=False, job_id_trim=None):
+        if slurm is False:
+            read1_list = glob.glob(os.path.join(work_dir,"trim","*_R1_001_val_1.fq.gz"))
+            hisat2_index = tt_seq_settings["hisat2"][genome]
+            os.makedirs(os.path.join(work_dir,"bam", genome), exist_ok=True)
             
-            if not utils.file_exists(bam):
-                hisat2 = ["hisat2", "-p", str(threads), "-x", hisat2_index,"-1", read1, "-2", read2,
-                          "2>>", os.path.join(work_dir,"align.log"), "|", "samtools", "view", "-q", "15", "-F", 
-                          "260", "-b", "-@", str(threads), "-", "|", "samtools", "sort", "-@", str(threads), "-",
-                          ">", bam]
-                utils.write2log(work_dir, " ".join(hisat2))
-                subprocess.call(hisat2)
-    else:
-        #if running on cluster, get thread count from cluster.yaml
-        if slurm == True:
-            with open(os.path.join(script_dir,"yaml","slurm.yaml")) as file:
-                slurm_settings = yaml.full_load(file)
-            threads = str(slurm_settings["TT-Seq"]["STAR_CPU"])
-        
-        #create file list of trimming output
-        extension = utils.get_extension(work_dir)
-        file_list = glob.glob(os.path.join(work_dir, "raw-data","*R1_001." + extension))
-        file_list = [x.split(".",1)[0] + "_val_1.fq.gz" for x in file_list]
-        file_list = [x.replace("raw-data", "trim") for x in file_list]
-        
-        #create empty csv file for commands
-        Path(os.path.join(work_dir,"slurm",f"slurm_STAR_{genome}.csv")).touch()
-        
-        for read1 in file_list:
-            read1 = read1.replace("_R1_001_val_1.fq.gz","_R2_001_val_2.fq.gz")
+            for read1 in read1_list:
+                read2 = read1.replace("_R1_001_val_1.fq.gz","_R2_001_val_2.fq.gz")
+                bam = os.path.join(work_dir,"bam", genome,os.path.basename(read1.replace("_R1_001_val_1.fq.gz","_sort.bam")))
+                sample = os.path.basename(read1.replace("_R1_001_val_1.fq.gz",""))
+                puts(colored.green(f"Aligning {sample} to {genome} with HISAT2"))
+                
+                if not utils.file_exists(bam):
+                    hisat2 = ["hisat2", "-p", str(threads), "-x", hisat2_index,"-1", read1, "-2", read2,
+                              "2>>", os.path.join(work_dir,"align.log"), "|", "samtools", "view", "-q", "15", "-F", 
+                              "260", "-b", "-@", str(threads), "-"]
+                    if genome != "R64-1-1":
+                        extend_hisat2 = ["|", "samtools", "sort", "-@", str(threads), "-", ">", bam]
+                        hisat2.extend(extend_hisat2)
+                    else:
+                        #don't sort yeast bam files
+                        bam = bam.replace("_sort.bam",".bam")
+                        extend_hisat2 = [">", bam]
+                        hisat2.extend(extend_hisat2)
+                    utils.write2log(work_dir, " ".join(hisat2))
+                    subprocess.call(hisat2)
+        else:
+            #if running on cluster, get thread count from cluster.yaml
+            if slurm == True:
+                with open(os.path.join(script_dir,"yaml","slurm.yaml")) as file:
+                    slurm_settings = yaml.full_load(file)
+                threads = str(slurm_settings["TT-Seq"]["STAR_CPU"])
             
+            #create file list of trimming output
+            extension = utils.get_extension(work_dir)
+            file_list = glob.glob(os.path.join(work_dir, "raw-data","*R1_001." + extension))
+            file_list = [x.split(".",1)[0] + "_val_1.fq.gz" for x in file_list]
+            file_list = [x.replace("raw-data", "trim") for x in file_list]
+            
+            #create empty csv file for commands
+            Path(os.path.join(work_dir,"slurm",f"slurm_STAR_{genome}.csv")).touch()
+            
+            for read1 in file_list:
+                read1 = read1.replace("_R1_001_val_1.fq.gz","_R2_001_val_2.fq.gz")
+                ###to do
+      
+    #align to selected genome
+    align(work_dir,threads, tt_seq_settings,genome, slurm, job_id_trim)
+    
+    #align to yeast genome (spike-in)
+    genome = "R64-1-1"
+    align(work_dir,threads, tt_seq_settings,genome, slurm, job_id_trim)
 
 
 def splitBam(threads, work_dir, genome):
@@ -309,46 +325,54 @@ def splitBam(threads, work_dir, genome):
     based on https://www.biostars.org/p/92935/
     
     '''
-    puts(colored.green("Creating forward and reverse strand-specific BAM files with samtools"))
+    puts(colored.green("Generating forward and reverse strand-specific BAM files with samtools"))
 
     file_list = glob.glob(os.path.join(work_dir, "bam", genome, "*", "*_sorted.bam"))
     
         
     for bam in file_list:
         print(os.path.basename(bam))
-        ##forward strand
-        fwd1 = bam.replace("*_sorted.bam","_fwd1.bam")
-        fwd2 = bam.replace("*_sorted.bam","_fwd2.bam")
+        ###forward strand
+        fwd1 = bam.replace("_sorted.bam","_fwd1.bam")
+        fwd2 = bam.replace("_sorted.bam","_fwd2.bam")
         
+        print("\tGenerating forward strand-specific BAM file")
         #alignments of the second in pair if they map to the forward strand
-        pysam.view("-@",threads,"-b","-f","128","-F","16",bam,"-o",fwd1, catch_stdout=False)
-        pysam.index(fwd1)
+        if not utils.file_exists(fwd1):
+            pysam.view("-@",threads,"-b","-f","128","-F","16",bam,"-o",fwd1, catch_stdout=False)
+            pysam.index(fwd1)
         
         #alignments of the first in pair if they map to the reverse  strand
-        pysam.view("-@",threads,"-b","-f","80",bam,"-o",fwd2, catch_stdout=False)
-        pysam.index(fwd2)
+        if not utils.file_exists(fwd2):
+            pysam.view("-@",threads,"-b","-f","80",bam,"-o",fwd2, catch_stdout=False)
+            pysam.index(fwd2)
         
         #merge all forward reads
-        fwd = bam.replace("*_sorted.bam","_fwd.bam")
-        pysam.merge("-f",fwd,fwd1,fwd2, catch_stdout=False)
-        pysam.index(fwd)
+        fwd = bam.replace("_sorted.bam","_fwd.bam")
+        if not utils.file_exists(fwd):
+            pysam.merge("-@",threads,fwd,fwd1,fwd2, catch_stdout=False)
+            pysam.index(fwd)
         
-        ##reverse strand
-        rev1 = bam.replace("*_sorted.bam","_rev1.bam")
-        rev2 = bam.replace("*_sorted.bam","_rev2.bam")
+        ###reverse strand
+        rev1 = bam.replace("_sorted.bam","_rev1.bam")
+        rev2 = bam.replace("_sorted.bam","_rev2.bam")
         
+        print("\tGenerating reverse strand-specific BAM file")
         #alignments of the second in pair if they map to the reverse strand
-        pysam.view("-b","-f","144",bam,"-o", rev1, catch_stdout=False)
-        pysam.index(rev1)
+        if not utils.file_exists(rev1):
+            pysam.view("-b","-f","144",bam,"-o", rev1, catch_stdout=False)
+            pysam.index(rev1)
         
         #alignments of the first in pair if they map to the forward strand
-        pysam.view("-@",threads,"-b","-f","64","-F","16",bam,"-o",rev2, catch_stdout=False)
-        pysam.index(rev2)
+        if not utils.file_exists(rev2):
+            pysam.view("-@",threads,"-b","-f","64","-F","16",bam,"-o",rev2, catch_stdout=False)
+            pysam.index(rev2)
         
         #merge all reverse reads
-        rev = bam.replace("*_sorted.bam","_rev.bam")
-        pysam.merge("-f",rev,rev1,rev2, catch_stdout=False)
-        pysam.index(fwd)
+        rev = bam.replace("_sorted.bam","_rev.bam")
+        if not utils.file_exists(rev):
+            pysam.merge("-@",threads,rev,rev1,rev2, catch_stdout=False)
+            pysam.index(rev)
         
         #remove all non-merged bam files
         remove = [fwd1,fwd2,rev1,rev2]
@@ -486,90 +510,20 @@ def splitBam(threads, work_dir, genome):
     #merge all forward and reverse reads
    ''' 
         
-def sizeFactors(work_dir, tt_seq_settings, slurm):
+def sizeFactors(script_dir, slurm):
     """
     Creates size factors based on yeast RNA spike-in for generating BigWig files
     Based on https://github.com/crickbabs/DRB_TT-seq/blob/master/bigwig.md with modifications
 
     """
-    puts(colored.green("Generating size factors for normalisation using HTSeq and DESeq2"))
-    #create output dir
-    os.makedirs(os.path.join(work_dir,"htseq-count"), exist_ok = True)
-    print("Quantifying reads with HTSeq")
-    
-        
-    #first prepare htseq-count input for DESeq2    
-    file_list = glob.glob(os.path.join(work_dir,"bam","R64-1-1","*","*Aligned.out.bam"))
-    rc_file = [os.path.join(work_dir, "htseq-count", os.path.basename(x.replace("Aligned.out.bam","_count.txt"))) for x in file_list] 
-     
-    #load yeast gtf file
-    gtf = tt_seq_settings["gtf"]["yeast"]
-    
-    for bam,count_file in zip(file_list,rc_file):
-                
-        if not utils.file_exists(count_file):
-           htseq_count = ["htseq-count", "--quiet", "--format", "bam", "--stranded", "yes", bam, gtf, ">", count_file]
-           print("Quantifying " + os.path.basename(bam) + " with htseq-count")
-           if slurm == False:
-               utils.write2log(work_dir, " ".join(htseq_count), "" )
-               subprocess.call(htseq_count)
-           else:
-                #create csv file with htseq-count commands
-                csv = os.path.join(work_dir,"slurm","slurm_htseq.csv")
-                if os.path.exists(csv):
-                    os.remove(csv)
-    
-                for bam, count_file in zip(file_list,rc_file):
-                    if not utils.file_exists(count_file):
-                        csv = open(os.path.join(work_dir,"slurm","slurm_htseq.csv"), "a")  
-                        csv.write(" ".join(htseq_count) +"\n")
-                        csv.close() 
-    
-    if slurm == True:
-        #load SLURM settings
-        with open(os.path.join(script_dir,"yaml","slurm.yaml")) as file:
-            slurm_settings = yaml.full_load(file)
-        threads = str(slurm_settings["TT-Seq"]["htseq_CPU"])
-        
-        mem = str(slurm_settings["TT-Seq"]["htseq_mem"])
-        slurm_time = str(slurm_settings["htseq_time"])
-        account = slurm_settings["groupname"]
-        partition = slurm_settings["TT-Seq"]["partition"]
-         
-        
-        print("Generating slurm_htseq.sh")
-        csv = os.path.join(work_dir,"slurm","slurm_htseq.csv")
-        commands = int(subprocess.check_output(f"cat {csv} | wc -l", shell = True).decode("utf-8"))
-        script_ = os.path.join(work_dir,"slurm","slurm_htseq.sh")
-        script = open(script_, "w")  
-        script.write("#!/bin/bash" + "\n")
-        script.write("\n")
-        script.write("#SBATCH -A " + account + "\n")
-        script.write("#SBATCH --mail-type=BEGIN,FAIL,END" + "\n")
-        script.write("#SBATCH -p " + partition + "\n")
-        script.write("#SBATCH -D " + work_dir + "\n")
-        script.write("#SBATCH -o slurm/slurm_htseq_%a.log" + "\n")
-        script.write("#SBATCH -c " + threads + "\n")
-        script.write("#SBATCH -t " + slurm_time + "\n")
-        script.write("#SBATCH --mem=" + mem + "\n")
-        script.write("#SBATCH -J " + "htseq-count" +"\n")
-        script.write("#SBATCH -a " + "1-" + str(commands) + "\n")
-        script.write("\n")
-        script.write("sed -n ${SLURM_ARRAY_TASK_ID}p " + csv +" | bash\n")
-        script.close()
-       
-        #submit SLURM bash script to cluster
-        print("Submitting slurm_slurm_htseq to cluster")
-        script_ = os.path.join(work_dir,"slurm","slurm_htseq.sh")
-        job_id_htseq = subprocess.check_output(f"sbatch {script} | cut -d ' ' -f 4", shell = True)  
-        
-        #run DESeq2 to obtain size factors for normalisation
-        print("Submitting SLURM job for creating size factors with DESeq2 with HTSeq files")
-        deseq2 = ["sbatch", f"--dependency=afterok:{job_id_htseq}", "Rscript", os.path.join(script_dir, "R", "tt-seq_sizefactors.R")]
-        subprocess.call(deseq2)
+    puts(colored.green("Generating size factors for normalisation using DESeq2"))
+            
+    #run DESeq2 to obtain size factors for normalisation
+    deseq2 = ["sbatch", "Rscript", os.path.join(script_dir, "R", "tt-seq_sizefactors.R")]
+    subprocess.call(deseq2)
     
     
-def ttSeqBigWig(work_dir, threads, tt_seq_settings, genome):
+def ttSeqBigWig(work_dir, threads, tt_seq_settings, genome, slurm):
     """
     Create BigWig files for TT-Seq with scaling factors derived from DESeq2
 
@@ -577,36 +531,35 @@ def ttSeqBigWig(work_dir, threads, tt_seq_settings, genome):
         
     #load scaling factors
     try:
-        scaling_factors = pd.read_csv(os.path.join(work_dir, "sizeFactors.csv"))
+        scaling_factors = pd.read_csv(os.path.join(work_dir, "scaleFactors.csv"))
     except FileNotFoundError:
-        return(puts(colored.red("ERROR: sizeFactors.csv not found")))
+        return(puts(colored.red("ERROR: scaleFactors.csv not found")))
     
     #create BigWig directory
-    os.makedirs(os.path.join(work_dir,"bigwig"), exist_ok = True)
+    os.makedirs(os.path.join(work_dir,"bigwig",genome), exist_ok = True)
     
-    #create scaled BigWig files
+    #BigWig function
+    def bigWig(work_dir, threads, base, strand, scaling_factor):
+        
+        bw_output = f"{base}_{strand}.bigwig"
+        bam = f"{base}_{strand}.bam"
+        bigwig = ["bamCoverage","--scaleFactor", scaling_factor, "-p", threads, "-b", bam, "-o", bw_output]
+        puts(colored.green(f"Generating {strand} BigWig file for {os.path.basename(base)}"))
+        if not utils.file_exists(bw_output):
+            utils.write2log(work_dir, " ".join(bigwig))
+            subprocess.call(bigwig)
+    
+    #create scaled BigWig files for both fwd and rev strands
     for index,row in scaling_factors.iterrows():
-        bam = os.path.join(work_dir,"bam", genome, 
-                           row["sample"].replace("_count.txt","")
-                           ,row["sample"].replace("_count.txt","_sorted.bam"))
-        scaling_factor = row["sizeFactors"]
-        
-        #BigWig function
-        def bigWig(work_dir, threads, bam, strand):
-            
-            fw_output = os.path.join(work_dir, "bigwig",os.path.basename(bam).replace("_sorted.bam","_" + strand +".bigwig"))
-            bigwig = ["bamCoverage","--scaleFactor",scaling_factor, "-p", threads, "-b", bam, "-o", fw_output]
-            puts(colored.green(f"Generating {strand} BigWig file for {os.path.basename(bam)}"))
-            if not utils.file_exists(fw_output):
-                utils.write2log(work_dir, " ".join(bigwig))
-                subprocess.call(bigwig)
-        
+        base = os.path.join(work_dir,"bigwig", genome, row["sample"] ,row["sample"]) 
+        scaling_factor = row["scaleFactors"]
         strands = ["fwd", "rev"]
         for i in strands:
-            bigWig(work_dir, threads, bam, i)
+            bigWig(work_dir, threads, base, i, scaling_factor)
     
     
     #create mean Wig files for all technical replicates with wiggletools
+    print("Generating mean Wig files from technical replicates using Wiggletools")
     samples = pd.read_csv(os.path.join(work_dir,"samples.csv"))
     genotypes = set(samples["genotype"])
     conditions = set(samples["condition"])
@@ -617,29 +570,32 @@ def ttSeqBigWig(work_dir, threads, tt_seq_settings, genome):
                 sub_samples = samples[samples["genotype"] == genotype]
                 sub_samples = sub_samples[samples["condition"] == condition]
                 sub_samples = list(sub_samples["sample"])
-                in_bigwigs = [os.path.join(work_dir,"bigwig",x + "_" + strand +".bigwig") for x in sub_samples]
+                print(" ".join(sub_samples))
+                in_bigwigs = [os.path.join(work_dir,"bigwig",genome,x,x + "_" + strand +".bigwig") for x in sub_samples]
                 
-                wig_mean = os.path.join(work_dir,"bigwig",genotype+"_"+condition+"_mean.wig")
+                wig_mean = os.path.join(work_dir,"bigwig", genome, genotype+"_"+condition+"_mean.wig")
                 wiggletools = ["wiggletools", "write", wig_mean, "mean", " ".join(in_bigwigs)]
                 utils.write2log(work_dir, " ".join(wiggletools))
                 subprocess.call(wiggletools)
     
     #generate chrom.sizes file needed for converting Wig to BigWig
     fasta = tt_seq_settings["fasta"][genome]
-    
+    print(f"Checking if chrom.sizes file exists for {os.path.basename(fasta)}")
     chrom_sizes = os.path.join(script_dir,"chrom.sizes",os.path.basename(fasta))
     chrom_sizes = chrom_sizes.rsplit(".",1)[0] + ".chrom.sizes"
+    os.makedirs(os.path.join(script_dir,"chrom.sizes"), exist_ok = True)
     
     if not utils.file_exists(chrom_sizes):
         fasta_index = fasta + ".fai"
         if not utils.file_exists(fasta_index):
-            pysam.faidx(fasta)
-            bash = ["cut", "-f1,2", fasta_index, ">", chrom_sizes]
+            pysam.faidx(fasta, catch_stdout=False)
+            bash = ["cut", "-f","1,2", fasta_index, ">", chrom_sizes]
             utils.write2log(work_dir, " ".join(bash),"Generate chrom.sizes file: ")
             subprocess.call(bash)
     
     #convert Wig to BigWig
-    file_list = glob.glob(os.path.join(work_dir,"bigwig","*_mean.wig"))
+    print("Converting Wig to BigWig")
+    file_list = glob.glob(os.path.join(work_dir,"bigwig", genome,"*_mean.wig"))
         
     for wig in file_list:
         bw = wig.replace("*_mean.wig","_mean.bigwig")

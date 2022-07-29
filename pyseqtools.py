@@ -310,13 +310,15 @@ def main():
                              action = 'store_true',
                              help = "Rename fastq files")
     parser_ttseq.add_argument("-a", "--align",
-                             const = None,
-                             nargs = "?",
+                             action = 'store_true',
                              required = False,
-                             help = "Alignment of fastq files (default is STAR)")
+                             help = "Alignment of fastq files using STAR")
     parser_ttseq.add_argument("-g", "--genome",
                              required = False,
-                             default = 'hg38',
+                             type = str,
+                             const = "hg38",
+                             nargs = "?",
+                             default = "hg38",
                              help = "Choose reference genome (default is hg38)")
     parser_ttseq.add_argument("--indexBAM",
                              required = False,
@@ -732,6 +734,8 @@ def main():
     
     
     def ttSeq(args, script_dir):
+        print("TT-Seq analysis selected")
+        
         slurm = args["slurm"]
         
         #set thread count for processing
@@ -739,6 +743,7 @@ def main():
         threads = args["threads"]
         if threads == "max":
             threads = max_threads
+        print(f"Using {threads} CPU threads for analysis")
         
         #rename files
         rename = args["rename"]
@@ -763,24 +768,21 @@ def main():
         
         #quality trim fastq files and align
         align=args["align"]
-        if align == "star":
-            slurm = args["slurm"]
+        slurm = args["slurm"]
+        if align == True:
             if slurm == True:
                 job_id_trim = utils.trimSLURM(script_dir, work_dir)
                 job_id_align = tt_seq_utils.STAR(work_dir, threads, script_dir, tt_seq_settings, genome, slurm, job_id_trim)
+                tt_seq_utils.bamSortSLURM(work_dir, job_id_align, genome="hg38")
             else:
                 utils.trim(script_dir, threads, work_dir)
                 tt_seq_utils.STAR(work_dir, threads, script_dir, tt_seq_settings, genome)
-        
-        #sort BAM files for SLURM job
-        if slurm == True:
-            tt_seq_utils.bamSortSLURM(work_dir, job_id_align, genome="hg38")
-        
+                
+               
         #index BAM files
-        #indexBAM = args["indexBAM"]
-        #if indexBAM == True:
-        #    if slurm == True:
-        #        utils.indexBam(work_dir, threads, slurm, script_dir)
+        indexBAM = args["indexBAM"]
+        if indexBAM == True:
+            utils.indexBam(work_dir, threads, slurm, script_dir)
         
         #perform deduplication
         dedup = args["deduplication"]
@@ -796,7 +798,7 @@ def main():
         splitBAM = args["splitBAM"]
         if splitBAM == True:
             if slurm == False:
-                tt_seq_utils.splitBam(threads, work_dir)
+                tt_seq_utils.splitBam(threads, work_dir, genome)
             
         #get scale factors from yeast spike-in
         sizeFactors = args["sizeFactors"]
