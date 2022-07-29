@@ -14,6 +14,12 @@ if (file.exists(out.file) == FALSE){
   #generate list of gene count file
   count.files <- Sys.glob(file.path(work.dir,"bam","R64-1-1","*","*ReadsPerGene.out.tab"))
   
+  #check if number of gene count files matches sample number
+  if(length(count.files) != length(rownames(sampleTable))){
+    print("ERROR: number of ReadsPerGene.out.tab (STAR) files does not match sample number in samples.csv")
+    exit()
+  }
+  
   #get gene/sample names for index names
   genes <- read.csv(count.files[1], skip=4, sep="\t", header=FALSE)
   genes <- genes$V1
