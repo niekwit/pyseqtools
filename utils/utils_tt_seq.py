@@ -564,7 +564,7 @@ def ttSeqBigWig(work_dir, threads, tt_seq_settings, genome, slurm):
     genotypes = set(samples["genotype"])
     conditions = set(samples["condition"])
     
-    for genotype in genotypes:
+    for genotype in genotypes: ###mistake: puts fwd an rev togther!!!! FIX
         for condition in conditions:
             for strand in strands:
                 sub_samples = samples[samples["genotype"] == genotype]
