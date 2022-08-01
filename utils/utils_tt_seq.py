@@ -509,7 +509,27 @@ def splitBam(threads, work_dir, genome):
     
     #merge all forward and reverse reads
    ''' 
+   
+def bamPCA(work_dir,threads, genome):
+    fwd_file_list = glob.glob(os.path.join(work_dir, "bam", genome, "*", "*_fwd.bam"))
+    rev_file_list = glob.glob(os.path.join(work_dir, "bam", genome, "*", "*_rev.bam"))
+    
+    def bamSummary(work_dir, threads, genome, file_list):
+        if any(["fwd" in x for x in file_list]):
+            strand = "fwd"
+        elif any(["rev" in x for x in file_list]):
+            strand = "rev"
         
+        matrix = os.path.join(work_dir, "bam", genome, f"{strand}_multiBamSummary.npz")
+        if not utils.file_exists(matrix):
+            command = ["multiBamSummary", "bins", "-p", threads, "--smartLabels", "--bamfiles"," ".join(file_list), "-o", matrix]
+            utils.write2log(work_dir, " ".join(command))
+            subprocess.call(command)
+    
+    bamSummary(work_dir, threads, genome, fwd_file_list)
+    bamSummary(work_dir, threads, genome, rev_file_list)
+    
+   
 def sizeFactors(script_dir, slurm):
     """
     Creates size factors based on yeast RNA spike-in for generating BigWig files
@@ -539,23 +559,71 @@ def ttSeqBigWig(work_dir, threads, tt_seq_settings, genome, slurm):
     os.makedirs(os.path.join(work_dir,"bigwig",genome), exist_ok = True)
     
     #BigWig function
-    def bigWig(work_dir, threads, base, strand, scaling_factor):
+    def bigWig(work_dir, threads, base, strand, scaling_factor, slurm):
         
         bw_output = f"{base}_{strand}.bigwig"
-        bam = f"{base}_{strand}.bam"
-        bigwig = ["bamCoverage","--scaleFactor", scaling_factor, "-p", threads, "-b", bam, "-o", bw_output]
+        bam = f"{base}_{strand}.bam".replace("bigwig", "bam")
+        bigwig = ["bamCoverage","--scaleFactor", str(scaling_factor), "-p", threads, "-b", bam, "-o", bw_output]
         puts(colored.green(f"Generating {strand} BigWig file for {os.path.basename(base)}"))
+        
         if not utils.file_exists(bw_output):
-            utils.write2log(work_dir, " ".join(bigwig))
-            subprocess.call(bigwig)
+            if slurm == False:
+                utils.write2log(work_dir, " ".join(bigwig))
+                subprocess.call(bigwig)
+            else:
+                #create csv file with bamCoverage commands
+                os.makedirs(os.path.join(work_dir,"slurm"), exist_ok = True)
+                csv = os.path.join(work_dir,"slurm","slurm_bamCoverage.csv")
+                csv = open(csv, "a")  
+                csv.write(" ".join(bigwig) +"\n")
+                csv.close()  
+                
+                #load SLURM settings
+                with open(os.path.join(script_dir,"yaml","slurm.yaml")) as file:
+                    slurm_settings = yaml.full_load(file)
+                threads = str(slurm_settings["TT-Seq"]["bamCoverage_CPU"])
+                
+                mem = str(slurm_settings["TT-Seq"]["bamCoverage_mem"])
+                slurm_time = str(slurm_settings["TT-Seq"]["bamCoverage_time"])
+                account = slurm_settings["groupname"]
+                partition = slurm_settings["TT-Seq"]["partition"]
+                
+                #create slurm bash script 
+                print("Generating slurm_bamCoverage.sh")
+                csv = os.path.join(work_dir,"slurm","slurm_bamCoverage.csv")
+                commands = int(subprocess.check_output(f"cat {csv} | wc -l", shell = True).decode("utf-8"))
+                script_ = os.path.join(work_dir,"slurm","slurm_bamCoverage.sh")
+                script = open(script_, "w")  
+                script.write("#!/bin/bash" + "\n")
+                script.write("\n")
+                script.write("#SBATCH -A " + account + "\n")
+                script.write("#SBATCH --mail-type=BEGIN,FAIL,END" + "\n")
+                script.write("#SBATCH -p " + partition + "\n")
+                script.write("#SBATCH -D " + work_dir + "\n")
+                script.write("#SBATCH -o slurm/slurm_bamCoverage_%a.log" + "\n")
+                script.write("#SBATCH -c " + threads + "\n")
+                script.write("#SBATCH -t " + slurm_time + "\n")
+                script.write("#SBATCH --mem=" + mem + "\n")
+                script.write("#SBATCH -J " + "bamCoverage" +"\n")
+                script.write("#SBATCH -a " + "1-" + str(commands) + "\n")
+                script.write("\n")
+                script.write("sed -n ${SLURM_ARRAY_TASK_ID}p " + csv +" | bash\n")
+                script.close()
+                script_ = os.path.join(work_dir,"slurm","slurm_bamCoverage.sh")
+                
+                print("Submitting SLURM script to cluster")
+                job_id_bigwig = subprocess.check_output(f"sbatch {script} | cut -d ' ' -f 4", shell = True)
+                return(job_id_bigwig)
+        
     
     #create scaled BigWig files for both fwd and rev strands
     for index,row in scaling_factors.iterrows():
+        os.makedirs(os.path.join(work_dir,"bigwig", genome, row["sample"] ), exist_ok = True)
         base = os.path.join(work_dir,"bigwig", genome, row["sample"] ,row["sample"]) 
         scaling_factor = row["scaleFactors"]
         strands = ["fwd", "rev"]
         for i in strands:
-            bigWig(work_dir, threads, base, i, scaling_factor)
+            bigWig(work_dir, threads, base, i, scaling_factor, slurm)
     
     
     #create mean Wig files for all technical replicates with wiggletools
@@ -564,16 +632,16 @@ def ttSeqBigWig(work_dir, threads, tt_seq_settings, genome, slurm):
     genotypes = set(samples["genotype"])
     conditions = set(samples["condition"])
     
-    for genotype in genotypes: ###mistake: puts fwd an rev togther!!!! FIX
+    for genotype in genotypes: 
         for condition in conditions:
             for strand in strands:
                 sub_samples = samples[samples["genotype"] == genotype]
                 sub_samples = sub_samples[samples["condition"] == condition]
                 sub_samples = list(sub_samples["sample"])
-                print(" ".join(sub_samples))
+                
                 in_bigwigs = [os.path.join(work_dir,"bigwig",genome,x,x + "_" + strand +".bigwig") for x in sub_samples]
                 
-                wig_mean = os.path.join(work_dir,"bigwig", genome, genotype+"_"+condition+"_mean.wig")
+                wig_mean = os.path.join(work_dir,"bigwig", genome, genotype+"_"+condition+f"_{strand}_mean.wig")
                 wiggletools = ["wiggletools", "write", wig_mean, "mean", " ".join(in_bigwigs)]
                 utils.write2log(work_dir, " ".join(wiggletools))
                 subprocess.call(wiggletools)
@@ -598,26 +666,29 @@ def ttSeqBigWig(work_dir, threads, tt_seq_settings, genome, slurm):
     file_list = glob.glob(os.path.join(work_dir,"bigwig", genome,"*_mean.wig"))
         
     for wig in file_list:
-        bw = wig.replace("*_mean.wig","_mean.bigwig")
+        bw = wig.replace("_mean.wig","_mean.bigwig")
         if not utils.file_exists(bw):
             wig2bigwig = ["wigToBigWig", wig, chrom_sizes, bw]
-            utils.write2log(work_dir,wig2bigwig)
+            utils.write2log(work_dir," ".join(wig2bigwig))
             subprocess.call(wig2bigwig)
+            os.remove(wig)
+    
 
-
-def bwQC(work_dir, threads):
+def bwQC(work_dir, threads, genome):
     """Quality control for BigWig files using deepTools
     """
     #samples = pd.read_csv(os.path.join(work_dir,"samples.csv"))
-    bigwig_all = glob.glob(os.path.join(work_dir,"bigwig","*[!_mean].bigwig"))
-    bigwig_mean = glob.glob(os.path.join(work_dir,"bigwig","*_mean.bigwig"))
+    bigwig_all = glob.glob(os.path.join(work_dir,"bigwig", genome,"*[!_mean].bigwig"))
+    bigwig_mean = glob.glob(os.path.join(work_dir,"bigwig", genome,"*_mean.bigwig"))
     
+    def multiBigWigSummary(work_dir, threads):
+        command = ["multiBigwigSummary", ]
     
 
 def metaProfiles(work_dir, threads, tt_seq_settings, genome):
     '''Generate meta plots using DeepTools for TT-Seq data
     '''
-    bigwig_mean = glob.glob(os.path.join(work_dir,"bigwig","*_mean.bigwig"))
+    bigwig_mean = glob.glob(os.path.join(work_dir,"bigwig", genome,"*_mean.bigwig"))
         
     #subset GTF for protein coding genes
     gtf = tt_seq_settings["gtf"][genome]

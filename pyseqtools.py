@@ -782,7 +782,7 @@ def main():
         #index BAM files
         indexBAM = args["indexBAM"]
         if indexBAM == True:
-            utils.indexBam(work_dir, threads, slurm, script_dir)
+            utils.indexBam(work_dir, threads, genome, slurm, script_dir)
         
         #perform deduplication
         dedup = args["deduplication"]
