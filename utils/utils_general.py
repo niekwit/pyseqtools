@@ -746,7 +746,7 @@ def trim(script_dir, threads, work_dir):
                                        os.path.join(work_dir,"trim"), "--paired", read1, read2]
                 #log commands
                 with open(work_dir+"/commands.log", "a") as file:
-                    file.write("Trim Galore: ")
+                    file.write("")
                     print(*trim_galore_command, sep = " ",file=file)
                 subprocess.run(trim_galore_command)
 

@@ -137,7 +137,7 @@ def main():
                                help = "Reference genome")
     parser_rnaseq.add_argument("-a", "--align",
                                required = False,
-                               choices = ["salmon","hisat2"],
+                               choices = ["salmon","star"],
                                default = "salmon",
                                help = "Choose aligner. Default is Salmon.")
     parser_rnaseq.add_argument("-p", "--pvalue",
@@ -161,6 +161,10 @@ def main():
                                action = 'store_true',
                                default = False,
                                help = "Skip FastQC/MultiQC")
+    parser_rnaseq.add_argument("--slurm",
+                             required = False,
+                             action = 'store_true',
+                             help = "Submit jobs to Cambridge HPC using SLURM")
 
     #create subparser for ChIP-Seq analysis commands
     parser_chip = subparsers.add_parser('chip-seq',
@@ -496,63 +500,74 @@ def main():
 
     def rna_seq(args, script_dir):
 
+        slurm = args["slurm"]        
+
         ####set thread count for processing
-        max_threads = str(multiprocessing.cpu_count())
-        threads = args["threads"]
-        if threads == "max":
-            threads = max_threads
+        if slurm == False:
+            max_threads = str(multiprocessing.cpu_count())
+            threads = args["threads"]
+            if threads == "max":
+                threads = max_threads
 
-        ### Check md5sums
-        utils.checkMd5(work_dir)
+            ### Check md5sums
+            utils.checkMd5(work_dir)
+    
+            ###Run FastQC/MultiQC
+            file_extension = utils.get_extension(work_dir)
+            skip_fastqc = args["skip_fastqc"]
+            if not skip_fastqc:
+                utils.fastqc(script_dir, work_dir, threads, file_extension)
+            else:
+                print("Skipping FastQC/MultiQC analysis")
+    
+            ###Set species variable
+            reference = args["reference"]
+            if "hg" in reference or reference == "gencode-v35":
+                species = "human"
+            elif "mm" in reference or reference == "gencode.vM1.pc_transcripts":
+                species = "mouse"
 
-        ###Run FastQC/MultiQC
-        file_extension = utils.get_extension(work_dir)
-        skip_fastqc = args["skip_fastqc"]
-        if not skip_fastqc:
-            utils.fastqc(script_dir, work_dir, threads, file_extension)
+
+            ###trim and align
+            pvalue = args["pvalue"]
+            align = args["align"]
+            if align.lower() == "salmon":
+                utils.trim(script_dir, threads, work_dir)
+                salmon_index = rna_seq_settings["salmon_index"][reference]
+                gtf = rna_seq_settings["salmon_gtf"][reference]
+                fasta = rna_seq_settings["FASTA"][reference]
+                rnaseq_utils.salmon(salmon_index,
+                                    str(threads),
+                                    work_dir,
+                                    gtf,
+                                    fasta,
+                                    script_dir,
+                                    rna_seq_settings,
+                                    reference)
+                rnaseq_utils.plotMappingRate(work_dir)
+                rnaseq_utils.plotPCA(work_dir, script_dir)
+                rnaseq_utils.diff_expr(work_dir, gtf, script_dir, species, pvalue)
+                rnaseq_utils.plotVolcano(work_dir)
+            elif align.lower() == "hisat2":
+                rnaseq_utils.trim(threads, work_dir)
+                #hisat2()
+
+            go = args["go"]
+    
+            pvalue = args["pvalue"]
+    
+    
+            if go == True:
+                gene_sets=args["gene_sets"]
+                rnaseq_utils.geneSetEnrichment(work_dir, pvalue, gene_sets)
         else:
-            print("Skipping FastQC/MultiQC analysis")
-
-        ###Set species variable
-        reference = args["reference"]
-        if "hg" in reference or reference == "gencode-v35":
-            species = "human"
-        elif "mm" in reference or reference == "gencode.vM1.pc_transcripts":
-            species = "mouse"
-
-
-        ###trim and align
-        pvalue = args["pvalue"]
-        align = args["align"]
-        if align.lower() == "salmon":
-            utils.trim(script_dir, threads, work_dir)
-            salmon_index = rna_seq_settings["salmon_index"][reference]
-            gtf = rna_seq_settings["salmon_gtf"][reference]
-            fasta = rna_seq_settings["FASTA"][reference]
-            rnaseq_utils.salmon(salmon_index,
-                                str(threads),
-                                work_dir,
-                                gtf,
-                                fasta,
-                                script_dir,
-                                rna_seq_settings,
-                                reference)
-            rnaseq_utils.plotMappingRate(work_dir)
-            rnaseq_utils.plotPCA(work_dir, script_dir)
-            rnaseq_utils.diff_expr(work_dir, gtf, script_dir, species, pvalue)
-            rnaseq_utils.plotVolcano(work_dir)
-        elif align.lower() == "hisat2":
-            rnaseq_utils.trim(threads, work_dir)
-            #hisat2()
-
-        go = args["go"]
-
-        pvalue = args["pvalue"]
-
-
-        if go == True:
-            gene_sets=args["gene_sets"]
-            rnaseq_utils.geneSetEnrichment(work_dir, pvalue, gene_sets)
+             genome = args["reference"]
+             align = args["align"]
+             threads = args["threads"]
+             
+             if align == "star":
+                 job_id_trim = utils.trimSLURM(script_dir, work_dir)
+                 rnaseq_utils.STAR(work_dir, threads, script_dir, rna_seq_settings, genome, slurm, job_id_trim)
 
     def chip_seq(args, script_dir):
 
@@ -803,7 +818,7 @@ def main():
         #get scale factors from yeast spike-in
         sizeFactors = args["sizeFactors"]
         if sizeFactors == True:
-            tt_seq_utils.sizeFactors(work_dir, tt_seq_settings, slurm)
+            tt_seq_utils.sizeFactors(work_dir)
             
         #create BigWig files
         bigwig = args["bigwig"]
