@@ -342,7 +342,7 @@ def STAR(work_dir, threads, script_dir, rna_seq_settings, genome, slurm=False, j
                     "--readFilesIn", read1, read2, "--readFilesCommand", "zcat", "--quantMode",
                     "TranscriptomeSAM", "GeneCounts", "--twopassMode", "Basic", "--outSAMunmapped",
                     "None", "--outSAMattrRGline","ID:"+sample,"PU:"+sample,"SM:"+sample,"LB:unknown",
-                    "PL:illumina", "--outSAMtype","BAM", "SortedByCoordinate", "--outTmpDir", temp_dir,
+                    "PL:illumina", "--outSAMtype","BAM", "Unsorted", "--outTmpDir", temp_dir,
                     "--outFileNamePrefix", os.path.join(work_dir,"bam",genome,sample,sample)]
             
             if slurm == False:
