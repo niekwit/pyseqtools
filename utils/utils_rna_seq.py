@@ -570,18 +570,40 @@ def geneSetEnrichment(work_dir,pvalue,gene_sets):
           GSEA(df,i,out_dir)    
     
 
-def retroElements(work_dir, script_dir, rna_seq_settings, genome, slurm):
+def retroElements(work_dir, script_dir, rna_seq_settings, threads, genome, slurm):
     '''
     Analysis of transposable elements using TEtranscripts
     https://hammelllab.labsites.cshl.edu/software/#TEtranscripts
 
     '''
+    puts(colored.green("TE transcript analysis"))
+    
+    if slurm == False:
+        #sort bam files first
+        print("Sorting STAR BAM files")
+        file_list = glob.glob(os.path.join(work_dir, "bam", genome, "*", "*Aligned.out.bam"))
+        sorted_file_list = [x.replace("Aligned.out.bam","Aligned.out.sorted.bam") for x in file_list]
+        
+        for bam,sorted_bam in zip(file_list,sorted_file_list):
+            if not utils.file_exists(sorted_bam):
+                print(f"Sorting {os.path.basename(bam)}")
+                pysam.sort("-@", threads, "-o", sorted_bam, bam)
+        
+        #indexing sorted BAM files
+        print("Indexing sorted BAM files")
+        sorted_index_file_list = [x + ".bai" for x in sorted_file_list]
+        for bam,index in zip(sorted_file_list, sorted_index_file_list):
+            print(f"Generating index for {os.path.basename(bam)} ")
+            if not utils.file_exists(index):
+                pysam.index("-@", threads, bam)
+    
+    #read samples csv file
     samples = pd.read_csv(os.path.join(work_dir,"samples.csv"))
     gtf = rna_seq_settings["gtf"][genome]
     gtf_te = rna_seq_settings["TE-gtf"][genome]
     
     #get number of comparisons
-    comparisons = len(samples.columns) - 2
+    comparisons = len(samples.columns) - 1 #number of comparisons +1
     
     #create TEtranscript commands for each comparison
     for i in range(1, comparisons):
@@ -589,7 +611,7 @@ def retroElements(work_dir, script_dir, rna_seq_settings, genome, slurm):
         df = samples.iloc[:,0:2]
         
         #add experiment column
-        df["exp"] = samples.iloc[:,2:2+i]
+        df["exp"] = samples.iloc[:,1+i:2+i]
         
         #remove irrelevant samples (nan)
         df = df.dropna()
@@ -617,14 +639,54 @@ def retroElements(work_dir, script_dir, rna_seq_settings, genome, slurm):
         os.makedirs(dir_name, exist_ok = True)
         
         #run TEtranscripts command
-        os.chdir(dir_name)
         command = ["TEtranscripts", "-c", controls, "-t", test_samples, 
                    "--GTF", gtf, "--TE", gtf_te, "--sortByPos", "--project",
                    os.path.basename(dir_name)]
         if not utils.file_exists(os.path.join(dir_name,os.path.basename(dir_name) + "_gene_TE_analysis.txt")):
             utils.write2log(work_dir, " ".join(command))
-            subprocess.call(command)
-            os.chdir(work_dir)
+            if slurm == False:
+                os.chdir(dir_name)
+                subprocess.call(command)
+                os.chdir(work_dir)
+            else:
+                print(f"Generating SLURM commands for {os.path.basename(dir_name)}")
+                csv = open(os.path.join(work_dir,"slurm",f"slurm_TEtranscripts_{genome}.csv"), "a")  
+                csv.write(" ".join(command) +"\n")
+                csv.close()
+                
+                #loading SLURM settings
+                with open(os.path.join(script_dir,"yaml","slurm.yaml")) as file:
+                    slurm_settings = yaml.full_load(file)
+                threads = str(slurm_settings["RNA-Seq"]["TEtranscript_CPU"])
+                mem = slurm_settings["RNA-Seq"]["TEtranscript_mem"]
+                time = slurm_settings["RNA-Seq"]["TEtranscript_time"]
+                account = slurm_settings["groupname"]
+                partition = slurm_settings["partition"]
+                
+                #generating SLURM script
+                csv = os.path.join(work_dir,"slurm",f"slurm_STAR_{genome}.csv")
+                commands = int(subprocess.check_output(f"cat {csv} | wc -l", shell = True).decode("utf-8"))
+                script_ = os.path.join(work_dir,"slurm",f"slurm_STAR_{genome}.sh")
+                script = open(script_, "w")  
+                script.write("#!/bin/bash" + "\n")
+                script.write("\n")
+                script.write("#SBATCH -A " + account + "\n")
+                script.write("#SBATCH --mail-type=BEGIN,FAIL,END" + "\n")
+                script.write("#SBATCH -p " + partition + "\n")
+                script.write("#SBATCH -D " + work_dir + "\n")
+                script.write(f"#SBATCH -o slurm/slurm_STAR_%a_{genome}.log" + "\n")
+                script.write("#SBATCH -c " + threads + "\n")
+                script.write("#SBATCH -t " + time + "\n")
+                script.write("#SBATCH --mem=" + mem + "\n")
+                script.write("#SBATCH -J " + "STAR_"+genome + "\n")
+                script.write("#SBATCH -a " + "1-" + str(commands) + "\n")
+                script.write("\n")
+                script.write("sed -n ${SLURM_ARRAY_TASK_ID}p " + csv +" | bash\n")
+                script.close()
+                
+                #move all TEtranscript generated files to proper directory
+                    
+    
         
         
         

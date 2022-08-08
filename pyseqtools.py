@@ -138,8 +138,7 @@ def main():
     parser_rnaseq.add_argument("-a", "--align",
                                required = False,
                                choices = ["salmon","star"],
-                               default = "salmon",
-                               help = "Choose aligner. Default is Salmon.")
+                               help = "Program to align fastq files")
     parser_rnaseq.add_argument("-p", "--pvalue",
                                required = False,
                                metavar = "<P value>",
@@ -148,7 +147,7 @@ def main():
     parser_rnaseq.add_argument("--TE",
                                required = False,
                                action = 'store_true',
-                               help = "Transposable element expression analysis (Required STAR alignment)")
+                               help = "Transposable element expression analysis (Requires STAR alignment)")
     parser_rnaseq.add_argument("--go",
                                required = False,
                                action = 'store_true',
@@ -577,6 +576,9 @@ def main():
              if align == "star":
                  job_id_trim = utils.trimSLURM(script_dir, work_dir)
                  rnaseq_utils.STAR(work_dir, threads, script_dir, rna_seq_settings, genome, slurm, job_id_trim)
+                 
+             if TE == True:
+                 
              
 
     def chip_seq(args, script_dir):
