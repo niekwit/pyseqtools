@@ -578,7 +578,7 @@ def main():
                  rnaseq_utils.STAR(work_dir, threads, script_dir, rna_seq_settings, genome, slurm, job_id_trim)
                  
              if TE == True:
-                 
+                 rnaseq_utils.retroElements(work_dir, script_dir, rna_seq_settings, threads, genome, slurm)
              
 
     def chip_seq(args, script_dir):
