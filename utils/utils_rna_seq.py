@@ -342,7 +342,7 @@ def STAR(work_dir, threads, script_dir, rna_seq_settings, genome, slurm=False, j
                     "--readFilesIn", read1, read2, "--readFilesCommand", "zcat", "--quantMode",
                     "TranscriptomeSAM", "GeneCounts", "--twopassMode", "Basic", "--outSAMunmapped",
                     "None", "--outSAMattrRGline","ID:"+sample,"PU:"+sample,"SM:"+sample,"LB:unknown",
-                    "PL:illumina", "--outSAMtype","BAM", "Unsorted", "--outTmpDir", temp_dir,
+                    "PL:illumina", "--outSAMtype","BAM", "SortedByCoordinate", "--outTmpDir", temp_dir,
                     "--outFileNamePrefix", os.path.join(work_dir,"bam",genome,sample,sample)]
             
             if slurm == False:
@@ -527,13 +527,9 @@ def geneSetEnrichment(work_dir,pvalue,gene_sets):
         terms=pre_res.res2d.index
         df_out=pre_res.res2d
         df_out.reset_index(inplace = True)
-        os.makedirs(os.path.join(out_dir,"GSEA"), 
-                    exist_ok = True)
-        df_out.to_csv(os.path.join(out_dir,"GSEA",'GSEA.csv'), 
-                      index = False)
-        
-        
-        
+        os.makedirs(os.path.join(out_dir,"GSEA"), exist_ok = True)
+        df_out.to_csv(os.path.join(out_dir,"GSEA",'GSEA.csv'), index = False)
+              
         for i in range(10): #plot GSEA plots for top 10 terms
             GSEA_dir=os.path.join(out_dir,"GSEA",gene_set) 
             os.makedirs(GSEA_dir, exist_ok=True)
@@ -573,3 +569,74 @@ def geneSetEnrichment(work_dir,pvalue,gene_sets):
        for i in gene_sets:
           GSEA(df,i,out_dir)    
     
+
+def retroElements(work_dir, script_dir, rna_seq_settings, genome, slurm):
+    '''
+    Analysis of transposable elements using TEtranscripts
+    https://hammelllab.labsites.cshl.edu/software/#TEtranscripts
+
+    '''
+    samples = pd.read_csv(os.path.join(work_dir,"samples.csv"))
+    gtf = rna_seq_settings["gtf"][genome]
+    gtf_te = rna_seq_settings["TE-gtf"][genome]
+    
+    #get number of comparisons
+    comparisons = len(samples.columns) - 2
+    
+    #create TEtranscript commands for each comparison
+    for i in range(1, comparisons):
+        #create base df (no comparison)
+        df = samples.iloc[:,0:2]
+        
+        #add experiment column
+        df["exp"] = samples.iloc[:,2:2+i]
+        
+        #remove irrelevant samples (nan)
+        df = df.dropna()
+        
+        #get control samples
+        controls = df[df["exp"] == "control"]
+        controls = list(controls["sample"])
+        
+        #get test samples
+        test_samples = df[df["exp"] == "test"]
+        test_samples = list(test_samples["sample"])
+
+        #create control bam list
+        controls = [os.path.join(work_dir,"bam",genome,x,f"{x}Aligned.out.sorted.bam") for x in controls]
+        controls = " ".join(controls)
+        
+        #create test bam list
+        test_samples = [os.path.join(work_dir,"bam",genome,x,f"{x}Aligned.out.sorted.bam") for x in test_samples]
+        test_samples = " ".join(test_samples)
+        
+        #generate output directory
+        conditions = list(set(df["condition"]))
+        dir_name = " ".join(conditions).replace(" ", "_vs_")
+        dir_name = os.path.join(work_dir,"TEtranscripts", dir_name)
+        os.makedirs(dir_name, exist_ok = True)
+        
+        #run TEtranscripts command
+        os.chdir(dir_name)
+        command = ["TEtranscripts", "-c", controls, "-t", test_samples, 
+                   "--GTF", gtf, "--TE", gtf_te, "--sortByPos", "--project",
+                   os.path.basename(dir_name)]
+        if not utils.file_exists(os.path.join(dir_name,os.path.basename(dir_name) + "_gene_TE_analysis.txt")):
+            utils.write2log(work_dir, " ".join(command))
+            subprocess.call(command)
+            os.chdir(work_dir)
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+
+

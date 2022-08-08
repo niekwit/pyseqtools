@@ -459,11 +459,13 @@ def indexBam(work_dir, threads, genome="hg38", slurm=False, script_dir=None):
         puts(colored.green("Indexing BAM files"))
         file_list = glob.glob(os.path.join(work_dir,"bam","*.bam"))
         
-        #directory structure for TT-Seq experiments is different
+        #directory structure for TT-Seq/RNA-Seq(TE analysis) experiments is different
         if len(file_list) == 0:
             file_list = glob.glob(os.path.join(work_dir, "bam", genome, "*", "*_sorted.bam"))
             if len(file_list) == 0:
-                return("ERROR: no bam files found to be indexed")
+                file_list = glob.glob(os.path.join(work_dir, "bam", genome, "*", "*Aligned.out.bam"))
+                if len(file_list) == 0:
+                    return("ERROR: no bam files found to be indexed")
     
         #index bam files
         #also check if bam files have been indexed

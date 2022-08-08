@@ -145,6 +145,10 @@ def main():
                                metavar = "<P value>",
                                default = 0.001,
                                help = "Set P value cut off (default is 0.001)")
+    parser_rnaseq.add_argument("--TE",
+                               required = False,
+                               action = 'store_true',
+                               help = "Transposable element expression analysis (Required STAR alignment)")
     parser_rnaseq.add_argument("--go",
                                required = False,
                                action = 'store_true',
@@ -548,10 +552,14 @@ def main():
                 rnaseq_utils.plotPCA(work_dir, script_dir)
                 rnaseq_utils.diff_expr(work_dir, gtf, script_dir, species, pvalue)
                 rnaseq_utils.plotVolcano(work_dir)
-            elif align.lower() == "hisat2":
+            elif align.lower() == "star":
                 rnaseq_utils.trim(threads, work_dir)
-                #hisat2()
-
+                rnaseq_utils.STAR(work_dir, threads, script_dir, rna_seq_settings, reference, slurm)
+            
+            TE = args["TE"]
+            if TE == True:
+                rnaseq_utils.retroElements(work_dir, script_dir, reference, slurm)
+            
             go = args["go"]
     
             pvalue = args["pvalue"]
@@ -564,10 +572,12 @@ def main():
              genome = args["reference"]
              align = args["align"]
              threads = args["threads"]
+             TE = args["TE"]
              
              if align == "star":
                  job_id_trim = utils.trimSLURM(script_dir, work_dir)
                  rnaseq_utils.STAR(work_dir, threads, script_dir, rna_seq_settings, genome, slurm, job_id_trim)
+             
 
     def chip_seq(args, script_dir):
 

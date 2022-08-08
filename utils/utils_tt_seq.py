@@ -510,27 +510,8 @@ def splitBam(threads, work_dir, genome):
     #merge all forward and reverse reads
    ''' 
    
-def bamPCA(work_dir,threads, genome):
-    fwd_file_list = glob.glob(os.path.join(work_dir, "bam", genome, "*", "*_fwd.bam"))
-    rev_file_list = glob.glob(os.path.join(work_dir, "bam", genome, "*", "*_rev.bam"))
-    
-    def bamSummary(work_dir, threads, genome, file_list):
-        if any(["fwd" in x for x in file_list]):
-            strand = "fwd"
-        elif any(["rev" in x for x in file_list]):
-            strand = "rev"
-        
-        matrix = os.path.join(work_dir, "bam", genome, f"{strand}_multiBamSummary.npz")
-        if not utils.file_exists(matrix):
-            command = ["multiBamSummary", "bins", "-p", threads, "--smartLabels", "--bamfiles"," ".join(file_list), "-o", matrix]
-            utils.write2log(work_dir, " ".join(command))
-            subprocess.call(command)
-    
-    bamSummary(work_dir, threads, genome, fwd_file_list)
-    bamSummary(work_dir, threads, genome, rev_file_list)
-    
-   
-def sizeFactors(script_dir, slurm):
+
+def sizeFactors(script_dir):
     """
     Creates size factors based on yeast RNA spike-in for generating BigWig files
     Based on https://github.com/crickbabs/DRB_TT-seq/blob/master/bigwig.md with modifications
@@ -677,19 +658,48 @@ def ttSeqBigWig(work_dir, threads, tt_seq_settings, genome, slurm):
 def bwQC(work_dir, threads, genome):
     """Quality control for BigWig files using deepTools
     """
-    #samples = pd.read_csv(os.path.join(work_dir,"samples.csv"))
-    bigwig_all = glob.glob(os.path.join(work_dir,"bigwig", genome,"*[!_mean].bigwig"))
-    bigwig_mean = glob.glob(os.path.join(work_dir,"bigwig", genome,"*_mean.bigwig"))
+    #get BigWig files
+    bigwig_all_fwd = glob.glob(os.path.join(work_dir,"bigwig", genome, "*","*fwd.bigwig"))
+    bigwig_all_rev = glob.glob(os.path.join(work_dir,"bigwig", genome, "*","*rev.bigwig"))
+    bigwig_mean_fwd = glob.glob(os.path.join(work_dir,"bigwig", genome,"*fwd_mean.bigwig"))
+    bigwig_mean_rev = glob.glob(os.path.join(work_dir,"bigwig", genome,"*rev_mean.bigwig"))
     
-    def multiBigWigSummary(work_dir, threads):
-        command = ["multiBigwigSummary", ]
+    files = [bigwig_all_fwd, bigwig_all_rev, bigwig_mean_fwd, bigwig_mean_rev]
+    names = ["all_fwd","all_rev","mean_fwd","mean_rev"]
     
+    #function to create BigWig files
+    def multiBigWigSummary(work_dir, threads, file_list, name,genome):
+        file_list = os.path.join(work_dir,"bigwig"," ".join(file_list))
+        matrix = os.athp.join(work_dir, "bigwig",genome, f"{name}_multiBigWigSummary.npz")
+        if not utils.file_exists(matrix):
+            command = ["multiBigwigSummary", "bins", "-p", threads, "--smartLabels","-b", file_list, "-o", matrix]
+            utils.write2log(work_dir, " ".join(command))
+            subprocess.call(command)
+    
+    def plotPCA(work_dir, threads, genome, matrix):
+        plot_file = matrix.replace(".npz","_PCA.pdf")
+        if not utils.file_exists(plot_file):
+            command = ["plotPCA", "-in", matrix, "--outFileNameData", matrix.replace("npz","tab"), "-o", plot_file]
+            utils.write2log(work_dir, " ".join(command))
+            subprocess.call(command)
+    
+    
+    #create BigWig Summary for all sample groups
+    for list_,name in zip(files,names):
+        multiBigWigSummary(work_dir, threads, list_, name, genome)
+    
+    #create PCA plot for each sample group
+    matrix_list = glob.glob(os.path.join(work_dir, "bigwig", genome, "*.npz"))
+    for matrix in matrix_list:
+        plotPCA(work_dir, threads, genome, matrix)
+
 
 def metaProfiles(work_dir, threads, tt_seq_settings, genome):
     '''Generate meta plots using DeepTools for TT-Seq data
     '''
-    bigwig_mean = glob.glob(os.path.join(work_dir,"bigwig", genome,"*_mean.bigwig"))
-        
+    bigwig_mean_fwd = glob.glob(os.path.join(work_dir,"bigwig", genome,"*fwd_mean.bigwig"))
+    bigwig_mean_rev = glob.glob(os.path.join(work_dir,"bigwig", genome,"*rev_mean.bigwig")) 
+    
     #subset GTF for protein coding genes
     gtf = tt_seq_settings["gtf"][genome]
     gtf_pc = gtf.replace(".gtf", "_pc.gtf")
@@ -701,26 +711,46 @@ def metaProfiles(work_dir, threads, tt_seq_settings, genome):
     
     os.makedirs(os.path.join(work_dir,"deeptools"), exist_ok=True)
     
-    #create compute matrix with deepTools
-    sample_names = [os.path.basename(x).replace("_mean.bigwig","") for x in bigwig_mean]
-    sample_names = " ".join(sample_names)
-    bigwig_mean = " ".join(bigwig_mean)
-    matrix = os.path.join(work_dir, "deeptools",  "matrix.npz")
-    if not utils.file_exists(matrix):
-        computematrix = ["computeMatrix", "scale-regions", "-S", bigwig_mean, 
-                         "-R", gtf, "-b", "5000","-a", "20000", "--samplesLabel",
-                         sample_names, "-p", threads, "-o", matrix]
-        utils.write2log(work_dir, " ".join(computematrix))
-        subprocess.cal(computematrix)
+    def computeMatrix(work_dir, threads, gtf, list_, strand):
+        #create compute matrix with deepTools
+        sample_names = [os.path.basename(x.replace(f"_{strand}_mean.bigwig","")) for x in list_]
+        sample_names = " ".join(sample_names)
+        bigwig_mean = " ".join(list_)
+        matrix = os.path.join(work_dir, "deeptools",  f"{strand}_plotProfile_matrix.mat.gz")
+        if not utils.file_exists(matrix):
+            computematrix = ["computeMatrix", "scale-regions","-m", "6000", "-b", "3000","-a", "20000", 
+                             "-S", bigwig_mean, "-R", gtf, "--samplesLabel",
+                             sample_names, "-p", threads, "-o", matrix]
+            utils.write2log(work_dir, " ".join(computematrix))
+            subprocess.call(computematrix)
+        
+    def plotProfile(work_dir, threads, strand):
+        #plot meta profiles
+        matrix = os.path.join(work_dir, "deeptools",  f"{strand}_plotProfile_matrix.mat.gz")
+        out_file = os.path.join(work_dir,"deeptools",f"{strand}_meta_profile_whole_genome.pdf")
+        plotProfile = ["plotProfile","-m", matrix, "-out", out_file, "--plotType", "se",
+                       "-z", "Protein_coding_genes", "--perGroup"]
+        if not utils.file_exists(out_file):
+            utils.write2log(work_dir, " ".join(plotProfile))
+            subprocess.call(plotProfile)
     
-    #plot meta profiles
-    out_file = os.path.jnoi(work_dir,"deeptools","meta_profile_whole_genome.pdf")
-    plotProfile = ["plotProfile","-m", matrix, "-o", out_file, "--plotType", "se",
-                   "-z", "'Protein coding genes'", "--perGroup", ""]
-    if not utils.file_exists(out_file):
-        utils.write2log(work_dir, plotProfile)
-        subprocess.call(plotProfile)
+    #generate matrices
+    computeMatrix(work_dir, threads, gtf_pc, bigwig_mean_fwd, "fwd")
+    computeMatrix(work_dir, threads, gtf_pc, bigwig_mean_rev, "rev")
     
+    #generate meta plots
+    plotProfile(work_dir, threads, "fwd")
+    plotProfile(work_dir, threads, "rev")
+
+
+def binsBED(script_dir):
+    '''
+    Create BED file that contains regions downstream of TSS and TES of protein coding genes
+    '''
+    #load GTF file that only contains protein coding whole gene coordinates
+    gtf = pd.read_csv(os.path.join(script_dir,"gtf","hg38","Homo_sapiens.GRCh38.106.chr_gene-only_pc.gtf"), 
+                      sep="\t",
+                      header=None)
    
 
 
