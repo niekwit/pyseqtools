@@ -665,7 +665,7 @@ def retroElements(work_dir, script_dir, rna_seq_settings, threads, genome, slurm
                 
                 #generating SLURM script
                 base = os.path.basename(dir_name)
-                script_ = os.path.join(work_dir,"slurm",f"slurm_TEtranscript_{genome}_base.sh")
+                script_ = os.path.join(work_dir,"slurm",f"slurm_TEtranscript_{genome}_{base}.sh")
                 script = open(script_, "w")  
                 script.write("#!/bin/bash\n")
                 script.write("\n")
@@ -684,7 +684,7 @@ def retroElements(work_dir, script_dir, rna_seq_settings, threads, genome, slurm
                 
                 #submit job to SLURM
                 print("Submitting SLURM script to cluster")
-                script_ = os.path.join(work_dir,"slurm",f"slurm_TEtranscript_{genome}_base.sh")
+                script_ = os.path.join(work_dir,"slurm",f"slurm_TEtranscript_{genome}_{base}.sh")
                 job_id = subprocess.check_output(f"sbatch {script} | cut -d ' ' -f 4", shell = True)
                 print(f"Job ID: {job_id}")
                     
