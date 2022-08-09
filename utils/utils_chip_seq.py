@@ -34,7 +34,7 @@ import utils_general as utils
 ###CHIP-SEQ ANALYSIS SPECIFIC FUNCTIONS
  
 
-def hisat2(script_dir, work_dir, threads, chip_seq_settings, genome):
+def hisat2(script_dir, work_dir, threads, chip_seq_settings, genome, slurm = False):
     ###check for HISAT2###
     path = os.environ["PATH"].lower()
     

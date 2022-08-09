@@ -12,6 +12,8 @@ import tempfile
 
 from clint.textui import colored, puts
 import pysam
+import pybedtools
+import biomart
 
 script_dir = os.path.abspath(os.path.dirname(__file__))
 script_dir = os.path.dirname(script_dir)
@@ -743,15 +745,12 @@ def metaProfiles(work_dir, threads, tt_seq_settings, genome):
     plotProfile(work_dir, threads, "rev")
 
 
-def binsBED(script_dir):
-    '''
-    Create BED file that contains regions downstream of TSS and TES of protein coding genes
-    '''
-    #load GTF file that only contains protein coding whole gene coordinates
-    gtf = pd.read_csv(os.path.join(script_dir,"gtf","hg38","Homo_sapiens.GRCh38.106.chr_gene-only_pc.gtf"), 
-                      sep="\t",
-                      header=None)
-   
+def bedBamOverlap(work_dir, slurm, bed):
+    """
+    Gets reads from BAM files that overlap with specified BED file
+
+    """
+    
 
 
 def txReadThrough(work_dir, threads):

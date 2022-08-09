@@ -649,10 +649,10 @@ def retroElements(work_dir, script_dir, rna_seq_settings, threads, genome, slurm
                 subprocess.call(command)
                 os.chdir(work_dir)
             else:
-                print(f"Generating SLURM commands for {os.path.basename(dir_name)}")
-                csv = open(os.path.join(work_dir,"slurm",f"slurm_TEtranscripts_{genome}.csv"), "a")  
-                csv.write(" ".join(command) +"\n")
-                csv.close()
+                print(f"Generating SLURM script for {os.path.basename(dir_name)}")
+                #csv = open(os.path.join(work_dir,"slurm",f"slurm_TEtranscripts_{genome}.csv"), "a")  
+                #csv.write(" ".join(command) +"\n")
+                #csv.close()
                 
                 #loading SLURM settings
                 with open(os.path.join(script_dir,"yaml","slurm.yaml")) as file:
@@ -664,27 +664,29 @@ def retroElements(work_dir, script_dir, rna_seq_settings, threads, genome, slurm
                 partition = slurm_settings["partition"]
                 
                 #generating SLURM script
-                csv = os.path.join(work_dir,"slurm",f"slurm_STAR_{genome}.csv")
-                commands = int(subprocess.check_output(f"cat {csv} | wc -l", shell = True).decode("utf-8"))
-                script_ = os.path.join(work_dir,"slurm",f"slurm_STAR_{genome}.sh")
+                base = os.path.basename(dir_name)
+                script_ = os.path.join(work_dir,"slurm",f"slurm_TEtranscript_{genome}_base.sh")
                 script = open(script_, "w")  
-                script.write("#!/bin/bash" + "\n")
+                script.write("#!/bin/bash\n")
                 script.write("\n")
-                script.write("#SBATCH -A " + account + "\n")
+                script.write(f"#SBATCH -A {account}\n")
                 script.write("#SBATCH --mail-type=BEGIN,FAIL,END" + "\n")
-                script.write("#SBATCH -p " + partition + "\n")
-                script.write("#SBATCH -D " + work_dir + "\n")
-                script.write(f"#SBATCH -o slurm/slurm_STAR_%a_{genome}.log" + "\n")
-                script.write("#SBATCH -c " + threads + "\n")
-                script.write("#SBATCH -t " + time + "\n")
-                script.write("#SBATCH --mem=" + mem + "\n")
-                script.write("#SBATCH -J " + "STAR_"+genome + "\n")
-                script.write("#SBATCH -a " + "1-" + str(commands) + "\n")
+                script.write(f"#SBATCH -p {partition}\n")
+                script.write(f"#SBATCH -D {dir_name}\n")
+                script.write(f"#SBATCH -o slurm/slurm_TEtranscript_{genome}_base.log\n")
+                script.write(f"#SBATCH -c {threads}\n")
+                script.write(f"#SBATCH -t {time}\n")
+                script.write(f"#SBATCH --mem={mem}\n")
+                script.write(f"#SBATCH -J TEtranscript_{genome}\n")
                 script.write("\n")
-                script.write("sed -n ${SLURM_ARRAY_TASK_ID}p " + csv +" | bash\n")
+                script.write(" ".join(command) +"\n")
                 script.close()
                 
-                #move all TEtranscript generated files to proper directory
+                #submit job to SLURM
+                print("Submitting SLURM script to cluster")
+                script_ = os.path.join(work_dir,"slurm",f"slurm_TEtranscript_{genome}_base.sh")
+                job_id = subprocess.check_output(f"sbatch {script} | cut -d ' ' -f 4", shell = True)
+                print(f"Job ID: {job_id}")
                     
     
         
