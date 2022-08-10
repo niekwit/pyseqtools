@@ -231,7 +231,7 @@ for (i in 1:length(df.list)){
   
   #write df to csv file
   write.csv(df, 
-            file=paste0(dir.out,"/DESeq-output.csv"),
+            file=paste0(dir.out,"/DESeq2-output.csv"),
             row.names=FALSE)
   
 }
