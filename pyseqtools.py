@@ -347,6 +347,10 @@ def main():
                              required = False,
                              action = 'store_true',
                              help = "Create BigWig files")
+    parser_ttseq.add_argument("--deseq2",
+                             required = False,
+                             action = 'store_true',
+                             help = "Calculate differential genes using DESeq2")
     parser_ttseq.add_argument("--metagene",
                              required = False,
                              action = 'store_true',
@@ -836,7 +840,12 @@ def main():
         bigwig = args["bigwig"]
         if bigwig == True:
             tt_seq_utils.ttSeqBigWig(work_dir, threads, tt_seq_settings, genome, slurm)
-                   
+            
+            
+        deseq2 = args["deseq2"]
+        if deseq2 == True:
+            tt_seq_utils.DESeq2(script_dir, genome)
+            
                 
     def geneSymConv(args, script_dir):
         conversion = args["conversion"]
