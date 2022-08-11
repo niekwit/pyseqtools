@@ -643,7 +643,7 @@ def main():
                     utils.indexBam(work_dir, threads)
         else:
             if align == "hisat2":
-                chipseq_utils.hisat2(script_dir, work_dir, threads, chip_seq_settings, genome)
+                chipseq_utils.hisat2SLURM(script_dir, work_dir, threads, chip_seq_settings, genome)
 
 
         dedup = args["deduplication"]
