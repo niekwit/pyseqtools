@@ -12,8 +12,8 @@ import tempfile
 
 from clint.textui import colored, puts
 import pysam
-import pybedtools
-import biomart
+#import pybedtools
+#import biomart
 
 script_dir = os.path.abspath(os.path.dirname(__file__))
 script_dir = os.path.dirname(script_dir)
@@ -745,12 +745,26 @@ def metaProfiles(work_dir, threads, tt_seq_settings, genome):
     plotProfile(work_dir, threads, "rev")
 
 
-def bedBamOverlap(work_dir, slurm, bed):
+def bedBamOverlap(work_dir, genome, slurm, bed):
     """
-    Gets reads from BAM files that overlap with specified BED file
+    Quantify reads from BAM files that overlap with specified BED file
 
     """
+    #merge replicate bam files
+    samples = pd.read_csv(os.path.join(work_dir,"samples.csv"))
+    genotypes = list(set(samples["genotype"]))
+    conditions = list(set(samples["condition"]))
     
+    for genotype in genotypes:
+        for condition in conditions:
+            sub_samples = samples[samples["genotype"] == genotype]
+            sub_samples = sub_samples[samples["condition"] == condition]
+            sub_samples = list(sub_samples["sample"])
+    
+
+def DESeq2(script_dir, genome):
+    pass
+
 
 
 def txReadThrough(work_dir, threads):

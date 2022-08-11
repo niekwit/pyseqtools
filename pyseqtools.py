@@ -187,14 +187,18 @@ def main():
                              required = False,
                              default = 'hg19',
                              help = "Choose reference genome (default is hg19)")
-    parser_chip.add_argument("-a", "--align",
+    parser_chip.add_argument("--trim",
+                             action = 'store_true',
+                             required = False,
+                             help = "Quality trimming of data using Trim_galore!")
+    parser_chip.add_argument("--align",
                              choices = ["hisat2",
                                         "bwa-mem",
                                         "bwa-aln"],
                              const = "hisat2",
                              nargs = "?",
                              required = False,
-                             help = "Create BAM files using HISAT2 or BWA (mem or aln")
+                             help = "Create BAM files using HISAT2 or BWA (mem or aln)")
     parser_chip.add_argument("-d", "--deduplication",
                              required = False,
                              action = 'store_true',
@@ -223,6 +227,10 @@ def main():
                              required = False,
                              action = 'store_true',
                              help = "Generate metageneplots and heatmaps with plotProfile (deepTools)")
+    parser_chip.add_argument("--slurm",
+                             required = False,
+                             action = 'store_true',
+                             help = "Submit jobs to Cambridge HPC using SLURM")
     parser_chip.add_argument("--skip-fastqc",
                                required = False,
                                action = 'store_true',
@@ -586,7 +594,8 @@ def main():
              
 
     def chip_seq(args, script_dir):
-
+        slurm = args["slurm"]
+        
         #set thread count for processing
         max_threads = str(multiprocessing.cpu_count())
         threads = args["threads"]
@@ -596,38 +605,44 @@ def main():
         #Check md5sums
         utils.checkMd5(work_dir)
 
-
         #create BAM files
         align = args["align"]
         genome = args["genome"]
-
-
-        if align is not None:
-            if align == "hisat2":
-                ##Run FastQC/MultiQC
-                skip_fastqc = args["skip_fastqc"]
-                file_extension = utils.get_extension(work_dir)
-                if not skip_fastqc:
-                    utils.fastqc(script_dir, work_dir,threads, file_extension)
-                else:
-                    print("Skipping FastQC/MultiQC analysis")
-
-                utils.trim(script_dir, threads, work_dir)
-                chipseq_utils.hisat2(script_dir, work_dir, threads, chip_seq_settings, genome)
-                utils.indexBam(work_dir, threads)
-            elif "bwa" in align:
-                ##Run FastQC/MultiQC
-                skip_fastqc = args["skip_fastqc"]
-                file_extension = utils.get_extension(work_dir)
-                if not skip_fastqc:
-                    utils.fastqc(script_dir, work_dir,threads, file_extension)
-                else:
-                    print("Skipping FastQC/MultiQC analysis")
-
-                utils.trim(script_dir, threads, work_dir)
-                utils.bwa(work_dir, script_dir, args, threads, chip_seq_settings, genome)
-                utils.indexBam(work_dir, threads)
-
+        
+        #trimming for cluster
+        trim = args["trim"]
+        if trim == True:
+            if slurm == True:
+                utils.trimSLURM(script_dir, work_dir)
+        
+        if slurm == False:
+            if align is not None:
+                if align == "hisat2":
+                    ##Run FastQC/MultiQC
+                    skip_fastqc = args["skip_fastqc"]
+                    file_extension = utils.get_extension(work_dir)
+                    if not skip_fastqc:
+                        utils.fastqc(script_dir, work_dir,threads, file_extension)
+                    else:
+                        print("Skipping FastQC/MultiQC analysis")
+    
+                    utils.trim(script_dir, threads, work_dir)
+                    chipseq_utils.hisat2(script_dir, work_dir, threads, chip_seq_settings, genome)
+                    utils.indexBam(work_dir, threads)
+                elif "bwa" in align:
+                    ##Run FastQC/MultiQC
+                    skip_fastqc = args["skip_fastqc"]
+                    file_extension = utils.get_extension(work_dir)
+                    if not skip_fastqc:
+                        utils.fastqc(script_dir, work_dir,threads, file_extension)
+                    else:
+                        print("Skipping FastQC/MultiQC analysis")
+    
+                    utils.trim(script_dir, threads, work_dir)
+                    utils.bwa(work_dir, script_dir, args, threads, chip_seq_settings, genome)
+                    utils.indexBam(work_dir, threads)
+        else:
+            pass
 
 
         dedup = args["deduplication"]

@@ -19,8 +19,6 @@ import shutil
 import re
 from pathlib import Path
 
-
-
 from clint.textui import colored, puts
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -36,8 +34,8 @@ try:
 except ModuleNotFoundError:
     subprocess.check_call([sys.executable, "-m", "pip", "install", "GitPython"])
 
-###GENERAL FUNCTIONS
 
+###GENERAL FUNCTIONS
 
 def check_whitespace(work_dir):
     if " " in work_dir:
@@ -370,83 +368,87 @@ def checkPicard(script_dir):
         return("picard.jar")
 
 
-def deduplicationBam(script_dir, work_dir, threads, args):
-    #Get Picard location
-    picard = checkPicard(script_dir)
+def deduplicationBam(script_dir, work_dir, threads, args, slurm = False):
+    if slurm == False:
+        #Get Picard location
+        picard = checkPicard(script_dir)
+    
+        file_list = glob.glob(os.path.join(work_dir,"bam","*-sort-bl.bam"))
+        print("Performing deduplication of BAM files")
+        for bam in file_list:
+            dedup_output = bam.replace("-sort-bl.bam",
+                                       "-sort-bl-dedupl.bam")
+            if not file_exists(dedup_output):
+    
+                log_name = os.path.basename(bam).split("-", 1)[0] + "-dedup_metrics.log"
+                log_name = os.path.join(work_dir,
+                                        "bam",
+                                        log_name)
+                picard_command = "java -jar " + picard + " MarkDuplicates INPUT=" + bam + " OUTPUT=" + dedup_output + " REMOVE_DUPLICATES=TRUE METRICS_FILE=" + log_name
+    
+                write2log(work_dir, picard_command, "Deduplication: ")
+    
+                subprocess.run(picard_command,
+                               shell = True)
 
 
-    file_list = glob.glob(os.path.join(work_dir,"bam","*-sort-bl.bam"))
-    print("Performing deduplication of BAM files")
-    for bam in file_list:
-        dedup_output = bam.replace("-sort-bl.bam",
-                                   "-sort-bl-dedupl.bam")
-        if not file_exists(dedup_output):
-
-            log_name = os.path.basename(bam).split("-", 1)[0] + "-dedup_metrics.log"
-            log_name = os.path.join(work_dir,
-                                    "bam",
-                                    log_name)
-            picard_command = "java -jar " + picard + " MarkDuplicates INPUT=" + bam + " OUTPUT=" + dedup_output + " REMOVE_DUPLICATES=TRUE METRICS_FILE=" + log_name
-
-            write2log(work_dir, picard_command, "Deduplication: ")
-
-            subprocess.run(picard_command,
-                           shell = True)
-
-    #plot number of reads after deduplication
-    #get counts from non-deduplicated bam files
-
-    file_list = sorted(glob.glob(os.path.join(work_dir,
-                                       "bam",
-                                       "*-sort-bl.bam")))
-
-    column_names = [os.path.basename(bam).replace("-sort-bl.bam","") for bam in file_list]
-    df = pd.DataFrame(columns = column_names)
-
-    for bam in file_list:
-          count = pysam.view("-@", str(threads) ,"-c", "-F" "260", bam)
-          column = os.path.basename(bam).replace("-sort-bl.bam","")
-          df.loc[1, column] = count
-
-    df["condition"] = "pre-deduplication"
-
-    #get counts for deduplicated bam files
-    file_list = sorted(glob.glob(os.path.join(work_dir,
-                                       "bam",
-                                       "*-sort-bl-dedupl.bam")))
-
-    for bam in file_list:
-          count = pysam.view("-@", str(threads) ,"-c", "-F" "260", bam)
-          column = os.path.basename(bam).replace("-sort-bl-dedupl.bam","")
-          df.loc[2, column] = count
-
-    df.loc[2, "condition"] = "deduplicated"
-
-    #create df for plotting
-    df_melt = pd.melt(df, id_vars = ["condition"],
-                      value_vars = column_names)
-    df_melt["value"] = pd.to_numeric(df_melt["value"])
-    df_melt["value"] = df_melt["value"] / 1000000
-
-    #create plot
-    save_file = os.path.join(work_dir,
-                             "bam",
-                             "read-counts-deduplication.pdf")
-
-    sns.catplot(x = 'variable', y = 'value',
-               hue = 'condition',
-               data = df_melt,
-               kind = 'bar',
-               legend_out = False,
-               edgecolor = "black",)
-    plt.ylabel("Uniquely mapped read count (millions)")
-    plt.xticks(rotation = 45, ha="right")
-    plt.xlabel("")
-    plt.ylim((0, df_melt["value"].max() * 1.3))
-    plt.legend(title = None,
-               frameon = False)
-    plt.tight_layout()
-    plt.savefig(save_file)
+        #plot number of reads after deduplication
+        #get counts from non-deduplicated bam files
+    
+        file_list = sorted(glob.glob(os.path.join(work_dir,
+                                           "bam",
+                                           "*-sort-bl.bam")))
+    
+        column_names = [os.path.basename(bam).replace("-sort-bl.bam","") for bam in file_list]
+        df = pd.DataFrame(columns = column_names)
+    
+        for bam in file_list:
+              count = pysam.view("-@", str(threads) ,"-c", "-F" "260", bam)
+              column = os.path.basename(bam).replace("-sort-bl.bam","")
+              df.loc[1, column] = count
+    
+        df["condition"] = "pre-deduplication"
+    
+        #get counts for deduplicated bam files
+        file_list = sorted(glob.glob(os.path.join(work_dir,
+                                           "bam",
+                                           "*-sort-bl-dedupl.bam")))
+    
+        for bam in file_list:
+              count = pysam.view("-@", str(threads) ,"-c", "-F" "260", bam)
+              column = os.path.basename(bam).replace("-sort-bl-dedupl.bam","")
+              df.loc[2, column] = count
+    
+        df.loc[2, "condition"] = "deduplicated"
+    
+        #create df for plotting
+        df_melt = pd.melt(df, id_vars = ["condition"],
+                          value_vars = column_names)
+        df_melt["value"] = pd.to_numeric(df_melt["value"])
+        df_melt["value"] = df_melt["value"] / 1000000
+    
+        #create plot
+        save_file = os.path.join(work_dir,
+                                 "bam",
+                                 "read-counts-deduplication.pdf")
+    
+        sns.catplot(x = 'variable', y = 'value',
+                   hue = 'condition',
+                   data = df_melt,
+                   kind = 'bar',
+                   legend_out = False,
+                   edgecolor = "black",)
+        plt.ylabel("Uniquely mapped read count (millions)")
+        plt.xticks(rotation = 45, ha="right")
+        plt.xlabel("")
+        plt.ylim((0, df_melt["value"].max() * 1.3))
+        plt.legend(title = None,
+                   frameon = False)
+        plt.tight_layout()
+        plt.savefig(save_file)
+        
+    else:
+        pass
 
 
 def indexBam(work_dir, threads, genome="hg38", slurm=False, script_dir=None):
@@ -783,12 +785,19 @@ def trim(script_dir, threads, work_dir):
         trimSE(work_dir, threads)
 
 
-def trimSLURM(script_dir, work_dir):
+def trimSLURM(script_dir, work_dir, module):
     """
     Creates SLURM bash script for PE-end quality trimming using Trim_galore
 
     """
-    puts(colored.green("Trimming paired-end fastq files"))
+    puts(colored.greenprint("Trimming paired-end fastq files"))
+    
+    if module == "tt-seq":
+        module = "TT-Seq"
+    elif module == "rna-seq":
+        module == "RNA-Seq"
+    elif module == "chip-seq":
+        module = "ChIP-Seq"
     
     #create output directories
     extension = get_extension(work_dir)
@@ -803,11 +812,11 @@ def trimSLURM(script_dir, work_dir):
             slurm_settings = yaml.full_load(file)
     
     #load slurm parameters
-    threads = str(slurm_settings["TT-Seq"]["Trim_galore_CPU"])
-    trim_mem = str(slurm_settings["TT-Seq"]["Trim_galore_mem"])
-    trim_time = str(slurm_settings["TT-Seq"]["Trim_galore_time"])
+    threads = str(slurm_settings[module]["Trim_galore_CPU"])
+    trim_mem = str(slurm_settings[module]["Trim_galore_mem"])
+    trim_time = str(slurm_settings[module]["Trim_galore_time"])
     account = slurm_settings["groupname"]
-    partition = slurm_settings["TT-Seq"]["partition"]
+    partition = slurm_settings[module]["partition"]
     #email = slurm_settings["email"]
     
     

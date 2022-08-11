@@ -16,6 +16,7 @@ import urllib.request
 import shutil
 from pathlib import Path
 import tempfile
+import warnings
 
 from clint.textui import colored, puts
 import pysam
@@ -611,6 +612,7 @@ def retroElements(work_dir, script_dir, rna_seq_settings, threads, genome, slurm
         df = samples.iloc[:,0:2]
         
         #add experiment column
+        warnings.simplefilter('ignore',lineno=616)
         df["exp"] = samples.iloc[:,1+i:2+i]
         
         #remove irrelevant samples (nan)
@@ -673,11 +675,11 @@ def retroElements(work_dir, script_dir, rna_seq_settings, threads, genome, slurm
                 script.write("#SBATCH --mail-type=BEGIN,FAIL,END" + "\n")
                 script.write(f"#SBATCH -p {partition}\n")
                 script.write(f"#SBATCH -D {dir_name}\n")
-                script.write(f"#SBATCH -o slurm/slurm_TEtranscript_{genome}_base.log\n")
+                script.write(f"#SBATCH -o slurm/slurm_TEtranscript_{genome}_{base}.log\n")
                 script.write(f"#SBATCH -c {threads}\n")
                 script.write(f"#SBATCH -t {time}\n")
                 script.write(f"#SBATCH --mem={mem}\n")
-                script.write(f"#SBATCH -J TEtranscript_{genome}\n")
+                script.write(f"#SBATCH -J TEtranscript_{genome}_{base}\n")
                 script.write("\n")
                 script.write(" ".join(command) +"\n")
                 script.close()
@@ -685,8 +687,7 @@ def retroElements(work_dir, script_dir, rna_seq_settings, threads, genome, slurm
                 #submit job to SLURM
                 print("Submitting SLURM script to cluster")
                 script_ = os.path.join(work_dir,"slurm",f"slurm_TEtranscript_{genome}_{base}.sh")
-                job_id = subprocess.check_output(f"sbatch {script} | cut -d ' ' -f 4", shell = True)
-                print(f"Job ID: {job_id}")
+                #subprocess.call(f"sbatch {script} | cut -d ' ' -f 4", shell = True)
                     
     
         
