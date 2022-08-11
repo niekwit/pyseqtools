@@ -852,8 +852,7 @@ def trimSLURM(script_dir, work_dir, module):
     script.write("#!/bin/bash" + "\n")
     script.write("\n")
     script.write("#SBATCH -A " + account + "\n")
-    script.write("#SBATCH --mail-type=FAIL" + "\n")
-    script.write("#SBATCH --mail-type=END" + "\n")
+    script.write("#SBATCH --mail-type=BEGIN,END,FAIL" + "\n")
     script.write("#SBATCH -p " + partition + "\n")
     script.write("#SBATCH -D " + work_dir + "\n")
     script.write("#SBATCH -o slurm/slurm_trim%a.log" + "\n")
@@ -874,7 +873,7 @@ def trimSLURM(script_dir, work_dir, module):
     print("Submitting slurm_trim.sh to cluster")
     job_id = subprocess.check_output(f"sbatch {script} | cut -d ' ' -f 4", shell = True)
     job_id = job_id.decode("utf-8").replace("\n","")
-    print(f"Quality trimming completed (job id {job_id})")
+    print(f"Quality trimming submitted (job id {job_id})")
     return(job_id)
 
 def blackList(script_dir, genome):
