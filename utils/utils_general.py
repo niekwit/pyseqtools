@@ -790,7 +790,7 @@ def trimSLURM(script_dir, work_dir, module):
     Creates SLURM bash script for PE-end quality trimming using Trim_galore
 
     """
-    puts(colored.greenprint("Trimming paired-end fastq files"))
+    puts(colored.green("Trimming paired-end fastq files"))
     
     if module == "tt-seq":
         module = "TT-Seq"
