@@ -35,187 +35,189 @@ import utils_general as utils
  
 
 def hisat2(script_dir, work_dir, threads, chip_seq_settings, genome, slurm = False):
-    ###check for HISAT2###
-    path = os.environ["PATH"].lower()
     
-    if "hisat2" not in path:
-        #Check for HISAT2 elsewhere
-        try:
-            hisat2 = [line[0:] for line in subprocess.check_output("find $HOME -name hisat2 ! -path '*/multiqc*'",
-                                                                   shell = True).splitlines()]
-            hisat2 = hisat2[0].decode("utf-8")
-        except:
-            print("WARNING: HISAT2 was not found\nInstalling HISAT2 now")
-            url = "https://cloud.biohpc.swmed.edu/index.php/s/hisat2-220-Linux_x86_64/download"
-            download_file = os.path.join(script_dir,"hisat2-2.2.0-Linux_x86_64.zip")
-            urllib.request.urlretrieve(url,download_file)
-            
-            #unzip HISAT2 file
-            subprocess.run(["unzip", download_file, "-d", script_dir])
-            
-           
-            
-            hisat2 = os.path.join(script_dir, 
-                                  "hisat2-2.2.0", 
-                                  "hisat2")
-            #remove download file
-            os.remove(download_file)
-            
-    else:
-        hisat2 = "hisat2"
-    
-    ###check for HISAT2 index###
-    index = chip_seq_settings["hisat2"][genome]
-    
-    def indexFromFasta(script_dir, hisat2, genome, fasta):
-        #build HISAT2 index from genome fasta
-        index_location = os.path.join(script_dir,
-                                 "index",
-                                 "hisat2",
-                                 genome,
-                                 "index")
-        os.makedirs(os.path.join(script_dir,
-                                 "index",
-                                 "hisat2",
-                                 genome), 
-                    exist_ok = True)
+    if slurm == False:
+        ###check for HISAT2###
+        path = os.environ["PATH"].lower()
         
-        #get full location of hisat2 to make hisat2-build command
-        if hisat2 == "hisat2":
-            path = os.environ["PATH"]
-            path = path.split(":")
-            for i in path:
-                if "hisat2" in i:
-                    hisat2_dir = i
-        
-            hisat2_build = os.path.join(hisat2_dir,"hisat2-build")
-        else:
-            hisat2_build = hisat2 + "-build"
-            
-        build_command = "python3 " + hisat2_build + " " + fasta + " " + index_location
-                    
-        utils.write2log(work_dir, build_command, "HISAT2 build index: ")
-        subprocess.run(build_command, shell = True)
-        
-        #add index to chip-seq.yaml
-        with open(os.path.join(script_dir, "yaml", "chip-seq.yaml")) as f:
-                doc = yaml.safe_load(f)
-                
-        doc["hisat2"][genome] = index_location
-        with open(os.path.join(script_dir,"yaml" ,"chip-seq.yaml"), "w") as f:
-            yaml.dump(doc,f)
-            
-        return(index_location)
-    
-    if index == "":
-        if chip_seq_settings["fasta"][genome] == "":
+        if "hisat2" not in path:
+            #Check for HISAT2 elsewhere
             try:
-                print("WARNING: HISAT2 index was not found")
-                print("WARNING: no " + genome + " fasta file was found")
-                print("Downloading pre-build index for " + genome)
+                hisat2 = [line[0:] for line in subprocess.check_output("find $HOME -name hisat2 ! -path '*/multiqc*'",
+                                                                       shell = True).splitlines()]
+                hisat2 = hisat2[0].decode("utf-8")
+            except:
+                print("WARNING: HISAT2 was not found\nInstalling HISAT2 now")
+                url = "https://cloud.biohpc.swmed.edu/index.php/s/hisat2-220-Linux_x86_64/download"
+                download_file = os.path.join(script_dir,"hisat2-2.2.0-Linux_x86_64.zip")
+                urllib.request.urlretrieve(url,download_file)
                 
-                if genome == "hg19":
-                    url = "https://genome-idx.s3.amazonaws.com/hisat/hg19_genome.tar.gz"
-                elif genome == "hg38":
-                    url = "https://genome-idx.s3.amazonaws.com/hisat/hg38_genome.tar.gz"
-                elif genome == "mm10":
-                    url = "https://genome-idx.s3.amazonaws.com/hisat/mm10_genome.tar.gz"
-                else:
-                    pass
+                #unzip HISAT2 file
+                subprocess.run(["unzip", download_file, "-d", script_dir])
                 
-                download_file = os.path.join(script_dir, 
-                                             os.path.basename(url))
+               
                 
-                if not utils.file_exists(download_file):
-                    urllib.request.urlretrieve(url, 
-                                               download_file)
-                
-                index_dir = os.path.join(script_dir, 
-                                         "index", 
-                                         "hisat2",
-                                         genome)
-                os.makedirs(index_dir, 
-                            exist_ok = True)
-                
-                #untar index file
-                tar_command = "tar -xzf " + download_file + " --directory " + index_dir
-                subprocess.run(tar_command,
-                               shell = True)
-                
-                #write index path to yaml
-                index_path = glob.glob(index_dir + "*/*/*.ht2")
-                index_path = index_path[0].split(".", 1)[0]
-                
-                with open(os.path.join(script_dir, "yaml", "chip-seq.yaml")) as f:
-                    doc = yaml.safe_load(f)
-                
-                doc["hisat2"][genome] = index_dir
-                with open(os.path.join(script_dir,"yaml" ,"chip-seq.yaml"), "w") as f:
-                    yaml.dump(doc,f)
-                
+                hisat2 = os.path.join(script_dir, 
+                                      "hisat2-2.2.0", 
+                                      "hisat2")
                 #remove download file
                 os.remove(download_file)
                 
-            except: #backup method in case index files are offline
-                print("WARNING: genome index not available from genome-idx.s3.amazonaws.com")
-                                
-                def downloadFasta(script_dir, chromosomes, genome):
-                    
-                    base_path = "ftp://hgdownload.cse.ucsc.edu/goldenPath"
-                    chromosome_dir = "chromosomes"
-                    extension = ".fa.gz"
-                    
-                    #prepare list with urls for each chromosome fasta file
-                    download_file_list = []
-                    for i in range(1, chromosomes):
-                        file = os.path.join(base_path, 
-                                            genome,
-                                            chromosome_dir,
-                                            "chr" + str(i) + extension)
-                        download_file_list.append(file)
-                    download_file_list.append(os.path.join(base_path, 
-                                                  genome,
-                                                  chromosome_dir,
-                                                  "chr" + "X" + extension))
-                    download_file_list.append(os.path.join(base_path, 
-                                                  genome,
-                                                  chromosome_dir,
-                                                  "chr" + "Y" + extension))
-                    
-                    os.makedirs(os.path.join(script_dir, 
-                                             "fasta", 
-                                             genome), exist_ok = True)
-                    out_put_list = [os.path.join(script_dir, 
-                                                 "fasta", 
-                                                 genome, 
-                                                 os.path.basename(i)) for i in download_file_list]
-                    #download fasta files
-                    print("Downloading fasta files from UCSC needed for building HISAT2 index")
-                  
-                    for i,j in zip(download_file_list, out_put_list):
-                        urllib.request.urlretrieve(i, j)
+        else:
+            hisat2 = "hisat2"
+        
+        ###check for HISAT2 index###
+        index = chip_seq_settings["hisat2"][genome]
+        
+        def indexFromFasta(script_dir, hisat2, genome, fasta):
+            #build HISAT2 index from genome fasta
+            index_location = os.path.join(script_dir,
+                                     "index",
+                                     "hisat2",
+                                     genome,
+                                     "index")
+            os.makedirs(os.path.join(script_dir,
+                                     "index",
+                                     "hisat2",
+                                     genome), 
+                        exist_ok = True)
+            
+            #get full location of hisat2 to make hisat2-build command
+            if hisat2 == "hisat2":
+                path = os.environ["PATH"]
+                path = path.split(":")
+                for i in path:
+                    if "hisat2" in i:
+                        hisat2_dir = i
+            
+                hisat2_build = os.path.join(hisat2_dir,"hisat2-build")
+            else:
+                hisat2_build = hisat2 + "-build"
+                
+            build_command = "python3 " + hisat2_build + " " + fasta + " " + index_location
                         
-                    #concatenate fasta files to build genome fasta
-                    print("Building whole genome fasta file")
-                    ucsc_fasta = os.path.join(script_dir, "fasta", genome, "ucsc." + genome + ".fasta")
-                    zcat_command = "zcat " + " ".join(out_put_list) + " > " + ucsc_fasta
-                    utils.write2log(work_dir,zcat_command,"Build fasta: ")
-                    subprocess.run(zcat_command, shell = True)
+            utils.write2log(work_dir, build_command, "HISAT2 build index: ")
+            subprocess.run(build_command, shell = True)
+            
+            #add index to chip-seq.yaml
+            with open(os.path.join(script_dir, "yaml", "chip-seq.yaml")) as f:
+                    doc = yaml.safe_load(f)
                     
-                    #remove downloaded fasta files
-                    for i in out_put_list:
-                        os.remove(i)
+            doc["hisat2"][genome] = index_location
+            with open(os.path.join(script_dir,"yaml" ,"chip-seq.yaml"), "w") as f:
+                yaml.dump(doc,f)
+                
+            return(index_location)
+    
+        if index == "":
+            if chip_seq_settings["fasta"][genome] == "":
+                try:
+                    print("WARNING: HISAT2 index was not found")
+                    print("WARNING: no " + genome + " fasta file was found")
+                    print("Downloading pre-build index for " + genome)
                     
-                    #add genome fasta file to chip-seq.yaml
+                    if genome == "hg19":
+                        url = "https://genome-idx.s3.amazonaws.com/hisat/hg19_genome.tar.gz"
+                    elif genome == "hg38":
+                        url = "https://genome-idx.s3.amazonaws.com/hisat/hg38_genome.tar.gz"
+                    elif genome == "mm10":
+                        url = "https://genome-idx.s3.amazonaws.com/hisat/mm10_genome.tar.gz"
+                    else:
+                        pass
+                    
+                    download_file = os.path.join(script_dir, 
+                                                 os.path.basename(url))
+                    
+                    if not utils.file_exists(download_file):
+                        urllib.request.urlretrieve(url, 
+                                                   download_file)
+                    
+                    index_dir = os.path.join(script_dir, 
+                                             "index", 
+                                             "hisat2",
+                                             genome)
+                    os.makedirs(index_dir, 
+                                exist_ok = True)
+                    
+                    #untar index file
+                    tar_command = "tar -xzf " + download_file + " --directory " + index_dir
+                    subprocess.run(tar_command,
+                                   shell = True)
+                    
+                    #write index path to yaml
+                    index_path = glob.glob(index_dir + "*/*/*.ht2")
+                    index_path = index_path[0].split(".", 1)[0]
+                    
                     with open(os.path.join(script_dir, "yaml", "chip-seq.yaml")) as f:
                         doc = yaml.safe_load(f)
                     
-                    doc["fasta"][genome] = ucsc_fasta
-                    
+                    doc["hisat2"][genome] = index_dir
                     with open(os.path.join(script_dir,"yaml" ,"chip-seq.yaml"), "w") as f:
                         yaml.dump(doc,f)
                     
-                    return(ucsc_fasta)
+                    #remove download file
+                    os.remove(download_file)
+                    
+                except: #backup method in case index files are offline
+                    print("WARNING: genome index not available from genome-idx.s3.amazonaws.com")
+                                    
+                    def downloadFasta(script_dir, chromosomes, genome):
+                        
+                        base_path = "ftp://hgdownload.cse.ucsc.edu/goldenPath"
+                        chromosome_dir = "chromosomes"
+                        extension = ".fa.gz"
+                        
+                        #prepare list with urls for each chromosome fasta file
+                        download_file_list = []
+                        for i in range(1, chromosomes):
+                            file = os.path.join(base_path, 
+                                                genome,
+                                                chromosome_dir,
+                                                "chr" + str(i) + extension)
+                            download_file_list.append(file)
+                        download_file_list.append(os.path.join(base_path, 
+                                                      genome,
+                                                      chromosome_dir,
+                                                      "chr" + "X" + extension))
+                        download_file_list.append(os.path.join(base_path, 
+                                                      genome,
+                                                      chromosome_dir,
+                                                      "chr" + "Y" + extension))
+                        
+                        os.makedirs(os.path.join(script_dir, 
+                                                 "fasta", 
+                                                 genome), exist_ok = True)
+                        out_put_list = [os.path.join(script_dir, 
+                                                     "fasta", 
+                                                     genome, 
+                                                     os.path.basename(i)) for i in download_file_list]
+                        #download fasta files
+                        print("Downloading fasta files from UCSC needed for building HISAT2 index")
+                      
+                        for i,j in zip(download_file_list, out_put_list):
+                            urllib.request.urlretrieve(i, j)
+                            
+                        #concatenate fasta files to build genome fasta
+                        print("Building whole genome fasta file")
+                        ucsc_fasta = os.path.join(script_dir, "fasta", genome, "ucsc." + genome + ".fasta")
+                        zcat_command = "zcat " + " ".join(out_put_list) + " > " + ucsc_fasta
+                        utils.write2log(work_dir,zcat_command,"Build fasta: ")
+                        subprocess.run(zcat_command, shell = True)
+                        
+                        #remove downloaded fasta files
+                        for i in out_put_list:
+                            os.remove(i)
+                        
+                        #add genome fasta file to chip-seq.yaml
+                        with open(os.path.join(script_dir, "yaml", "chip-seq.yaml")) as f:
+                            doc = yaml.safe_load(f)
+                        
+                        doc["fasta"][genome] = ucsc_fasta
+                        
+                        with open(os.path.join(script_dir,"yaml" ,"chip-seq.yaml"), "w") as f:
+                            yaml.dump(doc,f)
+                        
+                        return(ucsc_fasta)
                
                 if genome == "hg19":
                     ucsc_fasta = downloadFasta(script_dir, 23, "hg19")
@@ -250,93 +252,166 @@ def hisat2(script_dir, work_dir, threads, chip_seq_settings, genome, slurm = Fal
                     
                 with open(os.path.join(script_dir,"yaml" ,"chip-seq.yaml"), "w") as f:
                     yaml.dump(doc,f)
-    else:
-        index_location = index
-    
-    #load blacklist
-    blacklist = utils.blackList(script_dir, genome)
-    
-    ###perform alignment with HISAT2###
-    os.makedirs(os.path.join(work_dir, "bam"), exist_ok = True)
-    
-    def alignSE(work_dir, hisat2, blacklist, index_location, threads, genome):
-        file_list = glob.glob(os.path.join(work_dir, "trim","*trimmed.fq.gz"))
+        else:
+            index_location = index
         
-        print("Generating BAM files with HISAT2 (single-end mode)")
+        #load blacklist
+        blacklist = utils.blackList(script_dir, genome)
         
-        for file in file_list:
+        
+        ###perform alignment with HISAT2###
+        os.makedirs(os.path.join(work_dir, "bam"), exist_ok = True)
+        
+        def alignSE(work_dir, hisat2, blacklist, index_location, threads, genome):
+            file_list = glob.glob(os.path.join(work_dir, "trim","*trimmed.fq.gz"))
             
-            if genome == "dm3-ic":
-                hisat2_output = os.path.basename(file).replace("_trimmed.fq.gz",
-                                                               "-dm3ic-sort-bl.bam")
-            else:
-                hisat2_output = os.path.basename(file).replace("_trimmed.fq.gz",
+            print("Generating BAM files with HISAT2 (single-end mode)")
+            
+            for file in file_list:
+                
+                if genome == "dm3-ic":
+                    hisat2_output = os.path.basename(file).replace("_trimmed.fq.gz",
+                                                                   "-dm3ic-sort-bl.bam")
+                else:
+                    hisat2_output = os.path.basename(file).replace("_trimmed.fq.gz",
+                                                                   "-sort-bl.bam")
+                    
+                hisat2_output = os.path.join(work_dir,"bam",hisat2_output)
+                
+                if not utils.file_exists(hisat2_output):
+                    samtools = utils.checkSamtools(script_dir)
+                    bedtools = utils.checkBedtools(script_dir)
+                    
+                    
+                    align_command = "zcat " + file + " | " + hisat2 + " -p " + str(threads) + " -x " + index_location + " - 2>> align.log | " + samtools + " view -q 15 -F 260 -bS -@ " + str(threads) + " - | " + bedtools + " intersect -v -a 'stdin' -b " + blacklist + " -nonamecheck | " + samtools + " sort -@ " + str(threads) + " - > " + hisat2_output
+                    
+                    utils.write2log(work_dir, align_command, "HISAT2: ")
+                    
+                    print(os.path.basename(file) + ":", file = open("align.log", "a"))
+                    print("Aligning " + os.path.basename(file))
+                    subprocess.run(align_command,
+                               shell = True)
+    
+    
+        def alignPE(work_dir, hisat2, blacklist, index_location, threads, genome):
+            file_list = glob.glob(os.path.join(work_dir, "trim","*1_val_1.fq.gz"))
+            
+            print("Generating BAM files with HISAT2 (paired-end mode)")
+            samtools = utils.checkSamtools(script_dir)
+            bedtools = utils.checkBedtools(script_dir)
+            
+            for read1 in file_list:
+                read2 = read1.replace("R1_001_val_1.fq.gz", 
+                                      "R2_001_val_2.fq.gz")
+                
+                
+                if genome == "dm3-ic":
+                    hisat2_output = os.path.basename(read1).replace("_R1_001_val_1.fq.gz",
+                                                                   "-dm3ic-sort-bl.bam")
+                else:
+                    hisat2_output = os.path.basename(read1).replace("_R1_001_val_1.fq.gz",
                                                                "-sort-bl.bam")
+                hisat2_output = os.path.join(work_dir,
+                                             "bam",
+                                             hisat2_output)
                 
-            hisat2_output = os.path.join(work_dir,"bam",hisat2_output)
+                if not utils.file_exists(hisat2_output):
+                    
+                                    
+                    align_command = hisat2 + " -p " + str(threads) + " -x " + index_location
+                    align_command = align_command + " -1 " + read1 + " -2 " + read2
+                    align_command = align_command + " 2>> align.log | " + samtools + " view -q 15 -F 260 -bS -@ "
+                    align_command = align_command + threads + " - | " + bedtools + " intersect -v -a 'stdin' -b "
+                    align_command = align_command + blacklist + " -nonamecheck | " + samtools + " sort -@ "
+                    align_command = align_command + threads + " - > " + hisat2_output
+                    
+                    utils.write2log(work_dir, align_command, "HISAT2 PE: ")
+                    
+                    print(os.path.basename(read1.replace("_R1_001_val_1.fq.gz","")) + ":", file = open("align.log", "a"))
+                    subprocess.run(align_command, shell = True)
+                    
+               
+        if utils.getEND(work_dir) == "PE":
+            alignPE(work_dir, hisat2, blacklist, index_location, threads, genome)
+        elif utils.getEND(work_dir) == "SE":
+            alignSE(work_dir, hisat2, blacklist, index_location, threads, genome)
+    
+            #plot alignment rate
             
-            if not utils.file_exists(hisat2_output):
-                samtools = utils.checkSamtools(script_dir)
-                bedtools = utils.checkBedtools(script_dir)
-                
-                
-                align_command = "zcat " + file + " | " + hisat2 + " -p " + str(threads) + " -x " + index_location + " - 2>> align.log | " + samtools + " view -q 15 -F 260 -bS -@ " + str(threads) + " - | " + bedtools + " intersect -v -a 'stdin' -b " + blacklist + " -nonamecheck | " + samtools + " sort -@ " + str(threads) + " - > " + hisat2_output
-                
-                utils.write2log(work_dir, align_command, "HISAT2: ")
-                
-                print(os.path.basename(file) + ":", file = open("align.log", "a"))
-                print("Aligning " + os.path.basename(file))
-                subprocess.run(align_command,
-                           shell = True)
-
-
-    def alignPE(work_dir, hisat2, blacklist, index_location, threads, genome):
-        file_list = glob.glob(os.path.join(work_dir, "trim","*1_val_1.fq.gz"))
+            
+            #plot number of reads before deduplication
+            
+            
+    else: #HISAT2 alignment on cluster
+        puts(colored.green(f"Aligning quality trimmed files to {genome} using HISAT2"))
+    
+    
+        #it is assumed that all data is paired-end, and hisat2/samtools/bedtools are in $PATH
+        read1_list = glob.glob(os.path.join(work_dir, "trim","*R1_001_val_1.fq.gz"))
+        if len(read1_list) == 0:
+            puts(colored.red("ERROR: no fastq files found in trim/"))
         
-        print("Generating BAM files with HISAT2 (paired-end mode)")
-        samtools = utils.checkSamtools(script_dir)
-        bedtools = utils.checkBedtools(script_dir)
+        #create BAM directory
+        os.makedirs(os.path.join(work_dir,"bam", genome), exist_ok = True)
         
-        for read1 in file_list:
-            read2 = read1.replace("R1_001_val_1.fq.gz", 
-                                  "R2_001_val_2.fq.gz")
+        #load HISAT2 index
+        index = chip_seq_settings["hisat2"][genome]
+        
+        #load blacklist
+        blacklist = chip_seq_settings["blacklist"][genome]
+
+        #load SLURM settings
+        with open(os.path.join(script_dir,"yaml","slurm.yaml")) as file:
+            slurm_settings = yaml.full_load(file)        
+
+        threads = slurm_settings["ChIP-Seq"]["hisat2_CPU"]
+        mem = slurm_settings["ChIP-Seq"]["hisat2_mem"]
+        time = slurm_settings["ChIP-Seq"]["hisat2_time"]
+        account = slurm_settings["groupname"]
+        partition = slurm_settings["ChIP-Seq"]["partition"]
+
+        for read1 in read1_list:
+            read2 = read1.replace("R1_001_val_1.fq.gz","R2_001_val_2.fq.gz")
+            out_put_file = os.path.basename(read1.replace("R1_001_val_1.fq.gz","-sort-bl.bam"))
+            out_put_file = os.path.join(work_dir, "bam", genome, out_put_file)
             
-            
-            if genome == "dm3-ic":
-                hisat2_output = os.path.basename(read1).replace("_R1_001_val_1.fq.gz",
-                                                               "-dm3ic-sort-bl.bam")
-            else:
-                hisat2_output = os.path.basename(read1).replace("_R1_001_val_1.fq.gz",
-                                                           "-sort-bl.bam")
-            hisat2_output = os.path.join(work_dir,
-                                         "bam",
-                                         hisat2_output)
-            
-            if not utils.file_exists(hisat2_output):
+            if not utils.file_exists(out_put_file):
+                command = ["hisat2","-p", threads, "-x", index, "-1", read1, "-2", read2,
+                           "|", "samtools", "view", "-q", "15", "-F", "260", "-bS", "-@",
+                           threads, "-", "|", "bedtools", "intersect","-v", "-a", "'stdin'",
+                           "-b", blacklist, "-nonamecheck", "|", "samtools", "sort", "-@",
+                           threads, "-", ">", out_put_file]
+                os.makedirs(os.path.join(work_dir,"slurm"), exist_ok = True)
+                csv = os.path.join(work_dir,"slurm",f"slurm_hisat2_{genome}.csv")
+                csv = open(csv, "a")  
+                csv.write(" ".join(command) +"\n")
+                csv.close()  
                 
-                                
-                align_command = hisat2 + " -p " + str(threads) + " -x " + index_location
-                align_command = align_command + " -1 " + read1 + " -2 " + read2
-                align_command = align_command + " 2>> align.log | " + samtools + " view -q 15 -F 260 -bS -@ "
-                align_command = align_command + threads + " - | " + bedtools + " intersect -v -a 'stdin' -b "
-                align_command = align_command + blacklist + " -nonamecheck | " + samtools + " sort -@ "
-                align_command = align_command + threads + " - > " + hisat2_output
+                print(f"Generating slurm_hisat2_{genome}.sh")
+                csv = os.path.join(work_dir,"slurm",f"slurm_hisat2_{genome}.csv")
+                commands = int(subprocess.check_output(f"cat {csv} | wc -l", shell = True).decode("utf-8"))
+                script_ = os.path.join(work_dir,"slurm","slurm_hisat2_{genome}.sh")
+                script = open(script_, "w")  
+                script.write("#!/bin/bash" + "\n")
+                script.write("\n")
+                script.write(f"#SBATCH -A {account}\n")
+                script.write("#SBATCH --mail-type=BEGIN,FAIL,END" + "\n")
+                script.write(f"#SBATCH -p {partition}\n")
+                script.write(f"#SBATCH -D {work_dir}\n")
+                script.write("#SBATCH -o slurm/slurm_hisat2_%a.log" + "\n")
+                script.write(f"#SBATCH -c {threads}\n")
+                script.write(f"#SBATCH -t {time}\n")
+                script.write(f"#SBATCH --mem={mem}\n")
+                script.write("#SBATCH -J hisat2\n")
+                script.write(f"#SBATCH -a  1-{str(commands)}\n")
+                script.write("\n")
+                script.write("sed -n ${SLURM_ARRAY_TASK_ID}p " + f"{csv} | bash\n")
+                script.close()
+                script_ = os.path.join(work_dir,"slurm","slurm_hisat2_{genome}.sh")
                 
-                utils.write2log(work_dir, align_command, "HISAT2 PE: ")
-                
-                print(os.path.basename(read1.replace("_R1_001_val_1.fq.gz","")) + ":", file = open("align.log", "a"))
-                subprocess.run(align_command, shell = True)
-                
-           
-    if utils.getEND(work_dir) == "PE":
-        alignPE(work_dir, hisat2, blacklist, index_location, threads, genome)
-    elif utils.getEND(work_dir) == "SE":
-        alignSE(work_dir, hisat2, blacklist, index_location, threads, genome)
-    
-    #plot alignment rate
-    
-    
-    #plot number of reads before deduplication
+                print("Submitting SLURM script to cluster")
+                job_id_hisat2 = subprocess.check_output(f"sbatch {script_} | cut -d ' ' -f 4", shell = True)
+                print(f"SLURM job submitted successfully (job ID {job_id_hisat2})")
     
 
 def downsample(script_dir, work_dir, threads):
