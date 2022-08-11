@@ -593,7 +593,7 @@ def main():
                  rnaseq_utils.retroElements(work_dir, script_dir, rna_seq_settings, threads, genome, slurm)
              
 
-    def chip_seq(args, script_dir):
+    def chip_seq(args, script_dir, module):
         slurm = args["slurm"]
         
         #set thread count for processing
@@ -613,7 +613,7 @@ def main():
         trim = args["trim"]
         if trim == True:
             if slurm == True:
-                utils.trimSLURM(script_dir, work_dir)
+                utils.trimSLURM(script_dir, work_dir, module)
         
         if slurm == False:
             if align is not None:
@@ -892,7 +892,7 @@ def main():
     elif args["module"] == "rna-seq":
         rna_seq(args, script_dir)
     elif args["module"] == "chip-seq":
-        chip_seq(args, script_dir)
+        chip_seq(args, script_dir, args["module"])
     elif args["module"] == "tt-seq":
         ttSeq(args, script_dir)
     elif args["module"] == "cutrun":
