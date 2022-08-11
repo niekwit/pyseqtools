@@ -1,14 +1,11 @@
-options(java.parameters = "-Xmx30000m") #increase available memory for java
+options(java.parameters = "-Xmx30000m") #increase available memory for java required for xlsx package to function properly
 
 library(DESeq2)
 library(dplyr)
 library(RColorBrewer)
-library(pheatmap)
 library(biomaRt)
-
+library(pheatmap)
 library(xlsx)
-
-
 
 #get parsed arguments
 args <- commandArgs(trailingOnly=TRUE)
@@ -120,8 +117,6 @@ if (file.exists(deseq2.output) == FALSE) {
         
         #annotate data frame
         df$ensembl_id <- res@rownames
-        
-        
         genes.table <- getBM(filters = "ensembl_gene_id", attributes = c("ensembl_gene_id", "external_gene_name","description",
                                                                        "gene_biotype", "chromosome_name","start_position",
                                                                        "end_position", "percentage_gene_gc_content"), 
@@ -134,9 +129,7 @@ if (file.exists(deseq2.output) == FALSE) {
         df$gene_length <- df$end_position - df$start_position
         df.master[[length(df.master)+1]] <- df
         names(df.master)[length(df.master)] <- comparison
-        
-        
-      }
+        }
     }
     
     #save data frames to separate sheets of an excel file
@@ -147,13 +140,25 @@ if (file.exists(deseq2.output) == FALSE) {
       if (i == 1) {
         write.xlsx2(df.master[[i]], file=excel, sheetName=sheet, row.names = FALSE)
       }else{write.xlsx2(df.master[[i]], file=excel, sheetName=sheet, append = TRUE, row.names = FALSE)}
-      
     }
+    
+    #generate heatmap of sample distances
+    vsd <- vst(dds, blind=FALSE) #count data transformation for visualisation
+    sampleDists <- dist(t(assay(vsd)))
+    sampleDistMatrix <- as.matrix(sampleDists)
+    rownames(sampleDistMatrix) <- paste0(dds$geno_cond,rep(c("_1","_2","_3"),4))
+    colnames(sampleDistMatrix) <- NULL
+    colors <- colorRampPalette( rev(brewer.pal(9, "Blues")) )(255)
+    pheatmap(sampleDistMatrix,
+             clustering_distance_rows=sampleDists,
+             clustering_distance_cols=sampleDists,
+             col=colors,
+             filename = file.path(work.dir,"DESeq2","sample_distance_heatmap.pdf"))
+    
+    #plot PCA
+    pdf(file=file.path(work.dir,"DESeq2","PCA_plot.pdf"))
+    plotPCA(vsd, intgroup=c("genotype","condition"))
+    dev.off()
   }
 }
-  
-
-
-
-
 
