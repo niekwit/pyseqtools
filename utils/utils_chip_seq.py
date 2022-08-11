@@ -374,7 +374,7 @@ def hisat2SLURM(script_dir, work_dir, threads, chip_seq_settings, genome):
 
     for read1 in read1_list:
         read2 = read1.replace("R1_001_val_1.fq.gz","R2_001_val_2.fq.gz")
-        out_put_file = os.path.basename(read1.replace("R1_001_val_1.fq.gz","-sort-bl.bam"))
+        out_put_file = os.path.basename(read1.replace("_R1_001_val_1.fq.gz","-sort-bl.bam"))
         out_put_file = os.path.join(work_dir, "bam", genome, out_put_file)
         
         if not utils.file_exists(out_put_file):
@@ -413,7 +413,7 @@ def hisat2SLURM(script_dir, work_dir, threads, chip_seq_settings, genome):
     
     print("Submitting SLURM script to cluster")
     job_id_hisat2 = subprocess.check_output(f"sbatch {script_} | cut -d ' ' -f 4", shell = True)
-    job_id_hisat2 = job_id_hisat2.decode("UTF-8")
+    job_id_hisat2 = job_id_hisat2.decode("UTF-8").replace("\n","")
     print(f"SLURM job submitted successfully (job ID {job_id_hisat2})")       
     
 
