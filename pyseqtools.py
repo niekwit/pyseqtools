@@ -185,7 +185,7 @@ def main():
                              help = "Rename fq files")
     parser_chip.add_argument("-g", "--genome",
                              required = False,
-                             default = 'hg19',
+                             default = "hg38",
                              help = "Choose reference genome (default is hg19)")
     parser_chip.add_argument("--trim",
                              action = 'store_true',
@@ -652,7 +652,7 @@ def main():
                 utils.deduplicationBam(script_dir, work_dir, threads, args)
                 utils.indexBam(work_dir, threads)
             else:
-                pass
+                utils.deduplicationSLURM(script_dir, work_dir, genome)
 
         bigwig = args["bigwig"]
         if bigwig == True:
