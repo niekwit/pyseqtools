@@ -642,17 +642,22 @@ def main():
                     utils.bwa(work_dir, script_dir, args, threads, chip_seq_settings, genome)
                     utils.indexBam(work_dir, threads)
         else:
-            pass
+            if align == "hisat2":
+                chipseq_utils.hisat2(script_dir, work_dir, threads, chip_seq_settings, genome)
 
 
         dedup = args["deduplication"]
         if dedup == True:
-            utils.deduplicationBam(script_dir, work_dir, threads, args)
-            utils.indexBam(work_dir, threads)
+            if slurm == False:
+                utils.deduplicationBam(script_dir, work_dir, threads, args)
+                utils.indexBam(work_dir, threads)
+            else:
+                pass
 
         bigwig = args["bigwig"]
         if bigwig == True:
-            utils.createBigWig(work_dir, threads)
+            if slurm== False:
+                utils.createBigWig(work_dir, threads)
 
         qc = args["qc"]
         if qc == True:
