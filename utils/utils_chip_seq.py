@@ -392,7 +392,7 @@ def hisat2SLURM(script_dir, work_dir, threads, chip_seq_settings, genome):
     print(f"Generating slurm_hisat2_{genome}.sh")
     csv = os.path.join(work_dir,"slurm",f"slurm_hisat2_{genome}.csv")
     commands = int(subprocess.check_output(f"cat {csv} | wc -l", shell = True).decode("utf-8"))
-    script_ = os.path.join(work_dir,"slurm","slurm_hisat2_{genome}.sh")
+    script_ = os.path.join(work_dir,"slurm",f"slurm_hisat2_{genome}.sh")
     script = open(script_, "w")  
     script.write("#!/bin/bash" + "\n")
     script.write("\n")
@@ -409,7 +409,6 @@ def hisat2SLURM(script_dir, work_dir, threads, chip_seq_settings, genome):
     script.write("\n")
     script.write("sed -n ${SLURM_ARRAY_TASK_ID}p " + f"{csv} | bash\n")
     script.close()
-    script_ = os.path.join(work_dir,"slurm","slurm_hisat2_{genome}.sh")
     
     print("Submitting SLURM script to cluster")
     job_id_hisat2 = subprocess.check_output(f"sbatch {script_} | cut -d ' ' -f 4", shell = True)
