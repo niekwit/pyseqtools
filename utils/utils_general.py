@@ -369,6 +369,9 @@ def checkPicard(script_dir):
 
 
 def deduplicationBam(script_dir, work_dir, threads, args, slurm = False):
+    '''
+    Deduplication of BAM files with PICARD
+    '''
     if slurm == False:
         #Get Picard location
         picard = checkPicard(script_dir)
