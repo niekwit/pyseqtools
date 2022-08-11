@@ -873,7 +873,7 @@ def trimSLURM(script_dir, work_dir, module):
     
     print("Submitting slurm_trim.sh to cluster")
     job_id = subprocess.check_output(f"sbatch {script} | cut -d ' ' -f 4", shell = True)
-    job_id = job_id.decode("utf-8").relpace("\n","")
+    job_id = job_id.decode("utf-8").replace("\n","")
     print(f"Quality trimming completed (job id {job_id})")
     return(job_id)
 
