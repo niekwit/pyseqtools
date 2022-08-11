@@ -1,14 +1,19 @@
+options(java.parameters = "-Xmx30000m") #increase available memory for java
+
 library(DESeq2)
 library(dplyr)
 library(RColorBrewer)
 library(pheatmap)
-library(xlsx)
 library(biomaRt)
+
+library(xlsx)
+
 
 
 #get parsed arguments
 args <- commandArgs(trailingOnly=TRUE)
 genome <- args[1]
+cutoff <- args[2]
 
 #get working directory
 work.dir <- getwd()
@@ -68,7 +73,7 @@ if (file.exists(deseq2.output) == FALSE) {
   
   #reorder data frame columns
   samples <- rownames(sampleTable)
-  countMatrix <- countMatrix %>% select(samples)
+  countMatrix <- countMatrix %>% dplyr::select(samples)
   
   #load data for gene annotation
   mart <- useMart("ensembl")
@@ -117,23 +122,25 @@ if (file.exists(deseq2.output) == FALSE) {
         df$ensembl_id <- res@rownames
         
         
-        genes.table <- getBM(filters= "ensembl_gene_id", attributes= c("ensembl_gene_id", 
-                                                                       "external_gene_name", "description","gene_biotype", "chromosome_name","start_position","end_position"), 
-                             values= df$ensembl_id, mart= mart) 
+        genes.table <- getBM(filters = "ensembl_gene_id", attributes = c("ensembl_gene_id", "external_gene_name","description",
+                                                                       "gene_biotype", "chromosome_name","start_position",
+                                                                       "end_position", "percentage_gene_gc_content"), 
+                             values = df$ensembl_id, mart = mart) 
         names(genes.table)[1] <- "ensembl_id"
         
         df <- left_join(df,genes.table,by="ensembl_id")
         
         #add data to master data frame
+        df$gene_length <- df$end_position - df$start_position
         df.master[[length(df.master)+1]] <- df
         names(df.master)[length(df.master)] <- comparison
-        df$gene_length <- df$end_position - df$start_position
+        
         
       }
     }
     
     #save data frames to separate sheets of an excel file
-    dir.create(file.path(work.dir,"DESeq2"))
+    dir.create(file.path(work.dir,"DESeq2"), showWarnings = FALSE)
     excel <- file.path(work.dir,"DESeq2","DESeq2.xlsx")
     for (i in 1:length(df.master)){
       sheet <- names(df.master)[i]
