@@ -595,7 +595,8 @@ def indexBam(work_dir, threads, genome="hg38", slurm=False, script_dir=None):
         script = os.path.join(work_dir,"slurm","slurm_indexBAM.sh")
         print("Submitting SLURM script to cluster")
         job_id_index = subprocess.check_output(f"sbatch {script} | cut -d ' ' -f 4", shell = True)
-        print(f"SLURM job submitted {job_id_index}")
+        job_id_index = job_id_index.decode("UTF-8").replace("\n","")
+        print(f"SLURM job submitted (job ID {job_id_index})")
 
 def createBigWig(work_dir, script_dir, threads, chip_seq_settings, genome="hg38", slurm=False):
     #creates BigWig files for all existing BAM files

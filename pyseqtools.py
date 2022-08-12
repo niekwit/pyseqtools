@@ -661,6 +661,7 @@ def main():
         
         bigwig = args["bigwig"]
         if bigwig == True:
+            utils.indexBam(work_dir, threads, genome, slurm, script_dir)
             utils.createBigWig(work_dir, script_dir, threads, chip_seq_settings, genome, slurm)
     
 
