@@ -662,9 +662,9 @@ def createBigWig(work_dir, script_dir, threads, chip_seq_settings, genome="hg38"
         #load slurm settings 
         with open(os.path.join(script_dir,"yaml","slurm.yaml")) as file:
             slurm_settings = yaml.full_load(file)
-        threads = str(slurm_settings["bamCoverage_CPU"])
-        mem = str(slurm_settings["bamCoverage_mem"])
-        slurm_time = str(slurm_settings["bamCoverage_time"])
+        threads = str(slurm_settings["ChIP-Seq"]["bamCoverage_CPU"])
+        mem = str(slurm_settings["ChIP-Seq"]["bamCoverage_mem"])
+        slurm_time = str(slurm_settings["ChIP-Seq"]["bamCoverage_time"])
         account = slurm_settings["groupname"]
         partition = slurm_settings["partition"]
         
