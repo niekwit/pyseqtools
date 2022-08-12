@@ -707,7 +707,8 @@ def createBigWig(work_dir, script_dir, threads, chip_seq_settings, genome="hg38"
         script.close()
         
         job_id_bigwig = subprocess.check_output(f"sbatch {script_} | cut -d ' ' -f 4", shell = True)
-        print(f"Submitted SLURM script to cluster (job ID {job_id_bigwig}")
+        job_id_bigwig = job_id_bigwig.decode("UTF-8").replace("\n","")
+        print(f"Submitted SLURM script to cluster (job ID {job_id_bigwig})")
         
 
 def bigwigQC(work_dir, threads):
