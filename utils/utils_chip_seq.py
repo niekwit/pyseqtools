@@ -416,53 +416,61 @@ def hisat2SLURM(script_dir, work_dir, threads, chip_seq_settings, genome):
     print(f"SLURM job submitted successfully (job ID {job_id_hisat2})")       
     
 
-def downsample(script_dir, work_dir, threads):
+def downsample(script_dir, work_dir, threads, slurm=False):
+    '''
+    Downsampling of BAM files using samtools
+    '''
     #check if bam files have been deduplicated
     file_list = glob.glob(os.path.join(work_dir, "bam", "*.bam"))
     dedup = b_any("dedupl" in x for x in file_list)
     
     if dedup == True:
         file_list = sorted(glob.glob(os.path.join(work_dir,"bam","*-sort-bl-dedupl.bam")))
-      
-    #get counts from bam files
-    df = pd.DataFrame(columns = file_list)
-
-    for bam in file_list:
-          count = pysam.view("-@", str(threads) ,"-c", "-F" "260", bam)
-          df.loc[1, bam] = count.replace("\n","")
+    
+    if slurm == False:
+        #get counts from bam files
+        df = pd.DataFrame(columns = file_list)
+        
+        for bam in file_list:
+              count = pysam.view("-@", str(threads) ,"-c", "-F" "260", bam)
+              df.loc[1, bam] = count.replace("\n","")
+        
+        #get lowest read count
+        df.loc[1] = df.loc[1].astype(int)
+        lowest_count = df.min(1).item()
+        df.loc[2] = lowest_count
+        
+        #calculate scaling factor for each bam file
+        df.loc[3] = df.loc[2] / df.loc[1]
+        df.drop([1,2],0, inplace=True)
+        
+        #downscale bam files
+        for bam,factor in df.iteritems():
+            factor = factor.item()
+            outfile = bam.replace(".bam","-downscaled.bam")
+            if factor == 1.0:
+                if not utils.file_exists(outfile):
+                    shutil.copyfile(bam, outfile)
+            else:
+                if not utils.file_exists(outfile):
+                    samtools = utils.checkSamtools(script_dir)
+                    #seed for random number generator will be 0
+                    command = [samtools, "view", "-@", threads,"-bs", str(factor), bam, ">", outfile]
+                    utils.write2log(work_dir, " ".join(command), "")
+                    subprocess.run(command)  
+        
+        #export scaling factors
+        names = list(df.columns)
+        names = [os.path.basename(x) for x in names]
+        df.columns = names
+        
+        df.to_csv(os.path.join(work_dir,"BAM_scaling_factors.txt"), 
+                  sep = "\t",
+                  index = False)
+    else: 
+        pass
           
-    #get lowest read count
-    df.loc[1] = df.loc[1].astype(int)
-    lowest_count = df.min(1).item()
-    df.loc[2] = lowest_count
     
-    #calculate scaling factor for each bam file
-    df.loc[3] = df.loc[2] / df.loc[1]
-    df.drop([1,2],0, inplace=True)
-    
-    #downscale bam files
-    for bam,factor in df.iteritems():
-        factor = factor.item()
-        outfile = bam.replace(".bam","-downscaled.bam")
-        if factor == 1.0:
-            if not utils.file_exists(outfile):
-                shutil.copyfile(bam, outfile)
-        else:
-            if not utils.file_exists(outfile):
-                samtools = utils.checkSamtools(script_dir)
-                #seed for random number generator will be 0
-                command = [samtools, "view", "-@", threads,"-bs", str(factor), bam, ">", outfile]
-                utils.write2log(work_dir, " ".join(command), "Downscaling BAM: ")
-                subprocess.run(command)  
-    
-    #export scaling factors
-    names = list(df.columns)
-    names = [os.path.basename(x) for x in names]
-    df.columns = names
-    
-    df.to_csv(os.path.join(work_dir,"BAM_scaling_factors.txt"), 
-              sep = "\t",
-              index = False)
 
     
 def dmSpikeIn(work_dir, threads):
