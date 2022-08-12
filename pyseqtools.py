@@ -654,6 +654,11 @@ def main():
             else:
                 utils.deduplicationSLURM(script_dir, work_dir, genome)
 
+        downscale = args["downsample"]
+        if downscale == True:
+            chipseq_utils.downsample(script_dir, work_dir, threads, genome, slurm)
+
+        
         bigwig = args["bigwig"]
         if bigwig == True:
             if slurm== False:

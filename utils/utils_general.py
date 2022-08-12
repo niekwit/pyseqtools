@@ -501,7 +501,7 @@ def deduplicationSLURM(script_dir, work_dir, genome):
     script.write(f"#SBATCH -c {threads}\n")
     script.write(f"#SBATCH -t {time}\n")
     script.write(f"#SBATCH --mem={mem}\n")
-    script.write("#SBATCH -J hisat2\n")
+    script.write("#SBATCH -J picard\n")
     script.write(f"#SBATCH -a  1-{str(commands)}\n")
     script.write("\n")
     script.write("sed -n ${SLURM_ARRAY_TASK_ID}p " + f"{csv} | bash\n")
@@ -597,40 +597,116 @@ def indexBam(work_dir, threads, genome="hg38", slurm=False, script_dir=None):
         job_id_index = subprocess.check_output(f"sbatch {script} | cut -d ' ' -f 4", shell = True)
         print(f"SLURM job submitted {job_id_index}")
 
-def createBigWig(work_dir, threads):
+def createBigWig(work_dir, script_dir, threads, chip_seq_settings, genome="hg38", slurm=False):
     #creates BigWig files for all existing BAM files
-    print("Generating BigWig files")
-    os.makedirs(os.path.join(work_dir,"bigwig"), exist_ok = True)
-
-    file_list = glob.glob(os.path.join(work_dir,"bam","*.bam"))
-
-    
-    for bam in file_list:
-        bigwig_output = os.path.basename(bam.replace(".bam", "-norm.bw"))
-        base_dir = os.path.dirname(os.path.dirname(bam))
-        os.makedirs(os.path.join(base_dir,"bigwig"), exist_ok = True)
-        bigwig_output = os.path.join(base_dir,"bigwig", bigwig_output)
-    
-        if not file_exists(bigwig_output):
-            bigwig = "bamCoverage -p " + str(threads) + " --binSize 100 --normalizeUsing RPKM --extendReads 200 --effectiveGenomeSize 2827437033 -b "
-            bigwig = bigwig + bam +" -o " + bigwig_output
-            write2log(work_dir,bigwig, "Create BigWig file: ")
-            subprocess.run(bigwig, shell = True)
-
-    '''    
-    if b_any("downscaled.bam" in x for x in file_list):
-        file_list = glob.glob(os.path.join(work_dir,"bam","*downscaled.bam"))
+    puts(colored.green("Generating BigWig files with deepTools"))
+          
+    if slurm == False:
+        file_list = glob.glob(os.path.join(work_dir,"bam","*.bam"))
+        
+        #create directory
+        os.makedirs(os.path.join(work_dir,"bigwig"), exist_ok = True)
+        
         for bam in file_list:
-            bamCoverage(work_dir, threads, bam)
-    elif b_any("dedupl.bam" in x for x in file_list):
-        file_list = glob.glob(os.path.join(work_dir,"bam","*dedupl.bam"))
+            bigwig_output = os.path.basename(bam.replace(".bam", "-norm.bw"))
+            base_dir = os.path.dirname(os.path.dirname(bam))
+            os.makedirs(os.path.join(base_dir,"bigwig"), exist_ok = True)
+            bigwig_output = os.path.join(base_dir,"bigwig", bigwig_output)
+        
+            if not file_exists(bigwig_output):
+                bigwig = "bamCoverage -p " + str(threads) + " --binSize 100 --normalizeUsing RPKM --extendReads 200 --effectiveGenomeSize 2827437033 -b "
+                bigwig = bigwig + bam +" -o " + bigwig_output
+                write2log(work_dir,bigwig, "Create BigWig file: ")
+                subprocess.run(bigwig, shell = True)
+
+        '''    
+        if b_any("downscaled.bam" in x for x in file_list):
+            file_list = glob.glob(os.path.join(work_dir,"bam","*downscaled.bam"))
+            for bam in file_list:
+                bamCoverage(work_dir, threads, bam)
+        elif b_any("dedupl.bam" in x for x in file_list):
+            file_list = glob.glob(os.path.join(work_dir,"bam","*dedupl.bam"))
+            for bam in file_list:
+                bamCoverage(work_dir, threads, bam)
+        elif b_any("sort-bl.bam" in x for x in file_list):
+            file_list = glob.glob(os.path.join(work_dir,"bam","*sort-bl.bam"))
+            for bam in file_list:
+                bamCoverage(work_dir, threads, bam)
+        '''
+    else:
+        #create directory
+        os.makedirs(os.path.join(work_dir,"bigwig", genome), exist_ok = True)
+        
+        #load bamCoverage settings
+        read_length = chip_seq_settings["BigWig"]["read_length"]
+        
+        #according to https://deeptools.readthedocs.io/en/latest/content/feature/effectiveGenomeSize.html
+        effective_genome_sizes = {"hg19":{"50":"2685511504", "75":"2736124973", "100":"2776919808", "150":"2827437033", "200":"2855464000"},
+                                  "hg38":{"50":"2701495761", "75":"2747877777", "100":"2805636331", "150":"2862010578", "200":"2887553303"}}
+        
+        genome_size = effective_genome_sizes[genome][read_length]
+        extendReads = chip_seq_settings["BigWig"]["extendReads"]
+        normalizeUsing = chip_seq_settings["BigWig"]["normalizeUsing"]
+        binSize = chip_seq_settings["BigWig"]["binSize"]
+        
+        file_list = glob.glob(os.path.join(work_dir, "bam", genome, "*.bam"))
+        
+        if b_any("downscaled.bam" in x for x in file_list):
+            file_list = glob.glob(os.path.join(work_dir, genome, "bam", "*downscaled.bam"))
+            extension = "-sort-bl-dedupl-downscaled.bam"
+        elif b_any("dedupl.bam" in x for x in file_list):
+            file_list = glob.glob(os.path.join(work_dir, "bam", genome, "*dedupl.bam"))
+        elif b_any("sort-bl.bam" in x for x in file_list):
+            file_list = glob.glob(os.path.join(work_dir," bam", genome, "*sort-bl.bam"))
+        
+        #load slurm settings 
+        with open(os.path.join(script_dir,"yaml","slurm.yaml")) as file:
+            slurm_settings = yaml.full_load(file)
+        threads = str(slurm_settings["bamCoverage_CPU"])
+        mem = str(slurm_settings["bamCoverage_mem"])
+        slurm_time = str(slurm_settings["bamCoverage_time"])
+        account = slurm_settings["groupname"]
+        partition = slurm_settings["partition"]
+        
+        #create CSV file with bamCoverage commands
         for bam in file_list:
-            bamCoverage(work_dir, threads, bam)
-    elif b_any("sort-bl.bam" in x for x in file_list):
-        file_list = glob.glob(os.path.join(work_dir,"bam","*sort-bl.bam"))
-        for bam in file_list:
-            bamCoverage(work_dir, threads, bam)
-    '''
+            bigwig = os.path.basename(bam).replace(extension, ".bigwig")
+            if not file_exists(bigwig):
+                command = ["bamCoverage", "-p", threads, "--binSize", binSize, "--normalizeUsing",
+                           normalizeUsing, "--extendReads", extendReads, "--effectiveGenomeSize",
+                           genome_size,"-b", bam, "-o", bigwig]
+                
+                os.makedirs(os.path.join(work_dir,"slurm"), exist_ok = True)
+                csv = os.path.join(work_dir,"slurm",f"slurm_bamCoverage_{genome}.csv")
+                csv = open(csv, "a")  
+                csv.write(" ".join(command) +"\n")
+                csv.close()
+            
+        #create slurm bash script 
+        print(f"Generating slurm_bamCoverage_{genome}.sh")
+        csv = os.path.join(work_dir,"slurm",f"slurm_bamCoverage_{genome}.csv")
+        commands = int(subprocess.check_output(f"cat {csv} | wc -l", shell = True).decode("utf-8"))
+        script_ = os.path.join(work_dir,"slurm",f"slurm_bamCoverage_{genome}.sh")
+        script = open(script_, "w")  
+        script.write("#!/bin/bash" + "\n")
+        script.write("\n")
+        script.write(f"#SBATCH -A {account}\n")
+        script.write("#SBATCH --mail-type=BEGIN,FAIL,END" + "\n")
+        script.write(f"#SBATCH -p {partition}\n")
+        script.write("#SBATCH -D {work_dir}\n")
+        script.write("#SBATCH -o slurm/slurm_bamCoverage_%a.log" + "\n")
+        script.write(f"#SBATCH -c {threads}\n")
+        script.write(f"#SBATCH -t {slurm_time}\n")
+        script.write(f"#SBATCH --mem={mem}\n")
+        script.write("#SBATCH -J bamCoverage\n")
+        script.write("#SBATCH -a 1-{str(commands}\n")
+        script.write("\n")
+        script.write("sed -n ${SLURM_ARRAY_TASK_ID}p " + f"{csv} | bash\n")
+        script.close()
+        
+        job_id_bigwig = subprocess.check_output(f"sbatch {script_} | cut -d ' ' -f 4", shell = True)
+        print(f"Submitted SLURM script to cluster (job ID {job_id_bigwig}")
+        
 
 def bigwigQC(work_dir, threads):
 

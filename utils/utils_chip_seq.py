@@ -416,18 +416,20 @@ def hisat2SLURM(script_dir, work_dir, threads, chip_seq_settings, genome):
     print(f"SLURM job submitted successfully (job ID {job_id_hisat2})")       
     
 
-def downsample(script_dir, work_dir, threads, slurm=False):
+def downsample(script_dir, work_dir, threads, genome="hg38", slurm=False):
     '''
     Downsampling of BAM files using samtools
     '''
-    #check if bam files have been deduplicated
-    file_list = glob.glob(os.path.join(work_dir, "bam", "*.bam"))
-    dedup = b_any("dedupl" in x for x in file_list)
-    
-    if dedup == True:
-        file_list = sorted(glob.glob(os.path.join(work_dir,"bam","*-sort-bl-dedupl.bam")))
-    
+    puts(colored.green("Downsampling of BAM files using samtools"))
+
     if slurm == False:
+        #check if bam files have been deduplicated
+        file_list = glob.glob(os.path.join(work_dir, "bam", "*.bam"))
+        dedup = b_any("dedupl" in x for x in file_list)
+        
+        if dedup == True:
+            file_list = sorted(glob.glob(os.path.join(work_dir,"bam","*-sort-bl-dedupl.bam")))
+            
         #get counts from bam files
         df = pd.DataFrame(columns = file_list)
         
@@ -468,10 +470,131 @@ def downsample(script_dir, work_dir, threads, slurm=False):
                   sep = "\t",
                   index = False)
     else: 
-        pass
-          
-    
+        #get BAM files
+        file_list = glob.glob(os.path.join(work_dir, "bam", genome,"*.bam"))
+        dedup = b_any("dedupl" in x for x in file_list)
+        
+        if dedup == True:
+            file_list = sorted(glob.glob(os.path.join(work_dir,"bam","*-sort-bl-dedupl.bam")))
+        
+        #load SLURM settings
+        with open(os.path.join(script_dir,"yaml","slurm.yaml")) as file:
+            slurm_settings = yaml.full_load(file)        
 
+        threads = slurm_settings["ChIP-Seq"]["samtools_view_CPU"]
+        mem = slurm_settings["ChIP-Seq"]["samtools_view_mem"]
+        time = slurm_settings["ChIP-Seq"]["samtools_view_time"]
+        account = slurm_settings["groupname"]
+        partition = slurm_settings["ChIP-Seq"]["partition"]
+        
+        #create first part of slurm script
+        print("Generating SLURM script for counting reads")
+        
+        script_ = os.path.join(work_dir,"slurm",f"slurm_samtools_view_{genome}.sh")
+        script = open(script_, "w")  
+        script.write("#!/bin/bash" + "\n")
+        script.write("\n")
+        script.write(f"#SBATCH -A {account}\n")
+        script.write("#SBATCH --mail-type=BEGIN,FAIL,END" + "\n")
+        script.write(f"#SBATCH -p {partition}\n")
+        script.write(f"#SBATCH -D {work_dir}\n")
+        script.write("#SBATCH -o slurm/slurm_samtools_view.log" + "\n")
+        script.write(f"#SBATCH -c {threads}\n")
+        script.write(f"#SBATCH -t {time}\n")
+        script.write(f"#SBATCH --mem={mem}\n")
+        script.write("#SBATCH -J samtools_view\n")
+        script.write("#SBATCH --wait\n") #only exit when job is completed
+        script.write("\n")
+        script.close()
+        
+        #add commands to count reads in BAM files to SLURM script
+        script = open(script_, "a") 
+        for bam in file_list:
+            #generate read count command
+            samtools = ["samtools", "view", "-@", threads, "-c", "-F" "260", bam, ">>", "bam_read_counts.txt","\n"]
+            samtools = " ".join(samtools)
+            
+            #write to script 
+            script.write(f"echo {bam}")
+            script.write(samtools)
+        script.close()
+        
+        #submit job with to cluster
+        print("Submitting SLURM script to cluster")
+        job_id_samtools = subprocess.check_output(f"sbatch {script_} | cut -d ' ' -f 4", shell = True).decode("utf-8")
+        
+        #get job status after completion
+        seff = subprocess.check_output(f"seff {job_id_samtools} | grep State", shell = True)
+        
+        #only after succesful run, load read counts file and calculate scaling factors
+        if "COMPLETED (exit code 0)" in seff:
+            count_file = os.path.join(work_dir, "bam_read_counts.txt")
+            
+            #create df
+            df = pd.DataFrame(columns = ["bam", "read_count"])
+        
+            bam_files = []
+            read_counts = []
+            
+            #open read count file and add to df
+            with open(count_file,"r") as file:
+                for line in file:
+                    if ".bam" in line:
+                        bam_files.append(line)
+                    else:
+                        read_counts.append(int(line))
+            
+            df["bam"] = bam_files
+            df["read_count"] = read_counts
+            
+            #calculate scaling factors
+            lowest_count = df["read_count"].min()
+            
+            df["scaling_factor"] = lowest_count / df["read_count"]
+            df.to_csv(os.path.join(work_dir,"BAM_scaling_factors.txt"), 
+                      sep = "\t",
+                      index = False)
+            
+            #prepare first part of downscaling SLURM script
+            print("Generating SLURM script for downscaling BAM files")
+            
+            script_ = os.path.join(work_dir,"slurm",f"slurm_samtools_downscale_{genome}.sh")
+            script = open(script_, "w")  
+            script.write("#!/bin/bash" + "\n")
+            script.write("\n")
+            script.write(f"#SBATCH -A {account}\n")
+            script.write("#SBATCH --mail-type=BEGIN,FAIL,END" + "\n")
+            script.write(f"#SBATCH -p {partition}\n")
+            script.write(f"#SBATCH -D {work_dir}\n")
+            script.write("#SBATCH -o slurm/slurm_samtools_downscale.log" + "\n")
+            script.write(f"#SBATCH -c {threads}\n")
+            script.write(f"#SBATCH -t {time}\n")
+            script.write(f"#SBATCH --mem={mem}\n")
+            script.write("#SBATCH -J samtools_view\n")
+            script.write("\n")
+            script.close()
+            
+            #downscale BAM files (seed will be 0)
+            script = open(script_, "a") 
+            for index, row in df.iterrows():
+                bam = row["bam"]
+                scaling_factor = row["scaling_factor"]
+                outfile = bam.replace(".bam","-downscaled.bam")
+                if scaling_factor == 1.0:
+                    if not utils.file_exists(outfile):
+                        shutil.copyfile(bam, outfile)
+                else:
+                    if not utils.file_exists(outfile):
+                        #seed for random number generator will be 0
+                        command = [samtools, "view", "-@", threads,"-bs", str(scaling_factor), bam, ">", outfile, "\n"]
+                        command = " ".join(command)
+                        script.write(command)
+            script.close()
+            
+            #submit SLURM script to cluster
+            job_id_samtools = subprocess.check_output(f"sbatch {script_} | cut -d ' ' -f 4", shell = True).decode("utf-8")
+            print(f"Submitted SLURM script for downscaling BAM files to cluster (job ID {job_id_samtools})")
+            
     
 def dmSpikeIn(work_dir, threads):
     file_list = glob.glob(os.path.join(work_dir,"bam","*-downscaled.bam"))
