@@ -661,8 +661,8 @@ def main():
         
         bigwig = args["bigwig"]
         if bigwig == True:
-            if slurm== False:
-                utils.createBigWig(work_dir, threads)
+            utils.createBigWig(work_dir, script_dir, threads, chip_seq_settings, genome, slurm)
+    
 
         qc = args["qc"]
         if qc == True:
