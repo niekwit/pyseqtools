@@ -561,12 +561,12 @@ def indexBam(work_dir, threads, genome="hg38", slurm=False, script_dir=None):
             os.remove(csv)
         
         #create csv file with all index commands 
+        csv = open(csv, "a") 
         for bam,index in zip(file_list,index_list):
-            samtools = ["samtools", "index","-@", threads, bam]
             if not file_exists(index):
-                csv = open(csv, "a")  
+                samtools = ["samtools", "index","-@", threads, bam]
                 csv.write(" ".join(samtools) +"\n")
-                csv.close()
+        csv.close()
         
         #create slurm bash script
         csv = os.path.join(work_dir,"slurm","slurm_indexBAM.csv")
