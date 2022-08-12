@@ -557,7 +557,8 @@ def indexBam(work_dir, threads, genome="hg38", slurm=False, script_dir=None):
         
         #set path for csv file that contains index commands and delete pre-existing one
         csv = os.path.join(work_dir,"slurm","slurm_indexBAM.csv")
-        os.remove(csv)
+        if os.path.exists(csv):
+            os.remove(csv)
         
         #create csv file with all index commands 
         for bam,index in zip(file_list,index_list):
@@ -672,6 +673,10 @@ def createBigWig(work_dir, script_dir, threads, chip_seq_settings, genome="hg38"
         partition = slurm_settings["partition"]
         
         #create CSV file with bamCoverage commands
+        csv = os.path.join(work_dir,"slurm",f"slurm_bamCoverage_{genome}.csv")
+        if os.path.exists(csv):
+            os.remove(csv)
+        
         for bam in file_list:
             bigwig = os.path.basename(bam).replace(extension, ".bigwig")
             if not file_exists(bigwig):
@@ -680,7 +685,7 @@ def createBigWig(work_dir, script_dir, threads, chip_seq_settings, genome="hg38"
                            genome_size,"-b", bam, "-o", bigwig]
                 
                 os.makedirs(os.path.join(work_dir,"slurm"), exist_ok = True)
-                csv = os.path.join(work_dir,"slurm",f"slurm_bamCoverage_{genome}.csv")
+                                
                 csv = open(csv, "a")  
                 csv.write(" ".join(command) +"\n")
                 csv.close()
