@@ -1163,7 +1163,7 @@ def plotProfile(work_dir, chip_seq_settings, genome, threads, slurm=False):
             #create computeMatrix command
             computeMatrix = ["computeMatrix", "scale-regions", "-S", file_list, "-R", gtf,
                          "--smartLabels", "-p", threads, "-b", "2000", "-a", "2000",
-                         "-m", "6000", "-o", matrix, "-S", os.path.join(work_dir,"deepTools", genome,"matrix_values.tab")]
+                         "-m", "6000", "-o", matrix]
             computeMatrix = " ".join(computeMatrix)
             
             #generate SLURM script
