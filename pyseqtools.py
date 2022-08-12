@@ -670,22 +670,17 @@ def main():
         if bigwig == True:
             utils.createBigWig(work_dir, script_dir, threads, chip_seq_settings, genome, slurm)
     
-
         qc = args["qc"]
         if qc == True:
             chipseq_utils.bam_bwQC(work_dir, threads)
 
         metagene = args["metagene"]
         if metagene == True:
-            chipseq_utils.plotProfile(work_dir, chip_seq_settings, genome, threads)
+            chipseq_utils.plotProfile(work_dir, chip_seq_settings, genome, threads, slurm)
 
         peak = args["peaks"]
         if peak == True:
             chipseq_utils.peak(work_dir, threads, genome, chip_seq_settings)
-            
-        downsample = args["downsample"]
-        if downsample == True:
-            chipseq_utils.downsample(script_dir, work_dir, threads)
 
 
     def cutrun(args, script_dir):

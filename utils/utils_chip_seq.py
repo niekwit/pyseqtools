@@ -1043,96 +1043,191 @@ def bam_bwQC(work_dir, threads):
         subprocess.run(command, shell = True)
 
         
-def plotProfile(work_dir, chip_seq_settings, genome, threads):
-    #check for gtf file
-    gtf = chip_seq_settings["gtf"][genome]
+def plotProfile(work_dir, chip_seq_settings, genome, threads, slurm=False):
+    
+    if slurm == False:
+        #check for gtf file
+        gtf = chip_seq_settings["gtf"][genome]
+    
+        #download gtf file if not available
+        if gtf == "":
+            if genome == "hg19":
+                url = "http://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_19/gencode.v19.annotation.gtf.gz"
+            elif genome == "hg38":
+                url = "http://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_38/gencode.v38.annotation.gtf.gz"
+            elif genome == "mm10":
+                url = "http://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_mouse/release_M27/gencode.vM27.annotation.gtf.gz"
+            elif genome == "mm9":
+                url= "http://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_mouse/release_M1/gencode.vM1.annotation.gtf.gz"
+        
+            print("WARNING: gtf file not found for " + genome + ", downloading now")    
+            os.makedirs(os.path.join(script_dir, "gtf", genome), exist_ok = True)
+            download_file = os.path.join(script_dir, "gtf", genome, os.path.basename(url))
+        
+            urllib.request.urlretrieve(url, download_file)
+            
+            with gzip.open(download_file, "rb") as f_in:
+                        with open(download_file.replace(".gz",""), "wb") as f_out:
+                            shutil.copyfileobj(f_in, f_out)
+                            
+            os.remove(download_file)
+            
+            #write gtf file location to chip-seq.yaml
+            gtf = download_file.replace(".gz", "")
+            
+            with open(os.path.join(script_dir, "yaml", "chip-seq.yaml")) as f:
+                        doc = yaml.safe_load(f)
+                    
+            doc["gtf"][genome] = gtf
+                    
+            with open(os.path.join(script_dir,"yaml" ,"chip-seq.yaml"), "w") as f:
+                yaml.dump(doc,f)
+            
+        
+        #check if deduplicated BigWig files are present
+        file_list = glob.glob(os.path.join(work_dir, "bigwig", "*bw"))
+        dedup = b_any("dedupl" in x for x in file_list)
+        
+        if dedup == True:
+            file_list = glob.glob(os.path.join(work_dir, "bigwig", "*dedupl-norm.bw"))
+            samples_label = [i.replace("-dedupl-norm.bw", "") for i in file_list]
+            samples_label = [os.path.basename(i) for i in samples_label]
+            samples_label = " ".join(samples_label)
+            file_list = " ".join(file_list)
+            
+        else:
+            file_list = " ".join(file_list)
+            samples_label = [i.replace("-norm.bw", "") for i in file_list]
+            samples_label = [os.path.basename(i) for i in samples_label]
+            samples_label = " ".join(samples_label)
+            if len(file_list) == 0:
+                print("ERROR: no BigWig files found for metagene plot creation")
+                return None
+        
+        #generate compute matrix needed for metagene plot generation
+        print("Generating compute matrix for metagene plots")
+        os.makedirs(os.path.join(work_dir, "metagene_plots"), exist_ok = True)
+        matrix = os.path.join(work_dir, "metagene_plots", "compute_matrix.mar.gz")
+        
+        if not utils.file_exists(matrix):
+            cm = "computeMatrix scale-regions -S " + file_list + " -R " + gtf +\
+                " --beforeRegionStartLength 3000 --regionBodyLength 5000 --afterRegionStartLength 3000 -p " + \
+                    str(threads) + " -o " + matrix + " --samplesLabel " + samples_label
+            utils.write2log(work_dir, cm, "Compute matrix generation: ")
+            subprocess.run(cm, shell = True)
+    
+        #generate metagene plots
+        print("Generating metagene plots")
+        metagene_file = os.path.join(work_dir, "metagene_plots","metagene_plot_separate.pdf")
+        
+        if not utils.file_exists(metagene_file):
+            if os.path.exists(matrix):
+                pp = "plotProfile -m " + matrix + " -out " + metagene_file 
+                utils.write2log(work_dir, pp, "Generate metagene plot (overview): ")
+                subprocess.run(pp, shell = True)
+        
+        metagene_file = os.path.join(work_dir, "metagene_plots","metagene_plot_overlay.pdf")
+        
+        if not utils.file_exists(metagene_file):
+            if os.path.exists(matrix):
+                pp = "plotProfile -m " + matrix + " -out " + metagene_file + \
+                    " --perGroup --plotType=se --legendLocation upper-left" + \
+                        " --samplesLabel " + samples_label
+                utils.write2log(work_dir, pp, "Generate metagene plot (overlay): ")
+                subprocess.run(pp, shell = True)
+    
+    else: #SLURM function
+        puts(colored.green("Generating profile plot with deepTools"))
+        os.makedirs(os.path.join(work_dir, "deepTools"), exist_ok = True)
+        matrix = os.path.join(work_dir,"deepTools", genome,"compute_matrix.mar.gz")
+        
+        if not utils.file_exists(matrix):
+            #get GTF file
+            gtf = chip_seq_settings["gtf"][genome]
+            
+            #get list of non-input BigWig files
+            file_list = glob.glob(os.path.join(work_dir,"bigwig", genome, "*.bigwig"))
+            file_list = [x for x in file_list if "input" not in x.lower()]
+            file_list = " ".join(file_list)
+            
+            #load SLURM settings
+            with open(os.path.join(script_dir,"yaml","slurm.yaml")) as file:
+                slurm_settings = yaml.full_load(file)        
 
-    #download gtf file if not available
-    if gtf == "":
-        if genome == "hg19":
-            url = "http://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_19/gencode.v19.annotation.gtf.gz"
-        elif genome == "hg38":
-            url = "http://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_38/gencode.v38.annotation.gtf.gz"
-        elif genome == "mm10":
-            url = "http://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_mouse/release_M27/gencode.vM27.annotation.gtf.gz"
-        elif genome == "mm9":
-            url= "http://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_mouse/release_M1/gencode.vM1.annotation.gtf.gz"
-    
-        print("WARNING: gtf file not found for " + genome + ", downloading now")    
-        os.makedirs(os.path.join(script_dir, "gtf", genome), exist_ok = True)
-        download_file = os.path.join(script_dir, "gtf", genome, os.path.basename(url))
-    
-        urllib.request.urlretrieve(url, download_file)
-        
-        with gzip.open(download_file, "rb") as f_in:
-                    with open(download_file.replace(".gz",""), "wb") as f_out:
-                        shutil.copyfileobj(f_in, f_out)
-                        
-        os.remove(download_file)
-        
-        #write gtf file location to chip-seq.yaml
-        gtf = download_file.replace(".gz", "")
-        
-        with open(os.path.join(script_dir, "yaml", "chip-seq.yaml")) as f:
-                    doc = yaml.safe_load(f)
+            threads = slurm_settings["ChIP-Seq"]["computeMatrix_CPU"]
+            mem = slurm_settings["ChIP-Seq"]["computeMatrix_mem"]
+            time = slurm_settings["ChIP-Seq"]["computeMatrix_time"]
+            account = slurm_settings["groupname"]
+            partition = slurm_settings["ChIP-Seq"]["partition"]
+            
+            #create computeMatrix command
+            computeMatrix = ["computeMatrix", "scale-regions", "-S", file_list, "-R", gtf,
+                         "--smartLabels", "-p", threads, "-b", "2000", "-a", "2000",
+                         "-m", "6000", "-o", matrix, "-S", os.path.join(work_dir,"deepTools", genome,"matrix_values.tab")]
+            computeMatrix = " ".join(computeMatrix)
+            
+            #generate SLURM script
+            print("Generating SLURM script for computeMatrix")
+            script_ = os.path.join(work_dir,"slurm",f"slurm_computeMatrix_{genome}.sh")
+            script = open(script_, "w")  
+            script.write("#!/bin/bash" + "\n")
+            script.write("\n")
+            script.write(f"#SBATCH -A {account}\n")
+            script.write("#SBATCH --mail-type=BEGIN,FAIL,END" + "\n")
+            script.write(f"#SBATCH -p {partition}\n")
+            script.write(f"#SBATCH -D {os.path.join(work_dir,'deepTools', genome)}\n")
+            script.write("#SBATCH -o slurm/slurm_computeMatrix.log" + "\n")
+            script.write(f"#SBATCH -c {threads}\n")
+            script.write(f"#SBATCH -t {time}\n")
+            script.write(f"#SBATCH --mem={mem}\n")
+            script.write("#SBATCH -J computeMatrix\n")
+            script.write("\n")
+            script.write(f"{computeMatrix}\n")
+            script.write("\n")
+            script.close()
+            
+            #submit SLURM script to cluster
+            job_id_matrix = subprocess.check_output(f"sbatch {script_} | cut -d ' ' -f 4", shell = True)
+            job_id_matrix = job_id_matrix.decode("UTF-8").replace("\n","")
+            print(f"Submitted SLURM script to cluster (job ID {job_id_matrix})")
+            
+            #create profile plot
+            profile_plot = os.path.join(work_dir, "deepTools", genome, "gene_body.pdf")
+            
+            if not utils.file_exists(profile_plot):
+                command = ["plotProfile", "-m", matrix, "--perGroup", "--plotType=std"]
+                command = " ".join(command)
                 
-        doc["gtf"][genome] = gtf
+                #load SLURM settings
+                threads = slurm_settings["ChIP-Seq"]["plotProfile_CPU"]
+                mem = slurm_settings["ChIP-Seq"]["plotProfile_mem"]
+                time = slurm_settings["ChIP-Seq"]["plotProfile_time"]
                 
-        with open(os.path.join(script_dir,"yaml" ,"chip-seq.yaml"), "w") as f:
-            yaml.dump(doc,f)
-        
-    
-    #check if deduplicated BigWig files are present
-    file_list = glob.glob(os.path.join(work_dir, "bigwig", "*bw"))
-    dedup = b_any("dedupl" in x for x in file_list)
-    
-    if dedup == True:
-        file_list = glob.glob(os.path.join(work_dir, "bigwig", "*dedupl-norm.bw"))
-        samples_label = [i.replace("-dedupl-norm.bw", "") for i in file_list]
-        samples_label = [os.path.basename(i) for i in samples_label]
-        samples_label = " ".join(samples_label)
-        file_list = " ".join(file_list)
-        
-    else:
-        file_list = " ".join(file_list)
-        samples_label = [i.replace("-norm.bw", "") for i in file_list]
-        samples_label = [os.path.basename(i) for i in samples_label]
-        samples_label = " ".join(samples_label)
-        if len(file_list) == 0:
-            print("ERROR: no BigWig files found for metagene plot creation")
-            return None
-    
-    #generate compute matrix needed for metagene plot generation
-    print("Generating compute matrix for metagene plots")
-    os.makedirs(os.path.join(work_dir, "metagene_plots"), exist_ok = True)
-    matrix = os.path.join(work_dir, "metagene_plots", "compute_matrix.mar.gz")
-    
-    if not utils.file_exists(matrix):
-        cm = "computeMatrix scale-regions -S " + file_list + " -R " + gtf +\
-            " --beforeRegionStartLength 3000 --regionBodyLength 5000 --afterRegionStartLength 3000 -p " + \
-                str(threads) + " -o " + matrix + " --samplesLabel " + samples_label
-        utils.write2log(work_dir, cm, "Compute matrix generation: ")
-        subprocess.run(cm, shell = True)
-
-    #generate metagene plots
-    print("Generating metagene plots")
-    metagene_file = os.path.join(work_dir, "metagene_plots","metagene_plot_separate.pdf")
-    
-    if not utils.file_exists(metagene_file):
-        if os.path.exists(matrix):
-            pp = "plotProfile -m " + matrix + " -out " + metagene_file 
-            utils.write2log(work_dir, pp, "Generate metagene plot (overview): ")
-            subprocess.run(pp, shell = True)
-    
-    metagene_file = os.path.join(work_dir, "metagene_plots","metagene_plot_overlay.pdf")
-    
-    if not utils.file_exists(metagene_file):
-        if os.path.exists(matrix):
-            pp = "plotProfile -m " + matrix + " -out " + metagene_file + \
-                " --perGroup --plotType=se --legendLocation upper-left" + \
-                    " --samplesLabel " + samples_label
-            utils.write2log(work_dir, pp, "Generate metagene plot (overlay): ")
-            subprocess.run(pp, shell = True)
+                #generate SLURM script
+                print("Generating SLURM script for plotProfile")
+                script_ = os.path.join(work_dir,"slurm",f"slurm_samtools_view_{genome}.sh")
+                script = open(script_, "w")  
+                script.write("#!/bin/bash" + "\n")
+                script.write("\n")
+                script.write(f"#SBATCH -A {account}\n")
+                script.write("#SBATCH --mail-type=BEGIN,FAIL,END" + "\n")
+                script.write(f"#SBATCH -p {partition}\n")
+                script.write(f"#SBATCH -D {os.path.join(work_dir,'deepTools', genome)}\n")
+                script.write("#SBATCH -o slurm/slurm_computeMatrix.log" + "\n")
+                script.write(f"#SBATCH -c {threads}\n")
+                script.write(f"#SBATCH -t {time}\n")
+                script.write(f"#SBATCH --mem={mem}\n")
+                script.write("#SBATCH -J computeMatrix\n")
+                script.write(f"#SBATCH ---dependency=afterok:{job_id_matrix}\n")
+                script.write("\n")
+                script.write(f"{command}\n")
+                script.write("\n")
+                script.close()
+                
+                #submit SLURM script to cluster
+                job_id_profile = subprocess.check_output(f"sbatch {script_} | cut -d ' ' -f 4", shell = True)
+                job_id_profile = job_id_profile.decode("UTF-8").replace("\n","")
+                print(f"Submitted SLURM script to cluster (job ID {job_id_profile})")
 
 def bamCompare(work_dir, threads):
     file = open(os.path.join(work_dir,"config_bamcompare.txt"), "r")
