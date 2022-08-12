@@ -656,8 +656,10 @@ def createBigWig(work_dir, script_dir, threads, chip_seq_settings, genome="hg38"
             extension = "-sort-bl-dedupl-downscaled.bam"
         elif b_any("dedupl.bam" in x for x in file_list):
             file_list = glob.glob(os.path.join(work_dir, "bam", genome, "*dedupl.bam"))
+            extension = "-sort-bl-dedupl.bam"
         elif b_any("sort-bl.bam" in x for x in file_list):
             file_list = glob.glob(os.path.join(work_dir," bam", genome, "*sort-bl.bam"))
+            extension = "-sort-bl.bam"
         
         #load slurm settings 
         with open(os.path.join(script_dir,"yaml","slurm.yaml")) as file:
