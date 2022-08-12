@@ -677,6 +677,7 @@ def createBigWig(work_dir, script_dir, threads, chip_seq_settings, genome="hg38"
         if os.path.exists(csv):
             os.remove(csv)
         
+        csv = open(csv, "a")  
         for bam in file_list:
             bigwig = os.path.basename(bam).replace(extension, ".bigwig")
             if not file_exists(bigwig):
@@ -686,9 +687,9 @@ def createBigWig(work_dir, script_dir, threads, chip_seq_settings, genome="hg38"
                 
                 os.makedirs(os.path.join(work_dir,"slurm"), exist_ok = True)
                                 
-                csv = open(csv, "a")  
+                
                 csv.write(" ".join(command) +"\n")
-                csv.close()
+        csv.close()
             
         #create slurm bash script 
         print(f"Generating slurm_bamCoverage_{genome}.sh")

@@ -187,6 +187,10 @@ def main():
                              required = False,
                              default = "hg38",
                              help = "Choose reference genome (default is hg19)")
+    parser_chip.add_argument("--indexBAM",
+                             required = False,
+                             action = 'store_true',
+                             help = "Index BAM files with samtools")
     parser_chip.add_argument("--trim",
                              action = 'store_true',
                              required = False,
@@ -657,11 +661,13 @@ def main():
         downscale = args["downsample"]
         if downscale == True:
             chipseq_utils.downsample(script_dir, work_dir, threads, genome, slurm)
-
         
+        indexBAM = args["indexBAM"]
+        if indexBAM == True:
+            utils.indexBam(work_dir, threads, genome, slurm, script_dir)        
+
         bigwig = args["bigwig"]
         if bigwig == True:
-            utils.indexBam(work_dir, threads, genome, slurm, script_dir)
             utils.createBigWig(work_dir, script_dir, threads, chip_seq_settings, genome, slurm)
     
 
