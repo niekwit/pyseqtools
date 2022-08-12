@@ -1138,7 +1138,7 @@ def plotProfile(work_dir, chip_seq_settings, genome, threads, slurm=False):
     
     else: #SLURM function
         puts(colored.green("Generating profile plot with deepTools"))
-        os.makedirs(os.path.join(work_dir, "deepTools"), exist_ok = True)
+        os.makedirs(os.path.join(work_dir, "deepTools", genome), exist_ok = True)
         matrix = os.path.join(work_dir,"deepTools", genome,"compute_matrix.mar.gz")
         
         if not utils.file_exists(matrix):
@@ -1205,7 +1205,7 @@ def plotProfile(work_dir, chip_seq_settings, genome, threads, slurm=False):
                 
                 #generate SLURM script
                 print("Generating SLURM script for plotProfile")
-                script_ = os.path.join(work_dir,"slurm",f"slurm_samtools_view_{genome}.sh")
+                script_ = os.path.join(work_dir,"slurm",f"plotProfile_{genome}.sh")
                 script = open(script_, "w")  
                 script.write("#!/bin/bash" + "\n")
                 script.write("\n")
