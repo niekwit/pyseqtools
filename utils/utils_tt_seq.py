@@ -522,7 +522,7 @@ def sizeFactors(script_dir, work_dir, slurm=False):
     puts(colored.green("Generating size factors for normalisation using DESeq2"))
             
     #run DESeq2 to obtain size factors for normalisation
-    deseq2 = ["Rscript", os.path.join(script_dir, "R", "tt-seq_sizefactors.R")]
+    deseq2 = ["Rscript", os.path.join(script_dir, "R", "tt-seq_sizeFactors.R.R")]
     if slurm == False:
         subprocess.call(deseq2)
     else:
