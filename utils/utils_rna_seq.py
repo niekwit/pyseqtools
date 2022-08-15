@@ -299,6 +299,11 @@ def STAR(work_dir, threads, script_dir, rna_seq_settings, genome, slurm=False, j
     def align(work_dir, index, threads, genome, slurm=False):
         #get trimmed fastq files
         file_list = glob.glob(os.path.join(work_dir,"trim","*_val_1.fq.gz"))
+        
+        #create empty command file for SLURM
+        if slurm == True:
+            Path(os.path.join(work_dir,"slurm",f"slurm_STAR_{genome}.csv")).touch()
+
                      
         for read1 in file_list:
             read2 = read1.replace("_R1_001_val_1.fq.gz","_R2_001_val_2.fq.gz")
