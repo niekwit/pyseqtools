@@ -131,7 +131,7 @@ def main():
                                default = 1,
                                metavar = "<int>",
                                help = "Number of CPU threads to use (default is 1). Use max to apply all available CPU threads. For Salmon 8-12 threads are optimal")
-    parser_rnaseq.add_argument("-r", "--reference",
+    parser_rnaseq.add_argument("-g", "--genome",
                                required = False,
                                choices = rna_seq_genomeList,
                                help = "Reference genome")
@@ -548,7 +548,7 @@ def main():
                 print("Skipping FastQC/MultiQC analysis")
     
             ###Set species variable
-            reference = args["reference"]
+            reference = args["genome"]
             if "hg" in reference or reference == "gencode-v35":
                 species = "human"
             elif "mm" in reference or reference == "gencode.vM1.pc_transcripts":
@@ -594,7 +594,7 @@ def main():
         else:
              #get parsed arguments 
              module = args["module"]
-             genome = args["reference"]
+             genome = args["genome"]
              align = args["align"]
              threads = args["threads"]
              deseq2 = args["deseq2"]
@@ -603,7 +603,7 @@ def main():
              pvalue = args["pvalue"]
              
              ###Set species variable
-             reference = args["reference"]
+             reference = args["genome"]
              if "hg" in reference or reference == "gencode-v35":
                  species = "human"
              elif "mm" in reference or reference == "gencode.vM1.pc_transcripts":

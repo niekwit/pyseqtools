@@ -297,19 +297,9 @@ def STAR(work_dir, threads, script_dir, rna_seq_settings, genome, slurm=False, j
     
     #function for alignment with STAR
     def align(work_dir, index, threads, genome, slurm=False):
-        #get list of trimmed fastq files
-        if slurm == False:
-            file_list = glob.glob(os.path.join(work_dir,"trim","*_val_1.fq.gz"))
-        else:
-            #create trim output file list
-            extension = utils.get_extension(work_dir)
-            file_list = glob.glob(os.path.join(work_dir, "raw-data","*R1_001." + extension))
-            file_list = [x.split(".",1)[0] + "_val_1.fq.gz" for x in file_list]
-            file_list = [x.replace("raw-data", "trim") for x in file_list]
-        
-            #create empty csv file for commands
-            Path(os.path.join(work_dir,"slurm",f"slurm_STAR_{genome}.csv")).touch()
-        
+        #get trimmed fastq files
+        file_list = glob.glob(os.path.join(work_dir,"trim","*_val_1.fq.gz"))
+                     
         for read1 in file_list:
             read2 = read1.replace("_R1_001_val_1.fq.gz","_R2_001_val_2.fq.gz")
             
