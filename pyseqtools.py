@@ -610,10 +610,10 @@ def main():
                  species = "mouse"
                           
              if trim == True:
-                 job_id_trim = utils.trimSLURM(script_dir, work_dir,module)
+                 utils.trimSLURM(script_dir, work_dir,module)
              
              if align == "star":
-                 rnaseq_utils.STAR(work_dir, threads, script_dir, rna_seq_settings, genome, slurm, job_id_trim)
+                 rnaseq_utils.STAR(work_dir, threads, script_dir, rna_seq_settings, genome, slurm)
                  
              if deseq2 == True:
                  rnaseq_utils.diff_expr(work_dir,gtf,script_dir,species,pvalue)
