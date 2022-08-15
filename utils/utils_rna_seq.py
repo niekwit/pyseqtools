@@ -302,6 +302,7 @@ def STAR(work_dir, threads, script_dir, rna_seq_settings, genome, slurm=False, j
         
         #create empty command file for SLURM
         if slurm == True:
+            os.makedirs(os.path.join(work_dir,"slurm"), exist_ok = True)
             Path(os.path.join(work_dir,"slurm",f"slurm_STAR_{genome}.csv")).touch()
 
                      
