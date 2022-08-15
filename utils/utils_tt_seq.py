@@ -522,7 +522,7 @@ def sizeFactors(script_dir, work_dir, slurm=False):
     puts(colored.green("Generating size factors for normalisation using DESeq2"))
             
     #run DESeq2 to obtain size factors for normalisation
-    deseq2 = ["sbatch", "Rscript", os.path.join(script_dir, "R", "tt-seq_sizefactors.R")]
+    deseq2 = ["Rscript", os.path.join(script_dir, "R", "tt-seq_sizefactors.R")]
     if slurm == False:
         subprocess.call(deseq2)
     else:
@@ -537,6 +537,7 @@ def sizeFactors(script_dir, work_dir, slurm=False):
         partition = slurm_settings["RNA-Seq"]["partition"]
         
         #generate SLURM script
+        deseq2 = " ".join(deseq2)
         print("Generating SLURM script for caculating scale factors with DESeq2")
         script_ = os.path.join(work_dir,"slurm","slurm_scaleFactors.sh")
         script = open(script_, "w")  
