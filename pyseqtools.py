@@ -143,15 +143,19 @@ def main():
                                required = False,
                                choices = ["salmon","star"],
                                help = "Program to align fastq files")
+    parser_rnaseq.add_argument("-f", "--scaleFactors",
+                             required = False,
+                             action = 'store_true',
+                             help = "Calculate scale factors from yeast spike-in RNA with DESeq2")
     parser_rnaseq.add_argument("--deseq2",
                              required = False,
                              action = 'store_true',
                              help = "Calculate differential genes using DESeq2")
-    parser_rnaseq.add_argument("-p", "--pvalue",
-                               required = False,
-                               metavar = "<P value>",
-                               default = 0.001,
-                               help = "Set P value cut off (default is 0.001)")
+    parser_rnaseq.add_argument("-b", "--bigwig",
+                             required = False,
+                             action = 'store_true',
+                             help = "Create BigWig files using bamCoverage")
+
     parser_rnaseq.add_argument("--TE",
                                required = False,
                                action = 'store_true',
@@ -167,6 +171,11 @@ def main():
                                           "GO_Cellular_Component_2021",
                                           "GO_Biological_Process_2021"],
                                help = "Gene sets used for GO analysis (default is GO_Molecular_Function_2021, GO_Cellular_Component_2021, and GO_Biological_Process_2021). Gene sets can be found on https://maayanlab.cloud/Enrichr/#stats")
+    parser_rnaseq.add_argument("-p", "--pvalue",
+                               required = False,
+                               metavar = "<P value>",
+                               default = 0.001,
+                               help = "Set P value cut off (default is 0.001)")
     parser_rnaseq.add_argument("--skip-fastqc",
                                required = False,
                                action = 'store_true',
@@ -573,15 +582,12 @@ def main():
                                     reference)
                 rnaseq_utils.plotMappingRate(work_dir)
                 rnaseq_utils.plotPCA(work_dir, script_dir)
-                rnaseq_utils.diff_expr(work_dir, gtf, script_dir, species, pvalue)
+                rnaseq_utils.diff_expr(work_dir, gtf, script_dir, species, pvalue, reference)
                 rnaseq_utils.plotVolcano(work_dir)
             elif align.lower() == "star":
                 rnaseq_utils.trim(threads, work_dir)
                 rnaseq_utils.STAR(work_dir, threads, script_dir, rna_seq_settings, reference, slurm)
             
-            TE = args["TE"]
-            if TE == True:
-                rnaseq_utils.retroElements(work_dir, script_dir, reference, slurm)
             
             go = args["go"]
     
@@ -601,6 +607,10 @@ def main():
              TE = args["TE"]
              trim = args["trim"]
              pvalue = args["pvalue"]
+             deseq2 = args["deseq2"]
+             bigwig = args["bigwig"]
+             scaleFactors = args["scaleFactors"]
+
              
              ###Set species variable
              reference = args["genome"]
@@ -616,8 +626,14 @@ def main():
                  rnaseq_utils.STAR(work_dir, threads, script_dir, rna_seq_settings, genome, slurm)
                  
              if deseq2 == True:
-                 rnaseq_utils.diff_expr(work_dir,gtf,script_dir,species,pvalue)
+                 rnaseq_utils.diff_expr(work_dir,gtf,script_dir,species,pvalue,reference, slurm)
                  
+             if scaleFactors == True:
+                 tt_seq_utils.sizeFactors(script_dir, work_dir, slurm)
+             
+             if bigwig == True:
+                 rnaseq_utils.BigWig(work_dir, threads, reference, rna_seq_settings, slurm)   
+             
              if TE == True:
                  rnaseq_utils.retroElements(work_dir, script_dir, rna_seq_settings, threads, genome, slurm)
              

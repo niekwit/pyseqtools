@@ -735,10 +735,11 @@ def BigWig(work_dir, threads, genome, rna_seq_settings, slurm=False):
     '''
     Generate BigWig files from BAM files for RNA-Seq using bamCoverage
     '''    
+    puts(colored.green("Generating BigWig files from RNA-Seq data using bamCoverage"))
+    
     #create BigWig directory
     os.makedirs(os.path.join(work_dir,"bigwig",genome), exist_ok = True)
-    
-    
+      
     if slurm == False:
         pass
     else:
@@ -760,12 +761,10 @@ def BigWig(work_dir, threads, genome, rna_seq_settings, slurm=False):
         #load bamCoverage settings
         read_length = rna_seq_settings["BigWig"]["read_length"]
         genome_size = effective_genome_sizes[genome][read_length]
-        extendReads = rna_seq_settings["BigWig"]["extendReads"]
         normalizeUsing = rna_seq_settings["BigWig"]["normalizeUsing"]
         binSize = rna_seq_settings["BigWig"]["binSize"]
         
-        
-        
+              
         #create CSV file with bamCoverage commands
         os.makedirs(os.path.join(work_dir,"slurm"), exist_ok = True)
         
@@ -773,13 +772,22 @@ def BigWig(work_dir, threads, genome, rna_seq_settings, slurm=False):
         if os.path.exists(csv):
             os.remove(csv)
         
+        #load scaling factors if they have been generated
+        if os.path.exists(os.path.join(work_dir,"scaleFactors.csv")):
+            df = pd.read_csv(os.path.join(work_dir,"scaleFactors.csv"))
+        
+        #create csv file with bamCoverage commands
         csv = open(csv, "a")  
         for bam in file_list:
             bigwig = os.path.basename(bam).replace("Aligned.out.bam", ".bigwig")
             if not utils.file_exists(bigwig):
                 command = ["bamCoverage", "-p", threads, "--binSize", binSize, "--normalizeUsing",
-                           normalizeUsing, "--extendReads", extendReads, "--effectiveGenomeSize",
-                           genome_size,"-b", bam, "-o", bigwig]
+                           normalizeUsing,"--effectiveGenomeSize", genome_size,"-b", bam, "-o", bigwig]
+                if os.path.exists(os.path.join(work_dir,"scaleFactors.csv")):
+                    sample = os.path.basename(bam).replace("Aligned.out.bam","")
+                    scale_factor = df[df["sample"] == sample]["scaleFactors"].to_string().split(" ",1)[1].replace(" ","")
+                    extend_command = ["--scaleFactor", scale_factor]
+                    command.extend(extend_command)
                 csv.write(" ".join(command) +"\n")
         csv.close()
         
