@@ -135,10 +135,18 @@ def main():
                                required = False,
                                choices = rna_seq_genomeList,
                                help = "Reference genome")
+    parser_rnaseq.add_argument("--trim",
+                             action = 'store_true',
+                             required = False,
+                             help = "Quality trimming of data using Trim_galore!")
     parser_rnaseq.add_argument("-a", "--align",
                                required = False,
                                choices = ["salmon","star"],
                                help = "Program to align fastq files")
+    parser_rnaseq.add_argument("--deseq2",
+                             required = False,
+                             action = 'store_true',
+                             help = "Calculate differential genes using DESeq2")
     parser_rnaseq.add_argument("-p", "--pvalue",
                                required = False,
                                metavar = "<P value>",
@@ -584,14 +592,31 @@ def main():
                 gene_sets=args["gene_sets"]
                 rnaseq_utils.geneSetEnrichment(work_dir, pvalue, gene_sets)
         else:
+             #get parsed arguments 
+             module = args["module"]
              genome = args["reference"]
              align = args["align"]
              threads = args["threads"]
+             deseq2 = args["deseq2"]
              TE = args["TE"]
+             trim = args["trim"]
+             pvalue = args["pvalue"]
+             
+             ###Set species variable
+             reference = args["reference"]
+             if "hg" in reference or reference == "gencode-v35":
+                 species = "human"
+             elif "mm" in reference or reference == "gencode.vM1.pc_transcripts":
+                 species = "mouse"
+                          
+             if trim == True:
+                 job_id_trim = utils.trimSLURM(script_dir, work_dir,module)
              
              if align == "star":
-                 job_id_trim = utils.trimSLURM(script_dir, work_dir)
                  rnaseq_utils.STAR(work_dir, threads, script_dir, rna_seq_settings, genome, slurm, job_id_trim)
+                 
+             if deseq2 == True:
+                 rnaseq_utils.diff_expr(work_dir,gtf,script_dir,species,pvalue)
                  
              if TE == True:
                  rnaseq_utils.retroElements(work_dir, script_dir, rna_seq_settings, threads, genome, slurm)
