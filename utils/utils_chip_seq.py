@@ -1195,7 +1195,7 @@ def plotProfile(work_dir, chip_seq_settings, genome, threads, slurm=False):
             profile_plot = os.path.join(work_dir, "deepTools", genome, "gene_body.pdf")
             
             if not utils.file_exists(profile_plot):
-                command = ["plotProfile", "-m", matrix, "--perGroup", "--plotType=std"]
+                command = ["plotProfile", "-m", matrix, "--perGroup", "--plotType=std", "-o", profile_plot]
                 command = " ".join(command)
                 
                 #load SLURM settings
@@ -1205,7 +1205,7 @@ def plotProfile(work_dir, chip_seq_settings, genome, threads, slurm=False):
                 
                 #generate SLURM script
                 print("Generating SLURM script for plotProfile")
-                script_ = os.path.join(work_dir,"slurm",f"plotProfile_{genome}.sh")
+                script_ = os.path.join(work_dir,"slurm",f"slurm_plotProfile_{genome}.sh")
                 script = open(script_, "w")  
                 script.write("#!/bin/bash" + "\n")
                 script.write("\n")
