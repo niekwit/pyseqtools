@@ -596,12 +596,15 @@ def downsample(script_dir, work_dir, threads, genome="hg38", slurm=False):
             print(f"Submitted SLURM script for downscaling BAM files to cluster (job ID {job_id_samtools})")
             
     
-def dmSpikeIn(work_dir, threads):
-    file_list = glob.glob(os.path.join(work_dir,"bam","*-downscaled.bam"))
-    dm_file_list = [x.replace("-downscaled.bam","-dm3ic-sort-bl.bam") for x in file_list]
-    
-    if len(file_list) == 0:
-        puts(colored.orange("WARNING: no downscaled bam files found\nDo you want to continue?"))
+def dmSpikeIn(work_dir, threads, slurm=False):
+    if slurm ==False:
+        file_list = glob.glob(os.path.join(work_dir,"bam","*-downscaled.bam"))
+        dm_file_list = [x.replace("-downscaled.bam","-dm3ic-sort-bl.bam") for x in file_list]
+        
+        if len(file_list) == 0:
+            puts(colored.red("ERROR: no downscaled bam files found."))
+    else:
+        pass
         
         
 

@@ -513,7 +513,7 @@ def splitBam(threads, work_dir, genome):
    ''' 
    
 
-def sizeFactors(script_dir):
+def sizeFactors(script_dir, work_dir, slurm=False):
     """
     Creates size factors based on yeast RNA spike-in for generating BigWig files
     Based on https://github.com/crickbabs/DRB_TT-seq/blob/master/bigwig.md with modifications
@@ -523,7 +523,43 @@ def sizeFactors(script_dir):
             
     #run DESeq2 to obtain size factors for normalisation
     deseq2 = ["sbatch", "Rscript", os.path.join(script_dir, "R", "tt-seq_sizefactors.R")]
-    subprocess.call(deseq2)
+    if slurm == False:
+        subprocess.call(deseq2)
+    else:
+        #load SLURM settings
+        with open(os.path.join(script_dir,"yaml","slurm.yaml")) as file:
+            slurm_settings = yaml.full_load(file)        
+
+        threads = slurm_settings["RNA-Seq"]["deseq2_CPU"]
+        mem = slurm_settings["RNA-Seq"]["deseq2_mem"]
+        time = slurm_settings["RNA-Seq"]["deseq2_time"]
+        account = slurm_settings["groupname"]
+        partition = slurm_settings["RNA-Seq"]["partition"]
+        
+        #generate SLURM script
+        print("Generating SLURM script for caculating scale factors with DESeq2")
+        script_ = os.path.join(work_dir,"slurm","slurm_scaleFactors.sh")
+        script = open(script_, "w")  
+        script.write("#!/bin/bash" + "\n")
+        script.write("\n")
+        script.write(f"#SBATCH -A {account}\n")
+        script.write("#SBATCH --mail-type=BEGIN,FAIL,END" + "\n")
+        script.write(f"#SBATCH -p {partition}\n")
+        script.write(f"#SBATCH -D {work_dir}\n")
+        script.write("#SBATCH -o slurm/slurm_scaleFactors.log" + "\n")
+        script.write(f"#SBATCH -c {threads}\n")
+        script.write(f"#SBATCH -t {time}\n")
+        script.write(f"#SBATCH --mem={mem}\n")
+        script.write("#SBATCH -J scaleFactors\n")
+        script.write("\n")
+        script.write(f"{deseq2}\n")
+        script.write("\n")
+        script.close()
+        
+        #send job to cluster
+        job_id = subprocess.check_output(f"sbatch {script_} | cut -d ' ' -f 4", shell = True)
+        job_id = job_id.decode("UTF-8").replace("\n","")
+        print(f"Submitted SLURM script to cluster (job ID {job_id})")
     
     
 def ttSeqBigWig(work_dir, threads, tt_seq_settings, genome, slurm):
