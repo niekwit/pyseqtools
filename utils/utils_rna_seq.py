@@ -465,7 +465,13 @@ def hisat2(work_dir, rna_seq_settings, threads, genome):
     
 
 
-def diff_expr(work_dir,gtf,script_dir,species,pvalue):
+def diff_expr(work_dir,gtf,script_dir,species,pvalue,genome, slurm=False):
+    '''
+    
+    '''
+    puts(colored.green("Differential expression analysis using DESeq2"))
+
+    
     samples_input=os.path.join(work_dir,"samples.csv")
     if not os.path.exists(samples_input):
         sys.exit("ERROR: "+samples_input+" not found")
@@ -478,17 +484,56 @@ def diff_expr(work_dir,gtf,script_dir,species,pvalue):
                     gtf,
                     script_dir,
                     species,
-                    str(pvalue)]
+                    str(pvalue),
+                    genome]
+    deseq2_command = " ".join(deseq2_command)
     
-    with open(os.path.join(work_dir,"commands.log"), "a") as file:
-        file.write("DESeq2: ")
-        print(*deseq2_command, 
-              sep = " ", 
-              file = file)
-    print("Running differential expression analysis with DESeq2")
-    os.makedirs(os.path.join(work_dir, "DESeq2"),
-                exist_ok = True)
-    subprocess.run(deseq2_command)
+    
+    if slurm == False:
+        with open(os.path.join(work_dir,"commands.log"), "a") as file:
+            file.write("DESeq2: ")
+            print(*deseq2_command, 
+                  sep = " ", 
+                  file = file)
+        print("Running differential expression analysis with DESeq2")
+        os.makedirs(os.path.join(work_dir, "DESeq2"),
+                    exist_ok = True)
+        subprocess.run(deseq2_command)
+    else:
+        #load SLURM settings
+        with open(os.path.join(script_dir,"yaml","slurm.yaml")) as file:
+            slurm_settings = yaml.full_load(file)        
+
+        threads = slurm_settings["RNA-Seq"]["deseq2_CPU"]
+        mem = slurm_settings["RNA-Seq"]["deseq2_mem"]
+        time = slurm_settings["RNA-Seq"]["deseq2_time"]
+        account = slurm_settings["groupname"]
+        partition = slurm_settings["RNA-Seq"]["partition"]
+
+        #generate SLURM script
+        print("Generating SLURM script for differential experssion analysis with DESeq2")
+        script_ = os.path.join(work_dir,"slurm","slurm_DESeq2.sh")
+        script = open(script_, "w")  
+        script.write("#!/bin/bash" + "\n")
+        script.write("\n")
+        script.write(f"#SBATCH -A {account}\n")
+        script.write("#SBATCH --mail-type=BEGIN,FAIL,END" + "\n")
+        script.write(f"#SBATCH -p {partition}\n")
+        script.write(f"#SBATCH -D {work_dir}\n")
+        script.write("#SBATCH -o slurm/slurm_DESeq2.log" + "\n")
+        script.write(f"#SBATCH -c {threads}\n")
+        script.write(f"#SBATCH -t {time}\n")
+        script.write(f"#SBATCH --mem={mem}\n")
+        script.write("#SBATCH -J DESeq2\n")
+        script.write("\n")
+        script.write(f"{deseq2_command}\n")
+        script.write("\n")
+        script.close()
+        
+        #send job to cluster
+        job_id = subprocess.check_output(f"sbatch {script_} | cut -d ' ' -f 4", shell = True)
+        job_id = job_id.decode("UTF-8").replace("\n","")
+        print(f"Submitted SLURM script to cluster (job ID {job_id})")
 
 
 def geneSetEnrichment(work_dir,pvalue,gene_sets):
@@ -683,13 +728,89 @@ def retroElements(work_dir, script_dir, rna_seq_settings, threads, genome, slurm
                 #submit job to SLURM
                 print("Submitting SLURM script to cluster")
                 script_ = os.path.join(work_dir,"slurm",f"slurm_TEtranscript_{genome}_{base}.sh")
-                #subprocess.call(f"sbatch {script} | cut -d ' ' -f 4", shell = True)
+                subprocess.call(f"sbatch {script} | cut -d ' ' -f 4", shell = True)
                     
+
+def BigWig(work_dir, threads, genome, rna_seq_settings, slurm=False):
+    '''
+    Generate BigWig files from BAM files for RNA-Seq using bamCoverage
+    '''    
+    #create BigWig directory
+    os.makedirs(os.path.join(work_dir,"bigwig",genome), exist_ok = True)
     
+    
+    if slurm == False:
+        pass
+    else:
+        file_list = glob.glob(os.path.join(work_dir, "bam", genome), "*", "*Aligned.out.bam")
+        
+        #according to https://deeptools.readthedocs.io/en/latest/content/feature/effectiveGenomeSize.html
+        effective_genome_sizes = {"hg19":{"50":"2685511504", "75":"2736124973", "100":"2776919808", "150":"2827437033", "200":"2855464000"},
+                                  "hg38":{"50":"2701495761", "75":"2747877777", "100":"2805636331", "150":"2862010578", "200":"2887553303"}}
+        
+        #load slurm settings 
+        with open(os.path.join(script_dir,"yaml","slurm.yaml")) as file:
+            slurm_settings = yaml.full_load(file)
+        threads = str(slurm_settings["RNA-Seq"]["bamCoverage_CPU"])
+        mem = str(slurm_settings["RNA-Seq"]["bamCoverage_mem"])
+        slurm_time = str(slurm_settings["RNA-Seq"]["bamCoverage_time"])
+        account = slurm_settings["groupname"]
+        partition = slurm_settings["partition"]
+        
+        #load bamCoverage settings
+        read_length = rna_seq_settings["BigWig"]["read_length"]
+        genome_size = effective_genome_sizes[genome][read_length]
+        extendReads = rna_seq_settings["BigWig"]["extendReads"]
+        normalizeUsing = rna_seq_settings["BigWig"]["normalizeUsing"]
+        binSize = rna_seq_settings["BigWig"]["binSize"]
         
         
         
+        #create CSV file with bamCoverage commands
+        os.makedirs(os.path.join(work_dir,"slurm"), exist_ok = True)
         
+        csv = os.path.join(work_dir,"slurm",f"slurm_bamCoverage_{genome}.csv")
+        if os.path.exists(csv):
+            os.remove(csv)
+        
+        csv = open(csv, "a")  
+        for bam in file_list:
+            bigwig = os.path.basename(bam).replace("Aligned.out.bam", ".bigwig")
+            if not utils.file_exists(bigwig):
+                command = ["bamCoverage", "-p", threads, "--binSize", binSize, "--normalizeUsing",
+                           normalizeUsing, "--extendReads", extendReads, "--effectiveGenomeSize",
+                           genome_size,"-b", bam, "-o", bigwig]
+                csv.write(" ".join(command) +"\n")
+        csv.close()
+        
+        #create slurm bash script 
+        print("Generating SLURM script for bamCoverage")
+        csv = os.path.join(work_dir,"slurm",f"slurm_bamCoverage_{genome}.csv")
+        commands = subprocess.check_output(f"cat {csv} | wc -l", shell = True).decode("utf-8")
+        bigwig_dir = os.path.join(work_dir,"bigwig", genome)
+        slurm_log = os.path.join(work_dir, "slurm",'slurm_bamCoverage_%a.log')
+        script_ = os.path.join(work_dir,"slurm",f"slurm_bamCoverage_{genome}.sh")
+        script = open(script_, "w")  
+        script.write("#!/bin/bash" + "\n")
+        script.write("\n")
+        script.write(f"#SBATCH -A {account}\n")
+        script.write("#SBATCH --mail-type=BEGIN,FAIL,END" + "\n")
+        script.write(f"#SBATCH -p {partition}\n")
+        script.write(f"#SBATCH -D {bigwig_dir}\n")
+        script.write(f"#SBATCH -o {slurm_log}\n")
+        script.write(f"#SBATCH -c {threads}\n")
+        script.write(f"#SBATCH -t {slurm_time}\n")
+        script.write(f"#SBATCH --mem={mem}\n")
+        script.write("#SBATCH -J bamCoverage\n")
+        script.write(f"#SBATCH -a 1-{commands}\n")
+        script.write("\n")
+        script.write("sed -n ${SLURM_ARRAY_TASK_ID}p " + f"{csv} | bash\n")
+        script.close()
+        
+        #submit job to cluster
+        job_id_bigwig = subprocess.check_output(f"sbatch {script_} | cut -d ' ' -f 4", shell = True)
+        job_id_bigwig = job_id_bigwig.decode("UTF-8").replace("\n","")
+        print(f"Submitted SLURM script to cluster (job ID {job_id_bigwig})")
         
         
         
