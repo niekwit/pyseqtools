@@ -270,13 +270,7 @@ def bamSortSLURM(work_dir, genome="hg38", job_id_align=None):
         job_id = subprocess.check_output(f"sbatch --dependency=afterok:{job_id_align} {script} | cut -d ' ' -f 4", shell = True)
     job_id = job_id.decode("UTF-8").replace("\n","")
     print(f"Script submitted to cluster (job id {job_id})")
-    
-    
-    
-    job_id_bigwig = subprocess.check_output(f"sbatch {script_} | cut -d ' ' -f 4", shell = True)
-    job_id_bigwig = job_id_bigwig.decode("UTF-8").replace("\n","")
-    print(f"Submitted SLURM script to cluster (job ID {job_id_bigwig})")
-    
+        
     
 def hisat2(work_dir, threads, tt_seq_settings, genome, slurm=False, job_id_trim=None):
     """
