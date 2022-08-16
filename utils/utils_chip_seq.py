@@ -1199,7 +1199,7 @@ def plotProfile(work_dir, chip_seq_settings, genome, threads, slurm=False):
         profile_plot = os.path.join(work_dir, "deepTools", genome, "gene_body.pdf")
         
         if not utils.file_exists(profile_plot):
-            command = ["plotProfile", "-m", matrix, "--perGroup", "--plotType=std", "-o", profile_plot]
+            command = ["plotProfile", "-m", matrix, "--perGroup", "-o", profile_plot]
             command = " ".join(command)
             
             #load SLURM settings
