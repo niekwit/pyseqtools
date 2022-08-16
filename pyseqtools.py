@@ -610,7 +610,8 @@ def main():
              deseq2 = args["deseq2"]
              bigwig = args["bigwig"]
              scaleFactors = args["scaleFactors"]
-
+             
+             gtf = rna_seq_settings["gtf"][reference]
              
              ###Set species variable
              reference = args["genome"]
