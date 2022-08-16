@@ -238,7 +238,7 @@ if (dir.exists(file.path(work.dir,"salmon"))){
               row.names=FALSE)
     
   }
-} elif (dir.exists(file.path(work.dir,"bam"))){
+} else if (dir.exists(file.path(work.dir,"bam"))){
   #import sample table
   sampleTable <- read.csv(file.path(work.dir,"samples.csv"))
   
