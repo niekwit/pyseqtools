@@ -22,6 +22,7 @@ suppressMessages(library(readr))
 suppressMessages(library(DESeq2))
 suppressMessages(library(GenomicFeatures))
 suppressMessages(library(ggplot2))
+suppressMessages(library(dplyr))
 
 #get parsed arguments
 args <- commandArgs(trailingOnly=TRUE)
@@ -314,6 +315,7 @@ if (dir.exists(file.path(work.dir,"salmon"))){
       #apply size factors from yeast spike-in (if applicable)
       scale.factors <- read.csv(file.path(work.dir, "scaleFactors.csv"))
       if (file.exists(scale.factors)){
+        print("Applying scale factors found in scaleFactors.csv")
         size.factors <- scale.factors
         size.factors$sizeFactors <- 1 / size.factors$scaleFactors  
         size.factors$scaleFactors <- NULL
