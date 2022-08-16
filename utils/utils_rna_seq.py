@@ -782,12 +782,16 @@ def BigWig(work_dir, threads, genome, rna_seq_settings, slurm=False):
             bigwig = os.path.basename(bam).replace("Aligned.out.bam", ".bigwig")
             if not utils.file_exists(bigwig):
                 command = ["bamCoverage", "-p", threads, "--binSize", binSize, "--normalizeUsing",
-                           normalizeUsing,"--effectiveGenomeSize", genome_size,"-b", bam, "-o", bigwig]
+                           normalizeUsing,"--effectiveGenomeSize", genome_size,"-b", bam]
+                out_put = ["-o", bigwig]
                 if os.path.exists(os.path.join(work_dir,"scaleFactors.csv")):
                     sample = os.path.basename(bam).replace("Aligned.out.bam","")
                     scale_factor = df[df["sample"] == sample]["scaleFactors"].to_string().split(" ",1)[1].replace(" ","")
                     extend_command = ["--scaleFactor", scale_factor]
                     command.extend(extend_command)
+                    out_put = ["-o", bigwig.replace(".bigwig","_norm.bigwig")]
+                
+                command.extend(out_put)
                 csv.write(" ".join(command) +"\n")
         csv.close()
         
