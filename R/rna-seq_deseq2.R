@@ -1,3 +1,5 @@
+options(java.parameters = "-Xmx30000m") #increase available memory for java required for xlsx package to function properly
+
 #check if required packages are installed, if not install them
 packages <- rownames(installed.packages())
 biocmanager.packages <- c("tximport","DESeq2",
@@ -17,12 +19,15 @@ if(length(cran.packages2install) > 0){
   for (x in cran.packages2install){install.packages(x)} 
 }
 
-suppressMessages(library(tximport))
-suppressMessages(library(readr))
-suppressMessages(library(DESeq2))
-suppressMessages(library(GenomicFeatures))
-suppressMessages(library(ggplot2))
-suppressMessages(library(dplyr))
+library(tximport)
+library(readr)
+library(DESeq2)
+library(GenomicFeatures)
+library(ggplot2)
+library(dplyr)
+library(biomaRt)
+library(pheatmap)
+library(xlsx)
 
 #get parsed arguments
 args <- commandArgs(trailingOnly=TRUE)
