@@ -467,7 +467,7 @@ def hisat2(work_dir, rna_seq_settings, threads, genome):
 
 def diff_expr(work_dir,gtf,script_dir,species,pvalue,genome, slurm=False):
     '''
-    
+    Differential expression analysis using DESeq2
     '''
     puts(colored.green("Differential expression analysis using DESeq2"))
 

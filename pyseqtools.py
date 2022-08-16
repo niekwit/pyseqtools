@@ -135,6 +135,10 @@ def main():
                                required = False,
                                choices = rna_seq_genomeList,
                                help = "Reference genome")
+    parser_rnaseq.add_argument("--indexBAM",
+                             required = False,
+                             action = 'store_true',
+                             help = "Index BAM files with samtools")
     parser_rnaseq.add_argument("--trim",
                              action = 'store_true',
                              required = False,
@@ -610,6 +614,7 @@ def main():
              deseq2 = args["deseq2"]
              bigwig = args["bigwig"]
              scaleFactors = args["scaleFactors"]
+             indexBAM = args["indexBAM"]
              
              gtf = rna_seq_settings["gtf"][genome]
              
@@ -622,6 +627,9 @@ def main():
                           
              if trim == True:
                  utils.trimSLURM(script_dir, work_dir,module)
+                 
+             if indexBAM == True:
+                 utils.indexBam(work_dir, threads, reference, slurm, script_dir)
              
              if align == "star":
                  rnaseq_utils.STAR(work_dir, threads, script_dir, rna_seq_settings, genome, slurm)
