@@ -29,8 +29,6 @@ sys.path.append(os.path.join(script_dir, "utils"))
 import utils_general as utils
 import utils_tt_seq as ttseq
 
-script_dir = script_dir.replace("utils/","")
-
 def install_packages(): #check for required python packages; installs if absent
     required = {"pyyaml, cutadapt, multiqc"}
     installed = {pkg.key for pkg in pkg_resources.working_set}
@@ -753,7 +751,7 @@ def BigWig(work_dir, threads, genome, rna_seq_settings, slurm=False):
         
         #load slurm settings 
         
-        with open(os.path.join(script_dir,"yaml","slurm.yaml")) as file:
+        with open(os.path.join(os.path.dirname(script_dir),"yaml","slurm.yaml")) as file:
             slurm_settings = yaml.full_load(file)
         threads = str(slurm_settings["RNA-Seq"]["bamCoverage_CPU"])
         mem = str(slurm_settings["RNA-Seq"]["bamCoverage_mem"])
