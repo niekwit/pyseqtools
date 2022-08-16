@@ -769,7 +769,7 @@ def BigWig(work_dir, threads, genome, rna_seq_settings, slurm=False):
         #create CSV file with bamCoverage commands
         os.makedirs(os.path.join(work_dir,"slurm"), exist_ok = True)
         
-        csv = os.path.join(work_dir,"slurm",f"slurm_bamCoverage_{genome}.csv")
+        csv = os.path.join(work_dir,"slurm",f"slurm_bamCoverage_{genome}_{normalizeUsing}.csv")
         if os.path.exists(csv):
             os.remove(csv)
         
@@ -780,7 +780,7 @@ def BigWig(work_dir, threads, genome, rna_seq_settings, slurm=False):
         #create csv file with bamCoverage commands
         csv = open(csv, "a")  
         for bam in file_list:
-            bigwig = os.path.basename(bam).replace("Aligned.out.bam", ".bigwig")
+            bigwig = os.path.basename(bam).replace("Aligned.out.bam", f"_{normalizeUsing}.bigwig")
             if not utils.file_exists(bigwig):
                 command = ["bamCoverage", "-p", threads, "--binSize", binSize, "--normalizeUsing",
                            normalizeUsing,"--effectiveGenomeSize", genome_size,"-b", bam]
@@ -798,11 +798,11 @@ def BigWig(work_dir, threads, genome, rna_seq_settings, slurm=False):
         
         #create slurm bash script 
         print("Generating SLURM script for bamCoverage")
-        csv = os.path.join(work_dir,"slurm",f"slurm_bamCoverage_{genome}.csv")
+        csv = os.path.join(work_dir,"slurm",f"slurm_bamCoverage_{genome}_{normalizeUsing}.csv")
         commands = subprocess.check_output(f"cat {csv} | wc -l", shell = True).decode("utf-8")
         bigwig_dir = os.path.join(work_dir,"bigwig", genome)
         slurm_log = os.path.join(work_dir, "slurm",'slurm_bamCoverage_%a.log')
-        script_ = os.path.join(work_dir,"slurm",f"slurm_bamCoverage_{genome}.sh")
+        script_ = os.path.join(work_dir,"slurm",f"slurm_bamCoverage_{genome}_{normalizeUsing}.sh")
         script = open(script_, "w")  
         script.write("#!/bin/bash" + "\n")
         script.write("\n")
