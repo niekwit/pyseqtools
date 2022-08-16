@@ -637,7 +637,7 @@ def main():
                  utils.indexBam(work_dir, threads, reference, slurm, script_dir)
                  
              if sortBAM == True:
-                 tt_seq_utils.bamSortSLURM(work_dir, genome="hg38")
+                 tt_seq_utils.bamSortSLURM(work_dir, genome)
              
              if align == "star":
                  rnaseq_utils.STAR(work_dir, threads, script_dir, rna_seq_settings, genome, slurm)
