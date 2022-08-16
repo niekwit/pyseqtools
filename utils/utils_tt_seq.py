@@ -204,7 +204,7 @@ def STAR(work_dir, threads, script_dir, tt_seq_settings, genome, slurm=False, jo
     
 
 def bamSortSLURM(work_dir, genome="hg38", job_id_align=None):
-    puts(colored.green("Sorting BAM using samtools"))
+    puts(colored.green("Sorting BAM files using samtools"))
     #create BAM file list (files might not exist yet)
     file_list = glob.glob(os.path.join(work_dir,"bam","*.bam"))
     if len(file_list) == 0:

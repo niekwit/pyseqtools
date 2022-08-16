@@ -739,18 +739,48 @@ def BigWig(work_dir, threads, genome, rna_seq_settings, slurm=False):
     
     #create BigWig directory
     os.makedirs(os.path.join(work_dir,"bigwig",genome), exist_ok = True)
-      
+    
+    file_list = glob.glob(os.path.join(work_dir, "bam", genome, "*", "*Aligned.out_sorted.bam"))
+    
+    #according to https://deeptools.readthedocs.io/en/latest/content/feature/effectiveGenomeSize.html
+    effective_genome_sizes = {"hg19":{"50":"2685511504", "75":"2736124973", "100":"2776919808", "150":"2827437033", "200":"2855464000"},
+                              "hg38":{"50":"2701495761", "75":"2747877777", "100":"2805636331", "150":"2862010578", "200":"2887553303"}}
+    
+    #load bamCoverage settings
+    read_length = rna_seq_settings["BigWig"]["read_length"]
+    genome_size = effective_genome_sizes[genome][read_length]
+    normalizeUsing = rna_seq_settings["BigWig"]["normalizeUsing"]
+    binSize = rna_seq_settings["BigWig"]["binSize"]
+    
+    #load scaling factors if they have been generated
+    if os.path.exists(os.path.join(work_dir,"scaleFactors.csv")):
+        df = pd.read_csv(os.path.join(work_dir,"scaleFactors.csv"))
+    
+    for bam in file_list:
+        bigwig = os.path.basename(bam).replace("Aligned.out_sorted.bam", f"_{normalizeUsing}.bigwig")
+        bigwig = os.path.join(work_dir,"bigwig", genome, bigwig)
+        
+        command = ["bamCoverage", "-p", threads, "--binSize", binSize, "--normalizeUsing",
+                   normalizeUsing,"--effectiveGenomeSize", genome_size,"-b", bam]
+        out_put = ["-o", bigwig]
+        if os.path.exists(os.path.join(work_dir,"scaleFactors.csv")):
+            sample = os.path.basename(bam).replace("Aligned.out_sorted.bam","")
+            scale_factor = df[df["sample"] == sample]["scaleFactors"].to_string().split(" ",1)[1].replace(" ","")
+            extend_command = ["--scaleFactor", scale_factor]
+            command.extend(extend_command)
+            bigwig = bigwig.replace(".bigwig","_scaled.bigwig")
+            out_put = ["-o", bigwig]
+        
+        command.extend(out_put)
+        if not utils.file_exists(bigwig):
+            print(f"Generating {os.path.basename(bigwig)}")
+            utils.write2log(work_dir, " ".join(command))
+            subprocess.call(command)
+    
     if slurm == False:
         pass
     else:
-        file_list = glob.glob(os.path.join(work_dir, "bam", genome, "*", "*Aligned.out_sorted.bam"))
-        
-        #according to https://deeptools.readthedocs.io/en/latest/content/feature/effectiveGenomeSize.html
-        effective_genome_sizes = {"hg19":{"50":"2685511504", "75":"2736124973", "100":"2776919808", "150":"2827437033", "200":"2855464000"},
-                                  "hg38":{"50":"2701495761", "75":"2747877777", "100":"2805636331", "150":"2862010578", "200":"2887553303"}}
-        
         #load slurm settings 
-        
         with open(os.path.join(os.path.dirname(script_dir),"yaml","slurm.yaml")) as file:
             slurm_settings = yaml.full_load(file)
         threads = str(slurm_settings["RNA-Seq"]["bamCoverage_CPU"])
@@ -759,24 +789,13 @@ def BigWig(work_dir, threads, genome, rna_seq_settings, slurm=False):
         account = slurm_settings["groupname"]
         partition = slurm_settings["partition"]
         
-        #load bamCoverage settings
-        read_length = rna_seq_settings["BigWig"]["read_length"]
-        genome_size = effective_genome_sizes[genome][read_length]
-        normalizeUsing = rna_seq_settings["BigWig"]["normalizeUsing"]
-        binSize = rna_seq_settings["BigWig"]["binSize"]
-        
-              
         #create CSV file with bamCoverage commands
         os.makedirs(os.path.join(work_dir,"slurm"), exist_ok = True)
         
         csv = os.path.join(work_dir,"slurm",f"slurm_bamCoverage_{genome}_{normalizeUsing}.csv")
         if os.path.exists(csv):
             os.remove(csv)
-        
-        #load scaling factors if they have been generated
-        if os.path.exists(os.path.join(work_dir,"scaleFactors.csv")):
-            df = pd.read_csv(os.path.join(work_dir,"scaleFactors.csv"))
-        
+          
         #create csv file with bamCoverage commands
         csv = open(csv, "a")  
         for bam in file_list:

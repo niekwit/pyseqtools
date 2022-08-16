@@ -525,7 +525,7 @@ def indexBam(work_dir, threads, genome="hg38", slurm=False, script_dir=None):
     if len(file_list) == 0:
         file_list = glob.glob(os.path.join(work_dir, "bam", genome, "*", "*_sorted.bam"))
         if len(file_list) == 0:
-            file_list = glob.glob(os.path.join(work_dir, "bam", genome, "*", "*Aligned.out.bam"))
+            file_list = glob.glob(os.path.join(work_dir, "bam", genome, "*", "*Aligned.out_sorted.bam"))
             if len(file_list) == 0:
                 return("ERROR: no bam files found to be indexed")
     

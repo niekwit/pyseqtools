@@ -26,6 +26,7 @@ library(dplyr)
 library(biomaRt)
 library(pheatmap)
 library(openxlsx)
+library(RColorBrewer)
 
 #get parsed arguments
 args <- commandArgs(trailingOnly=TRUE)
@@ -302,6 +303,9 @@ if (dir.exists(file.path(work.dir,"salmon"))){
   
   #check whether the order of the sample names between countMatrix and sampleTable is the same
   if(all(rownames(sampleTable) == colnames(countMatrix))){
+    #output file
+    excel <- file.path(work.dir,"DESeq2","DESeq2.xlsx")
+    
     #create DESeq2 object
     dds <- DESeqDataSetFromMatrix(countData = countMatrix,
                                   colData = sampleTable,
@@ -324,6 +328,7 @@ if (dir.exists(file.path(work.dir,"salmon"))){
         size.factors$sizeFactors <- 1 / size.factors$scaleFactors  
         size.factors$scaleFactors <- NULL
         sizeFactors(dds) <- size.factors$sizeFactors
+        excel <- file.path(work.dir,"DESeq2","DESeq2_scaled.xlsx")
       }
       
       #run DESeq2
@@ -361,18 +366,17 @@ if (dir.exists(file.path(work.dir,"salmon"))){
     }
     
     #create output directory
-    dir.create(file.path(work.dir,"DESeq2"))
+    dir.create(file.path(work.dir,"DESeq2"), showWarnings = FALSE)
     
     #save data frames to separate sheets of an excel fileq
     #dir.create(file.path(work.dir,"DESeq2"), showWarnings = FALSE)
-    excel <- file.path(work.dir,"DESeq2","DESeq2.xlsx")
     write.xlsx(df.master, file = excel, asTable = TRUE)
     
     #generate heatmap of sample distances
     vsd <- vst(dds, blind=FALSE) #count data transformation for visualisation
     sampleDists <- dist(t(assay(vsd)))
     sampleDistMatrix <- as.matrix(sampleDists)
-    rownames(sampleDistMatrix) <- paste0(dds$geno_cond,rep(c("_1","_2","_3"),4))
+    rownames(sampleDistMatrix) <- paste0(dds$geno_cond,rep(c("_1","_2","_3"),length(levels(dds$geno_cond))))
     colnames(sampleDistMatrix) <- NULL
     colors <- colorRampPalette( rev(brewer.pal(9, "Blues")) )(255)
     pheatmap(sampleDistMatrix,
