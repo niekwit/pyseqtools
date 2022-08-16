@@ -518,34 +518,30 @@ def indexBam(work_dir, threads, genome="hg38", slurm=False, script_dir=None):
     Index BAM files in bam/ directory using samtools
 
     '''
+    puts(colored.green("Indexing BAM files using samtools"))
+    file_list = glob.glob(os.path.join(work_dir,"bam","*.bam"))
+    
+    #directory structure for TT-Seq/RNA-Seq(TE analysis) experiments is different
+    if len(file_list) == 0:
+        file_list = glob.glob(os.path.join(work_dir, "bam", genome, "*", "*_sorted.bam"))
+        if len(file_list) == 0:
+            file_list = glob.glob(os.path.join(work_dir, "bam", genome, "*", "*Aligned.out.bam"))
+            if len(file_list) == 0:
+                return("ERROR: no bam files found to be indexed")
+    
+    index_file_list = [bam + ".bai" for bam in file_list]
     
     if slurm == False:
         puts(colored.green("Indexing BAM files"))
-        file_list = glob.glob(os.path.join(work_dir,"bam","*.bam"))
         
-        #directory structure for TT-Seq/RNA-Seq(TE analysis) experiments is different
-        if len(file_list) == 0:
-            file_list = glob.glob(os.path.join(work_dir, "bam", genome, "*", "*_sorted.bam"))
-            if len(file_list) == 0:
-                file_list = glob.glob(os.path.join(work_dir, "bam", genome, "*", "*Aligned.out.bam"))
-                if len(file_list) == 0:
-                    return("ERROR: no bam files found to be indexed")
-    
         #index bam files
         #also check if bam files have been indexed
-        index_file_list = [bam + ".bai" for bam in file_list]
-    
+            
         for bai, bam in zip(index_file_list, file_list):
             if not file_exists(bai):
                 print(os.path.basename(bam))
                 pysam.index("-@", str(threads), bam)
     else:
-        puts(colored.green("Indexing BAM files (SLURM)"))
-        #find all BAM files in working directory
-        file_list = list(Path(work_dir).rglob("*.bam"))
-        file_list = [x.as_posix() for x in file_list]
-        index_list = [x + ".bai" for x in file_list]
-        
         #load slurm settings
         with open(os.path.join(script_dir,"yaml","slurm.yaml")) as file:
             slurm_settings = yaml.full_load(file)
@@ -562,7 +558,7 @@ def indexBam(work_dir, threads, genome="hg38", slurm=False, script_dir=None):
         
         #create csv file with all index commands 
         csv = open(csv, "a") 
-        for bam,index in zip(file_list,index_list):
+        for bam,index in zip(file_list,index_file_list):
             if not file_exists(index):
                 samtools = ["samtools", "index","-@", threads, bam]
                 csv.write(" ".join(samtools) +"\n")
