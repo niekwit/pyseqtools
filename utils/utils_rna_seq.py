@@ -789,7 +789,7 @@ def BigWig(work_dir, threads, genome, rna_seq_settings, slurm=False):
                     scale_factor = df[df["sample"] == sample]["scaleFactors"].to_string().split(" ",1)[1].replace(" ","")
                     extend_command = ["--scaleFactor", scale_factor]
                     command.extend(extend_command)
-                    out_put = ["-o", bigwig.replace(".bigwig","_norm.bigwig")]
+                    out_put = ["-o", bigwig.replace(".bigwig","_scaled.bigwig")]
                 
                 command.extend(out_put)
                 csv.write(" ".join(command) +"\n")
