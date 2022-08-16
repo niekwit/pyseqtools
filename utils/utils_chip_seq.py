@@ -1144,6 +1144,16 @@ def plotProfile(work_dir, chip_seq_settings, genome, threads, slurm=False):
         os.makedirs(os.path.join(work_dir, "deepTools", genome), exist_ok = True)
         matrix = os.path.join(work_dir,"deepTools", genome,"compute_matrix.mar.gz")
         
+        #load SLURM settings
+        with open(os.path.join(script_dir,"yaml","slurm.yaml")) as file:
+            slurm_settings = yaml.full_load(file)        
+
+        threads = slurm_settings["ChIP-Seq"]["computeMatrix_CPU"]
+        mem = slurm_settings["ChIP-Seq"]["computeMatrix_mem"]
+        time = slurm_settings["ChIP-Seq"]["computeMatrix_time"]
+        account = slurm_settings["groupname"]
+        partition = slurm_settings["ChIP-Seq"]["partition"]
+        
         #create matrix
         if not utils.file_exists(matrix):
             #get GTF file
@@ -1153,17 +1163,7 @@ def plotProfile(work_dir, chip_seq_settings, genome, threads, slurm=False):
             file_list = glob.glob(os.path.join(work_dir,"bigwig", genome, "*.bigwig"))
             file_list = [x for x in file_list if "input" not in x.lower()]
             file_list = " ".join(file_list)
-            
-            #load SLURM settings
-            with open(os.path.join(script_dir,"yaml","slurm.yaml")) as file:
-                slurm_settings = yaml.full_load(file)        
-
-            threads = slurm_settings["ChIP-Seq"]["computeMatrix_CPU"]
-            mem = slurm_settings["ChIP-Seq"]["computeMatrix_mem"]
-            time = slurm_settings["ChIP-Seq"]["computeMatrix_time"]
-            account = slurm_settings["groupname"]
-            partition = slurm_settings["ChIP-Seq"]["partition"]
-            
+                                    
             #create computeMatrix command
             computeMatrix = ["computeMatrix", "scale-regions", "-S", file_list, "-R", gtf,
                          "--smartLabels", "-p", threads, "-b", "2000", "-a", "2000",
