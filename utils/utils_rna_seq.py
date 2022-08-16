@@ -743,7 +743,7 @@ def BigWig(work_dir, threads, genome, rna_seq_settings, slurm=False):
     if slurm == False:
         pass
     else:
-        file_list = glob.glob(os.path.join(work_dir, "bam", genome), "*", "*Aligned.out.bam")
+        file_list = glob.glob(os.path.join(work_dir, "bam", genome, "*", "*Aligned.out.bam"))
         
         #according to https://deeptools.readthedocs.io/en/latest/content/feature/effectiveGenomeSize.html
         effective_genome_sizes = {"hg19":{"50":"2685511504", "75":"2736124973", "100":"2776919808", "150":"2827437033", "200":"2855464000"},
