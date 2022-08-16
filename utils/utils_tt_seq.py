@@ -263,12 +263,12 @@ def bamSortSLURM(work_dir, genome="hg38", job_id_align=None):
     script.close()
    
     #submit SLURM bash script to cluster
-    print("Submitting slurm_sortBAM.sh to cluster")
     script_ = os.path.join(work_dir,"slurm","slurm_sortBAM.sh")
     if job_id_align == None:
-        subprocess.call(["sbatch", script])
+        job_id = subprocess.check_output(f"sbatch {script} | cut -d ' ' -f 4", shell = True)
     else:
-        subprocess.call(["sbatch", f"--dependency=afterok:{job_id_align}", script])
+        job_id = subprocess.check_output(f"sbatch --dependency=afterok:{job_id_align} {script} | cut -d ' ' -f 4", shell = True)
+    print(f"Script submitted to cluster (job id {job_id})")
     
     
 def hisat2(work_dir, threads, tt_seq_settings, genome, slurm=False, job_id_trim=None):
