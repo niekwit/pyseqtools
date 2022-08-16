@@ -135,10 +135,6 @@ def main():
                                required = False,
                                choices = rna_seq_genomeList,
                                help = "Reference genome")
-    parser_rnaseq.add_argument("--indexBAM",
-                             required = False,
-                             action = 'store_true',
-                             help = "Index BAM files with samtools")
     parser_rnaseq.add_argument("--trim",
                              action = 'store_true',
                              required = False,
@@ -147,6 +143,14 @@ def main():
                                required = False,
                                choices = ["salmon","star"],
                                help = "Program to align fastq files")
+    parser_rnaseq.add_argument("--indexBAM",
+                             required = False,
+                             action = 'store_true',
+                             help = "Index BAM files with samtools")
+    parser_rnaseq.add_argument("--sortBAM",
+                             required = False,
+                             action = 'store_true',
+                             help = "Sort BAM files with samtools")
     parser_rnaseq.add_argument("-f", "--scaleFactors",
                              required = False,
                              action = 'store_true',
@@ -158,7 +162,7 @@ def main():
     parser_rnaseq.add_argument("-b", "--bigwig",
                              required = False,
                              action = 'store_true',
-                             help = "Create BigWig files using bamCoverage")
+                             help = "Create BigWig files using bamCoverage (requires indexed BAM files")
 
     parser_rnaseq.add_argument("--TE",
                                required = False,
@@ -615,6 +619,7 @@ def main():
              bigwig = args["bigwig"]
              scaleFactors = args["scaleFactors"]
              indexBAM = args["indexBAM"]
+             sortBAM = args["sortBAM"]
              
              gtf = rna_seq_settings["gtf"][genome]
              
@@ -630,6 +635,9 @@ def main():
                  
              if indexBAM == True:
                  utils.indexBam(work_dir, threads, reference, slurm, script_dir)
+                 
+             if sortBAM == True:
+                 tt_seq_utils.bamSortSLURM(work_dir, genome="hg38")
              
              if align == "star":
                  rnaseq_utils.STAR(work_dir, threads, script_dir, rna_seq_settings, genome, slurm)
