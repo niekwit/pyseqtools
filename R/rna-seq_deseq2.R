@@ -1,5 +1,3 @@
-options(java.parameters = "-Xmx30000m") #increase available memory for java required for xlsx package to function properly
-
 #check if required packages are installed, if not install them
 packages <- rownames(installed.packages())
 biocmanager.packages <- c("tximport","DESeq2",
@@ -27,7 +25,7 @@ library(ggplot2)
 library(dplyr)
 library(biomaRt)
 library(pheatmap)
-library(xlsx)
+library(openxlsx)
 
 #get parsed arguments
 args <- commandArgs(trailingOnly=TRUE)
@@ -254,7 +252,7 @@ if (dir.exists(file.path(work.dir,"salmon"))){
   #extract reference conditions
   sample_references <- sampleTable[sampleTable$ref %in% "ref",]
   sample_references <- unique(sample_references$geno_cond)
-  sampleTable <- sampleTable %>% select(-one_of("genotype","condition","ref"))
+  sampleTable <- sampleTable %>% dplyr::select(-one_of("genotype","condition","ref"))
   
   sampleTable$geno_cond <- factor(sampleTable$geno_cond)
   rownames(sampleTable) <- sampleTable$sample
@@ -318,9 +316,10 @@ if (dir.exists(file.path(work.dir,"salmon"))){
       dds$geno_cond <- relevel(dds$geno_cond, reference)
       
       #apply size factors from yeast spike-in (if applicable)
-      scale.factors <- read.csv(file.path(work.dir, "scaleFactors.csv"))
+      scale.factors <- file.path(work.dir, "scaleFactors.csv")
       if (file.exists(scale.factors)){
         print("Applying scale factors found in scaleFactors.csv")
+        scale.factors <- read.csv(scale.factors)
         size.factors <- scale.factors
         size.factors$sizeFactors <- 1 / size.factors$scaleFactors  
         size.factors$scaleFactors <- NULL
@@ -361,15 +360,10 @@ if (dir.exists(file.path(work.dir,"salmon"))){
       }
     }
     
-    #save data frames to separate sheets of an excel file
-    dir.create(file.path(work.dir,"DESeq2"), showWarnings = FALSE)
+    #save data frames to separate sheets of an excel fileq
+    #dir.create(file.path(work.dir,"DESeq2"), showWarnings = FALSE)
     excel <- file.path(work.dir,"DESeq2","DESeq2.xlsx")
-    for (i in 1:length(df.master)){
-      sheet <- names(df.master)[i]
-      if (i == 1) {
-        write.xlsx2(df.master[[i]], file=excel, sheetName=sheet, row.names = FALSE)
-      }else{write.xlsx2(df.master[[i]], file=excel, sheetName=sheet, append = TRUE, row.names = FALSE)}
-    }
+    write.xlsx(df.master, file = excel, asTable = TRUE)
     
     #generate heatmap of sample distances
     vsd <- vst(dds, blind=FALSE) #count data transformation for visualisation
