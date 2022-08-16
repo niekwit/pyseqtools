@@ -1144,6 +1144,7 @@ def plotProfile(work_dir, chip_seq_settings, genome, threads, slurm=False):
         os.makedirs(os.path.join(work_dir, "deepTools", genome), exist_ok = True)
         matrix = os.path.join(work_dir,"deepTools", genome,"compute_matrix.mar.gz")
         
+        #create matrix
         if not utils.file_exists(matrix):
             #get GTF file
             gtf = chip_seq_settings["gtf"][genome]
@@ -1194,44 +1195,44 @@ def plotProfile(work_dir, chip_seq_settings, genome, threads, slurm=False):
             job_id_matrix = job_id_matrix.decode("UTF-8").replace("\n","")
             print(f"Submitted SLURM script to cluster (job ID {job_id_matrix})")
             
-            #create profile plot
-            profile_plot = os.path.join(work_dir, "deepTools", genome, "gene_body.pdf")
+        #create profile plot
+        profile_plot = os.path.join(work_dir, "deepTools", genome, "gene_body.pdf")
+        
+        if not utils.file_exists(profile_plot):
+            command = ["plotProfile", "-m", matrix, "--perGroup", "--plotType=std", "-o", profile_plot]
+            command = " ".join(command)
             
-            if not utils.file_exists(profile_plot):
-                command = ["plotProfile", "-m", matrix, "--perGroup", "--plotType=std", "-o", profile_plot]
-                command = " ".join(command)
-                
-                #load SLURM settings
-                threads = slurm_settings["ChIP-Seq"]["plotProfile_CPU"]
-                mem = slurm_settings["ChIP-Seq"]["plotProfile_mem"]
-                time = slurm_settings["ChIP-Seq"]["plotProfile_time"]
-                
-                #generate SLURM script
-                print("Generating SLURM script for plotProfile")
-                script_ = os.path.join(work_dir,"slurm",f"slurm_plotProfile_{genome}.sh")
-                script = open(script_, "w")  
-                script.write("#!/bin/bash" + "\n")
-                script.write("\n")
-                script.write(f"#SBATCH -A {account}\n")
-                script.write("#SBATCH --mail-type=BEGIN,FAIL,END" + "\n")
-                script.write(f"#SBATCH -p {partition}\n")
-                script.write(f"#SBATCH -D {work_dir}\n")
-                script.write("#SBATCH -o slurm/slurm_plotProfile.log" + "\n")
-                script.write(f"#SBATCH -c {threads}\n")
-                script.write(f"#SBATCH -t {time}\n")
-                script.write(f"#SBATCH --mem={mem}\n")
-                script.write("#SBATCH -J plotProfile\n")
-                if not os.path.exists(matrix):
-                    script.write(f"#SBATCH --dependency=afterok:{job_id_matrix}\n")
-                script.write("\n")
-                script.write(f"{command}\n")
-                script.write("\n")
-                script.close()
-                
-                #submit SLURM script to cluster
-                job_id_profile = subprocess.check_output(f"sbatch {script_} | cut -d ' ' -f 4", shell = True)
-                job_id_profile = job_id_profile.decode("UTF-8").replace("\n","")
-                print(f"Submitted SLURM script to cluster (job ID {job_id_profile})")
+            #load SLURM settings
+            threads = slurm_settings["ChIP-Seq"]["plotProfile_CPU"]
+            mem = slurm_settings["ChIP-Seq"]["plotProfile_mem"]
+            time = slurm_settings["ChIP-Seq"]["plotProfile_time"]
+            
+            #generate SLURM script
+            print("Generating SLURM script for plotProfile")
+            script_ = os.path.join(work_dir,"slurm",f"slurm_plotProfile_{genome}.sh")
+            script = open(script_, "w")  
+            script.write("#!/bin/bash" + "\n")
+            script.write("\n")
+            script.write(f"#SBATCH -A {account}\n")
+            script.write("#SBATCH --mail-type=BEGIN,FAIL,END" + "\n")
+            script.write(f"#SBATCH -p {partition}\n")
+            script.write(f"#SBATCH -D {work_dir}\n")
+            script.write("#SBATCH -o slurm/slurm_plotProfile.log" + "\n")
+            script.write(f"#SBATCH -c {threads}\n")
+            script.write(f"#SBATCH -t {time}\n")
+            script.write(f"#SBATCH --mem={mem}\n")
+            script.write("#SBATCH -J plotProfile\n")
+            if not os.path.exists(matrix):
+                script.write(f"#SBATCH --dependency=afterok:{job_id_matrix}\n")
+            script.write("\n")
+            script.write(f"{command}\n")
+            script.write("\n")
+            script.close()
+            
+            #submit SLURM script to cluster
+            job_id_profile = subprocess.check_output(f"sbatch {script_} | cut -d ' ' -f 4", shell = True)
+            job_id_profile = job_id_profile.decode("UTF-8").replace("\n","")
+            print(f"Submitted SLURM script to cluster (job ID {job_id_profile})")
 
 def bamCompare(work_dir, threads):
     file = open(os.path.join(work_dir,"config_bamcompare.txt"), "r")
