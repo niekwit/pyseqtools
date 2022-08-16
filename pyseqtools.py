@@ -611,7 +611,7 @@ def main():
              bigwig = args["bigwig"]
              scaleFactors = args["scaleFactors"]
              
-             gtf = rna_seq_settings["gtf"][reference]
+             gtf = rna_seq_settings["gtf"][genome]
              
              ###Set species variable
              reference = args["genome"]
