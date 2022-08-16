@@ -56,9 +56,15 @@ if (file.exists(out.file) == FALSE){
   #check whether the order of the sample names between countMatrix and sampleTable is the same
   if(all(rownames(sampleTable) == colnames(countMatrix))){
     #create DESeq2 object
-    dds <- DESeqDataSetFromMatrix(countData = countMatrix,
-                                  colData = sampleTable,
-                                  design = ~ condition)
+    if (length(unique(sampleTable$condition)) > 1){
+      dds <- DESeqDataSetFromMatrix(countData = countMatrix,
+                                    colData = sampleTable,
+                                    design = ~ condition)
+    } else if (length(unique(sampleTable$condition)) == 1) {
+      dds <- DESeqDataSetFromMatrix(countData = countMatrix,
+                                    colData = sampleTable,
+                                    design = ~ genotype)
+    }
     
     #calculate size factors
     sizeFactors <- estimateSizeFactors(dds)
