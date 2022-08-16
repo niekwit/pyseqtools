@@ -360,6 +360,9 @@ if (dir.exists(file.path(work.dir,"salmon"))){
       }
     }
     
+    #create output directory
+    dir.create(file.path(work.dir,"DESeq2"))
+    
     #save data frames to separate sheets of an excel fileq
     #dir.create(file.path(work.dir,"DESeq2"), showWarnings = FALSE)
     excel <- file.path(work.dir,"DESeq2","DESeq2.xlsx")
