@@ -1221,7 +1221,8 @@ def plotProfile(work_dir, chip_seq_settings, genome, threads, slurm=False):
                 script.write(f"#SBATCH -t {time}\n")
                 script.write(f"#SBATCH --mem={mem}\n")
                 script.write("#SBATCH -J plotProfile\n")
-                script.write(f"#SBATCH --dependency=afterok:{job_id_matrix}\n")
+                if not os.path.exists(matrix):
+                    script.write(f"#SBATCH --dependency=afterok:{job_id_matrix}\n")
                 script.write("\n")
                 script.write(f"{command}\n")
                 script.write("\n")
