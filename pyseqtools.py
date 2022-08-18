@@ -184,11 +184,11 @@ def main():
                                metavar = "<P value>",
                                default = 0.001,
                                help = "Set P value cut off (default is 0.001)")
-    parser_rnaseq.add_argument("--skip-fastqc",
+    parser_rnaseq.add_argument("--fastqc",
                                required = False,
                                action = 'store_true',
                                default = False,
-                               help = "Skip FastQC/MultiQC")
+                               help = "Run FastQC/MultiQC")
     parser_rnaseq.add_argument("--slurm",
                              required = False,
                              action = 'store_true',
@@ -260,11 +260,11 @@ def main():
                              required = False,
                              action = 'store_true',
                              help = "Submit jobs to Cambridge HPC using SLURM")
-    parser_chip.add_argument("--skip-fastqc",
+    parser_chip.add_argument("--fastqc",
                                required = False,
                                action = 'store_true',
                                default = False,
-                               help = "Skip FastQC/MultiQC")
+                               help = "Run FastQC/MultiQC")
 
 
     #create subparser for CUT&RUN analysis commands
@@ -543,7 +543,22 @@ def main():
         
 
     def rna_seq(args, script_dir):
-
+        #get parsed arguments 
+        module = args["module"]
+        genome = args["genome"]
+        align = args["align"]
+        threads = args["threads"]
+        deseq2 = args["deseq2"]
+        TE = args["TE"]
+        trim = args["trim"]
+        pvalue = args["pvalue"]
+        deseq2 = args["deseq2"]
+        bigwig = args["bigwig"]
+        scaleFactors = args["scaleFactors"]
+        indexBAM = args["indexBAM"]
+        sortBAM = args["sortBAM"]
+        
+        gtf = rna_seq_settings["gtf"][genome]
         slurm = args["slurm"]        
 
         ####set thread count for processing
@@ -558,12 +573,10 @@ def main():
     
             ###Run FastQC/MultiQC
             file_extension = utils.get_extension(work_dir)
-            skip_fastqc = args["skip_fastqc"]
-            if not skip_fastqc:
+            fastqc = args["fastqc"]
+            if fastqc == True:
                 utils.fastqc(script_dir, work_dir, threads, file_extension)
-            else:
-                print("Skipping FastQC/MultiQC analysis")
-    
+                
             ###Set species variable
             reference = args["genome"]
             if "hg" in reference or reference == "gencode-v35":
@@ -575,53 +588,50 @@ def main():
             ###trim and align
             pvalue = args["pvalue"]
             align = args["align"]
-            if align.lower() == "salmon":
-                utils.trim(script_dir, threads, work_dir)
-                salmon_index = rna_seq_settings["salmon_index"][reference]
-                gtf = rna_seq_settings["salmon_gtf"][reference]
-                fasta = rna_seq_settings["FASTA"][reference]
-                rnaseq_utils.salmon(salmon_index,
-                                    str(threads),
-                                    work_dir,
-                                    gtf,
-                                    fasta,
-                                    script_dir,
-                                    rna_seq_settings,
-                                    reference)
-                rnaseq_utils.plotMappingRate(work_dir)
-                rnaseq_utils.plotPCA(work_dir, script_dir)
-                rnaseq_utils.diff_expr(work_dir, gtf, script_dir, species, pvalue, reference)
-                rnaseq_utils.plotVolcano(work_dir)
-            elif align.lower() == "star":
-                rnaseq_utils.trim(threads, work_dir)
-                rnaseq_utils.STAR(work_dir, threads, script_dir, rna_seq_settings, reference, slurm)
-            
+            if align != None:
+                if align.lower() == "salmon":
+                    utils.trim(script_dir, threads, work_dir)
+                    salmon_index = rna_seq_settings["salmon_index"][reference]
+                    gtf = rna_seq_settings["salmon_gtf"][reference]
+                    fasta = rna_seq_settings["FASTA"][reference]
+                    rnaseq_utils.salmon(salmon_index,
+                                        str(threads),
+                                        work_dir,
+                                        gtf,
+                                        fasta,
+                                        script_dir,
+                                        rna_seq_settings,
+                                        reference)
+                    rnaseq_utils.plotMappingRate(work_dir)
+                    rnaseq_utils.plotPCA(work_dir, script_dir)
+                    rnaseq_utils.diff_expr(work_dir, gtf, script_dir, species, pvalue, reference)
+                    rnaseq_utils.plotVolcano(work_dir)
+                elif align.lower() == "star":
+                    rnaseq_utils.trim(threads, work_dir)
+                    rnaseq_utils.STAR(work_dir, threads, script_dir, rna_seq_settings, reference, slurm)
+                
             
             go = args["go"]
     
             pvalue = args["pvalue"]
-    
+            
+            if deseq2 == True:
+                rnaseq_utils.diff_expr(work_dir,gtf,script_dir,species,pvalue,reference, slurm)
+                
+            if scaleFactors == True:
+                tt_seq_utils.sizeFactors(script_dir, work_dir, slurm)
+            
+            if bigwig == True:
+                rnaseq_utils.BigWig(work_dir, threads, reference, rna_seq_settings, slurm)   
+            
+            if TE == True:
+                rnaseq_utils.retroElements(work_dir, script_dir, rna_seq_settings, threads, genome, slurm)
     
             if go == True:
                 gene_sets=args["gene_sets"]
                 rnaseq_utils.geneSetEnrichment(work_dir, pvalue, gene_sets)
         else:
-             #get parsed arguments 
-             module = args["module"]
-             genome = args["genome"]
-             align = args["align"]
-             threads = args["threads"]
-             deseq2 = args["deseq2"]
-             TE = args["TE"]
-             trim = args["trim"]
-             pvalue = args["pvalue"]
-             deseq2 = args["deseq2"]
-             bigwig = args["bigwig"]
-             scaleFactors = args["scaleFactors"]
-             indexBAM = args["indexBAM"]
-             sortBAM = args["sortBAM"]
              
-             gtf = rna_seq_settings["gtf"][genome]
              
              ###Set species variable
              reference = args["genome"]

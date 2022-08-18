@@ -10,10 +10,9 @@ import yaml
 from pathlib import Path
 import tempfile
 
+
 from clint.textui import colored, puts
 import pysam
-#import pybedtools
-#import biomart
 
 script_dir = os.path.abspath(os.path.dirname(__file__))
 script_dir = os.path.dirname(script_dir)
@@ -199,8 +198,6 @@ def STAR(work_dir, threads, script_dir, tt_seq_settings, genome, slurm=False, jo
             print("Skipping STAR alignment, all output BAM files for R64-1-1 already detected")
     else:
         align(work_dir, yeast_index, threads, "R64-1-1")
-    
-    
     
 
 def bamSortSLURM(work_dir, genome="hg38", job_id_align=None):
@@ -792,26 +789,131 @@ def metaProfiles(work_dir, threads, tt_seq_settings, genome):
     plotProfile(work_dir, threads, "rev")
 
 
-def bedBamOverlap(work_dir, genome, slurm, bed):
-    """
-    Quantify reads from BAM files that overlap with specified BED file
-
-    """
-    #merge replicate bam files
-    samples = pd.read_csv(os.path.join(work_dir,"samples.csv"))
-    genotypes = list(set(samples["genotype"]))
-    conditions = list(set(samples["condition"]))
+def mergeBAM(work_dir, genome, threads, slurm=False):
+    '''
+    Merge replicate BAM files using samtools
+    '''
+    puts(colored.green("Merging replicate BAM files using samtools"))
     
-    for genotype in genotypes:
-        for condition in conditions:
-            sub_samples = samples[samples["genotype"] == genotype]
-            sub_samples = sub_samples[samples["condition"] == condition]
-            sub_samples = list(sub_samples["sample"])
+    #load samples.csv
+    df = pd.read_csv(os.path.join(work_dir,"samples.csv"))
+    df.drop("ref", axis=1, inplace = True)
+
+    #merge genotype and condition
+    df["merge"] = df["genotype"] + "_" + df["condition"]
+    df.drop(["genotype","condition"], axis=1,inplace = True)
     
+    #generate sample names for merged BAM files
+    sample_names = list(set(df["merge"]))
+    
+    #merge BAM files
+    
+    for sample_name in sample_names:
+        #get BAM files to be merged
+        samples = df[df["merge"] == sample_name]
+        samples = samples["sample"]
+        out_bam = os.path.join(work_dir, "bam", genome, f"{sample_name}_merged.bam")
+        bam_files = [os.path.join(work_dir, "bam", genome, x, f"{x}_sorted.bam") for x in samples]
+        print_ = " ".join([os.path.basename(x) for x in bam_files])
+        print(f"Merging {print_}")
+        
+        if not utils.file_exists(out_bam):
+            command = ["samtools", "merge", "-@", threads, "-"]
+            for i in bam_files:
+                command.append(i)
+            command.extend(["|", "samtools", "sort", "-@", threads, "-" ,">", out_bam])
+            
+            if slurm == False:
+                utils.write2log(work_dir, " ".join(command))
+                subprocess.call(command)
+            else:
+                pass
+    
+    #deduplicate merged BAM files
+    file_list = glob.glob(os.path.join(work_dir,"bam", genome,"*_merged.bam"))
+    
+    print("Removing duplicates from merged BAM files using PICARD")
+    for bam in file_list:
+        if slurm == False:
+            print(os.path.basename(bam))
+            picard = utils.checkPicard(script_dir)
+            dedup_bam = bam.replace(".bam","_dedup.bam")
+            log = bam.replace(".bam","_deduplication.log")
+            command = ["java", "-jar", picard, "MarkDuplicates", f"INPUT={bam}" , 
+                       f"OUTPUT={dedup_bam}", "REMOVE_DUPLICATES=TRUE", f"METRICS_FILE={log}"]
+            utils.write2log(work_dir, " ".join(command))
+            if utils.file_exists(dedup_bam):
+                subprocess.call(command)
+           
 
-def DESeq2(script_dir, genome):
-    pass
+def readRatio(work_dir, genome, threads, bed, slurm=False):
+    """
+    Calculate ratios of reads around TSS and TES on replicate merged BAM files.
+    Note: use sorted BED file to reduce memory usage
 
+    """
+    
+    #first merge replicate BAM files
+    mergeBAM(work_dir, genome, threads, slurm)
+    
+    puts(colored.green("Calculating ratios of reads at TSS vs TES in replicate merged BAM files"))
+    
+    #get merged BAM files
+    file_list = glob.glob(os.path.join(work_dir,"bam", genome,"*_merged_dedup.bam"))
+    if len(file_list) == 0:
+        puts(colored.red("ERROR: no merged BAM files found"))
+        return()
+    
+    if slurm == False:
+        pass
+    else:
+        #load SLURM settings
+        with open(os.path.join(script_dir,"yaml","slurm.yaml")) as file:
+            slurm_settings = yaml.full_load(file)
+        threads = str(slurm_settings["TT-Seq"]["readRatio_CPU"])
+        
+        mem = str(slurm_settings["TT-Seq"]["readRatio_mem"])
+        slurm_time = str(slurm_settings["TT-Seq"]["readRatio_time"])
+        account = slurm_settings["groupname"]
+        partition = slurm_settings["TT-Seq"]["readRatio_partition"]
+        
+        #load bed file location
+        with open(os.path.join(script_dir,"yaml","tt-seq.yaml")) as file:
+            ttseq_settings = yaml.full_load(file)
+        bed = (ttseq_settings["readRatio"]["bed"])
+        
+        #create csv file with commands
+        os.makedirs(os.path.join(work_dir,"slurm"), exist_ok = True)
+        
+        csv = os.path.join(work_dir,"slurm",f"slurm_bedtools-intersect_{genome}.csv")
+        if os.path.exists(csv):
+            os.remove(csv)
+        
+        csv = open(csv, "a")  
+        for bam in file_list:
+            #base bedtools command
+            command = ["bedtools", "intersect", "-sorted","a", bed, "-b" ]
+            command.append(bam)
+            csv.write(" ".join(command) +"\n")
+        csv.close()
+        
+        #create SLURM script
+
+def DESeq2(work_dir, script_dir, genome, slurm=False):
+    '''
+    Differential transcript analysis for TT-Seq using DESeq2
+    '''
+    puts(colored.green("Differential expression analysis using DESeq2"))
+    
+    samples = os.path.join(work_dir,"samples.csv")
+    if not os.path.exists(samples):
+        puts(colored.red(f"ERROR: {samples} not found"))
+        return()
+    
+    if slurm == False:
+        pass
+    else:
+        pass
 
 
 def txReadThrough(work_dir, threads):

@@ -740,7 +740,11 @@ def BigWig(work_dir, threads, genome, rna_seq_settings, slurm=False):
     #create BigWig directory
     os.makedirs(os.path.join(work_dir,"bigwig",genome), exist_ok = True)
     
-    file_list = glob.glob(os.path.join(work_dir, "bam", genome, "*", "*Aligned.out_sorted.bam"))
+    file_list = glob.glob(os.path.join(work_dir, "bam", genome, "*", "*_sorted.bam"))
+    if len(file_list) == 0:
+        puts(colored.red("ERROR: no sorted BAM files found"))
+        return()
+
     
     #according to https://deeptools.readthedocs.io/en/latest/content/feature/effectiveGenomeSize.html
     effective_genome_sizes = {"hg19":{"50":"2685511504", "75":"2736124973", "100":"2776919808", "150":"2827437033", "200":"2855464000"},
@@ -754,17 +758,23 @@ def BigWig(work_dir, threads, genome, rna_seq_settings, slurm=False):
     
     #load scaling factors if they have been generated
     if os.path.exists(os.path.join(work_dir,"scaleFactors.csv")):
+        print("Found scaling factors (will be applied when generating BigWig files)")
         df = pd.read_csv(os.path.join(work_dir,"scaleFactors.csv"))
     
     for bam in file_list:
-        bigwig = os.path.basename(bam).replace("Aligned.out_sorted.bam", f"_{normalizeUsing}.bigwig")
+        if "Aligned.out_sorted.bam" in bam:
+            extension = "Aligned.out_sorted.bam"
+        else:
+            extension = "_sorted.bam"
+        
+        bigwig = os.path.basename(bam).replace(extension, f"_{normalizeUsing}.bigwig")
         bigwig = os.path.join(work_dir,"bigwig", genome, bigwig)
         
         command = ["bamCoverage", "-p", threads, "--binSize", binSize, "--normalizeUsing",
                    normalizeUsing,"--effectiveGenomeSize", genome_size,"-b", bam]
         out_put = ["-o", bigwig]
         if os.path.exists(os.path.join(work_dir,"scaleFactors.csv")):
-            sample = os.path.basename(bam).replace("Aligned.out_sorted.bam","")
+            sample = os.path.basename(bam).replace(extension,"")
             scale_factor = df[df["sample"] == sample]["scaleFactors"].to_string().split(" ",1)[1].replace(" ","")
             extend_command = ["--scaleFactor", scale_factor]
             command.extend(extend_command)
