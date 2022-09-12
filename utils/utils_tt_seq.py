@@ -846,13 +846,13 @@ def mergeBAM(work_dir, genome, threads, slurm=False):
                 subprocess.call(command)
            
 
-def readRatio(work_dir, genome, threads, bed, slurm=False):
+def readRatio(work_dir, genome, threads, slurm=False):
     """
     Calculate ratios of reads around TSS and TES on replicate merged BAM files.
     Note: use sorted BED file to reduce memory usage
 
     """
-      
+    puts(colored.green("Calculating ratios of reads at TSS vs TES in replicate merged BAM files")) 
     #get merged BAM files
     file_list = glob.glob(os.path.join(work_dir,"bam", genome,"*_merged_dedup.bam"))
   
@@ -861,8 +861,7 @@ def readRatio(work_dir, genome, threads, bed, slurm=False):
         if len(file_list) == 0:
             puts(colored.orange("WARNING: no merged deduplicated BAM files found"))
         mergeBAM(work_dir, genome, threads, slurm)
-        
-        puts(colored.green("Calculating ratios of reads at TSS vs TES in replicate merged BAM files"))
+           
     else:
         if len(file_list) == 0:
             puts(colored.red("ERROR: no merged deduplicated BAM files found"))

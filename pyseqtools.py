@@ -869,11 +869,12 @@ def main():
         slurm = args["slurm"]
         
         #set thread count for processing
-        max_threads = str(multiprocessing.cpu_count())
-        threads = args["threads"]
-        if threads == "max":
-            threads = max_threads
-        print(f"Using {threads} CPU threads for analysis")
+        if slurm == False:
+            max_threads = str(multiprocessing.cpu_count())
+            threads = args["threads"]
+            if threads == "max":
+                threads = max_threads
+            print(f"Using {threads} CPU threads for analysis")
         
         #rename files
         rename = args["rename"]
@@ -949,7 +950,7 @@ def main():
             
         readRatio = args["readRatio"]
         if readRatio == True:
-            readRatio(work_dir, genome, threads, slurm)
+            tt_seq_utils.readRatio(work_dir, genome, threads, slurm)
             
                 
     def geneSymConv(args, script_dir):
