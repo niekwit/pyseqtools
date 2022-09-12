@@ -950,9 +950,9 @@ def main():
         readRatio = args["readRatio"]
         if readRatio == True:
             if slurm == True:
-                tt_seq_utils.readRatio(work_dir, genome, slurm)
+                tt_seq_utils.readRatio(work_dir, script_dir, genome, slurm)
             else:
-                tt_seq_utils.readRatio(work_dir, genome, slurm, threads)
+                tt_seq_utils.readRatio(work_dir, script_dir, genome, slurm, threads)
             
                 
     def geneSymConv(args, script_dir):
