@@ -901,7 +901,6 @@ def main():
         
         #quality trim fastq files and align
         align=args["align"]
-        slurm = args["slurm"]
         if align == True:
             if slurm == True:
                 job_id_trim = utils.trimSLURM(script_dir, work_dir)
@@ -950,7 +949,10 @@ def main():
             
         readRatio = args["readRatio"]
         if readRatio == True:
-            tt_seq_utils.readRatio(work_dir, genome, threads, slurm)
+            if slurm == True:
+                tt_seq_utils.readRatio(work_dir, genome, slurm)
+            else:
+                tt_seq_utils.readRatio(work_dir, genome, slurm, threads)
             
                 
     def geneSymConv(args, script_dir):

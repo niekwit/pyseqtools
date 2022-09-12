@@ -846,7 +846,7 @@ def mergeBAM(work_dir, genome, threads, slurm=False):
                 subprocess.call(command)
            
 
-def readRatio(work_dir, genome, threads, slurm=False):
+def readRatio(work_dir, genome, slurm=False, threads = "1"):
     """
     Calculate ratios of reads around TSS and TES on replicate merged BAM files.
     Note: use sorted BED file to reduce memory usage
