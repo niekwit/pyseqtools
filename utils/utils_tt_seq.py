@@ -910,26 +910,26 @@ def readRatio(work_dir, script_dir, genome, slurm=False, threads = "1"):
         print("Generating SLURM script for bedtools intersect")
         csv = os.path.join(work_dir,"slurm",f"slurm_bedtools-intersect_{genome}.csv")
         commands = str(subprocess.check_output(f"cat {csv} | wc -l", shell = True).decode("utf-8"))
-        script_ = os.path.join(work_dir,"slurm",f"slurm_bedtools-intersect_{genome}.sh")
-        script = open(script_, "w")  
-        script.write("#!/bin/bash" + "\n")
-        script.write("\n")
-        script.write(f"#SBATCH -A {account}\n")
-        script.write("#SBATCH --mail-type=BEGIN,FAIL,END\n")
-        script.write(f"#SBATCH -p {partition}\n")
-        script.write(f"#SBATCH -D {work_dir}\n")
-        script.write("#SBATCH -o slurm/slurm_bedtools-intersect_%a.log" + "\n")
-        script.write(f"#SBATCH -c {threads}\n")
-        script.write(f"#SBATCH -t {slurm_time}\n")
-        script.write(f"#SBATCH --mem={mem}\n")
-        script.write("#SBATCH -J bedtools-intersect\n")
-        script.write(f"#SBATCH -a 1-{commands}\n")
-        script.write("\n")
-        script.write("sed -n ${SLURM_ARRAY_TASK_ID}p " + csv +" | bash\n")
-        script.close()
-        
         
         if commands != "0":
+            script_ = os.path.join(work_dir,"slurm",f"slurm_bedtools-intersect_{genome}.sh")
+            script = open(script_, "w")  
+            script.write("#!/bin/bash" + "\n")
+            script.write("\n")
+            script.write(f"#SBATCH -A {account}\n")
+            script.write("#SBATCH --mail-type=BEGIN,FAIL,END\n")
+            script.write(f"#SBATCH -p {partition}\n")
+            script.write(f"#SBATCH -D {work_dir}\n")
+            script.write("#SBATCH -o slurm/slurm_bedtools-intersect_%a.log" + "\n")
+            script.write(f"#SBATCH -c {threads}\n")
+            script.write(f"#SBATCH -t {slurm_time}\n")
+            script.write(f"#SBATCH --mem={mem}\n")
+            script.write("#SBATCH -J bedtools-intersect\n")
+            script.write(f"#SBATCH -a 1-{commands}\n")
+            script.write("\n")
+            script.write("sed -n ${SLURM_ARRAY_TASK_ID}p " + csv +" | bash\n")
+            script.close()
+            
             print("Submitting SLURM script to cluster")
             job_id_intersect = subprocess.check_output(f"sbatch {script_} | cut -d ' ' -f 4", shell = True)
             job_id_intersect = job_id_intersect.decode("utf-8").replace("\n","")
@@ -951,7 +951,7 @@ def readRatio(work_dir, script_dir, genome, slurm=False, threads = "1"):
             out_bed_tes = bed.replace(".bed","_count_TES.txt")
             
             if not utils.file_exists(out_bed_tss):
-                command = [os.path.join(script_dir, "bash", "readRatio.sh", out_bed_tss, out_bed_tes) ]
+                command = [os.path.join(script_dir, "bash", "readRatio.sh"), bed, out_bed_tss, out_bed_tes]
                 csv.write(" ".join(command) +"\n")
             else:
                 continue
@@ -969,7 +969,7 @@ def readRatio(work_dir, script_dir, genome, slurm=False, threads = "1"):
         script.write("#SBATCH --mail-type=BEGIN,FAIL,END\n")
         script.write(f"#SBATCH -p {partition}\n")
         script.write(f"#SBATCH -D {work_dir}\n")
-        script.write("#SBATCH -o slurm/slurm_countreads-bedtools_%a.log" + "\n")
+        script.write(f"#SBATCH -o slurm/slurm_countreads-bedtools_{genome}_%a.log" + "\n")
         script.write(f"#SBATCH -c {threads}\n")
         script.write(f"#SBATCH -t {slurm_time}\n")
         script.write(f"#SBATCH --mem={mem}\n")
@@ -986,7 +986,8 @@ def readRatio(work_dir, script_dir, genome, slurm=False, threads = "1"):
             job_id_count = subprocess.check_output(f"sbatch {script} | cut -d ' ' -f 4", shell = True)
         else:
             print("Submitting SLURM script to cluster")
-            job_id_count = subprocess.check_output(f"sbatch --dependency=afterok:{job_id_intersect} {script} | cut -d ' ' -f 4", shell = True)  
+            job_id_count = subprocess.check_output(f"sbatch --dependency=afterok:{job_id_intersect} {script} | cut -d ' ' -f 4", shell = True)
+            print(f"Submitted SLURM script to cluster (job ID {job_id_count})")
             
         #plot read count with R
         
