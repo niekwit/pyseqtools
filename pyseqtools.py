@@ -392,6 +392,10 @@ def main():
                              required = False,
                              action = 'store_true',
                              help = "Generate metagene plots and heatmaps with plotProfile (deepTools)")
+    parser_ttseq.add_argument("--readRatio",
+                             required = False,
+                             action = 'store_true',
+                             help = "Calculate ratios of read numbers in areas around TSS vs TES")
     parser_ttseq.add_argument("--skip-fastqc",
                                required = False,
                                action = 'store_true',
@@ -940,6 +944,10 @@ def main():
         deseq2 = args["deseq2"]
         if deseq2 == True:
             tt_seq_utils.DESeq2(script_dir, genome)
+            
+        readRatio = args["readRatio"]
+        if readRatio == True:
+            readRatio(work_dir, genome, threads, slurm)
             
                 
     def geneSymConv(args, script_dir):
