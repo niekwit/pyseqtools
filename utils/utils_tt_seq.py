@@ -894,7 +894,7 @@ def readRatio(work_dir, genome, slurm=False, threads = "1"):
             out_bed = os.path.join(work_dir, "readRatio", os.path.basename(bam).replace("_merged_dedup.bam",".bed"))
             if not utils.file_exists(out_bed):
                 #base bedtools command
-                command = ["bedtools", "intersect", "-sorted","a", bed, "-b" ]
+                command = ["bedtools", "intersect", "-sorted","-a", bed, "-b" ]
                 #create final command
                 command.extend([bam, ">", out_bed])
                 csv.write(" ".join(command) +"\n")
@@ -929,6 +929,7 @@ def readRatio(work_dir, genome, slurm=False, threads = "1"):
         
         print("Submitting SLURM script to cluster")
         job_id = subprocess.check_output(f"sbatch {script_} | cut -d ' ' -f 4", shell = True)
+        job_id = job_id.decode("utf-8")
         print(f"Submitted SLURM script to cluster (job ID {job_id})")
         
         #
