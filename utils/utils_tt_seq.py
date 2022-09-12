@@ -870,10 +870,10 @@ def readRatio(work_dir, genome, slurm=False, threads = "1"):
         #load SLURM settings
         with open(os.path.join(script_dir,"yaml","slurm.yaml")) as file:
             slurm_settings = yaml.full_load(file)
-        threads = str(slurm_settings["TT-Seq"]["readRatio_CPU"])
+        threads = slurm_settings["TT-Seq"]["readRatio_CPU"]
         
-        mem = str(slurm_settings["TT-Seq"]["readRatio_mem"])
-        slurm_time = str(slurm_settings["TT-Seq"]["readRatio_time"])
+        mem = slurm_settings["TT-Seq"]["readRatio_mem"]
+        slurm_time = slurm_settings["TT-Seq"]["readRatio_time"]
         account = slurm_settings["groupname"]
         partition = slurm_settings["partition"]
         
@@ -919,10 +919,10 @@ def readRatio(work_dir, genome, slurm=False, threads = "1"):
         script.write(f"#SBATCH -D {work_dir}\n")
         script.write("#SBATCH -o slurm/slurm_readRatio_%a.log" + "\n")
         script.write(f"#SBATCH -c {threads}\n")
-        script.write("#SBATCH -t {slurm_time}\n")
-        script.write("#SBATCH --mem={mem}\n")
+        script.write(f"#SBATCH -t {slurm_time}\n")
+        script.write(f"#SBATCH --mem={mem}\n")
         script.write("#SBATCH -J bedtools-intersect\n")
-        script.write("#SBATCH -a 1-{commands}\n")
+        script.write(f"#SBATCH -a 1-{commands}\n")
         script.write("\n")
         script.write("sed -n ${SLURM_ARRAY_TASK_ID}p " + csv +" | bash\n")
         script.close()
