@@ -879,17 +879,19 @@ def main():
         rename = args["rename"]
         if rename == True:
             utils.rename(work_dir)
-            
+        
+        ''' 
         #determine file extension raw data
         file_extension = utils.get_extension(work_dir)
             
         #run FastQC/MultiQC
+       
         skip_fastqc = args["skip_fastqc"]
         if not skip_fastqc:
             utils.fastqc(script_dir, work_dir,threads,file_extension)
         else:
             print("Skipping FastQC/MultiQC analysis")
-        
+        '''
         #get selected genome
         genome = args["genome"]
         
