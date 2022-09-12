@@ -909,7 +909,7 @@ def readRatio(work_dir, genome, slurm=False, threads = "1"):
         print("Generating SLURM script")
         csv = os.path.join(work_dir,"slurm",f"slurm_readRatio_{genome}.csv")
         commands = str(subprocess.check_output(f"cat {csv} | wc -l", shell = True).decode("utf-8"))
-        script_ = os.path.join(work_dir,"slurm","slurm_readRatio.sh")
+        script_ = os.path.join(work_dir,"slurm",f"slurm_readRatio_{genome}.sh")
         script = open(script_, "w")  
         script.write("#!/bin/bash" + "\n")
         script.write("\n")
@@ -928,7 +928,7 @@ def readRatio(work_dir, genome, slurm=False, threads = "1"):
         script.close()
         
         print("Submitting SLURM script to cluster")
-        job_id = subprocess.check_output(f"sbatch {script} | cut -d ' ' -f 4", shell = True)
+        job_id = subprocess.check_output(f"sbatch {script_} | cut -d ' ' -f 4", shell = True)
         print(f"Submitted SLURM script to cluster (job ID {job_id})")
         
         #
