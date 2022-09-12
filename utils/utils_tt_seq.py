@@ -881,7 +881,6 @@ def readRatio(work_dir, genome, slurm=False, threads = "1"):
         with open(os.path.join(script_dir,"yaml","tt-seq.yaml")) as file:
             ttseq_settings = yaml.full_load(file)
         bed = ttseq_settings["readRatio"]["bed"]
-        genome_file = ttseq_settings["genome_file"][genome]
         
         #create csv file with commands
         os.makedirs(os.path.join(work_dir,"slurm"), exist_ok = True)
