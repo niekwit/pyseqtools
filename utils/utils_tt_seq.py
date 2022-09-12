@@ -852,21 +852,22 @@ def readRatio(work_dir, genome, threads, bed, slurm=False):
     Note: use sorted BED file to reduce memory usage
 
     """
-    
-    #first merge replicate BAM files
-    mergeBAM(work_dir, genome, threads, slurm)
-    
-    puts(colored.green("Calculating ratios of reads at TSS vs TES in replicate merged BAM files"))
-    
+      
     #get merged BAM files
     file_list = glob.glob(os.path.join(work_dir,"bam", genome,"*_merged_dedup.bam"))
-    if len(file_list) == 0:
-        puts(colored.red("ERROR: no merged BAM files found"))
-        return()
-    
+  
     if slurm == False:
-        pass
+        #first merge replicate BAM files
+        if len(file_list) == 0:
+            puts(colored.orange("WARNING: no merged deduplicated BAM files found"))
+        mergeBAM(work_dir, genome, threads, slurm)
+        
+        puts(colored.green("Calculating ratios of reads at TSS vs TES in replicate merged BAM files"))
     else:
+        if len(file_list) == 0:
+            puts(colored.red("ERROR: no merged deduplicated BAM files found"))
+            return()
+        
         #load SLURM settings
         with open(os.path.join(script_dir,"yaml","slurm.yaml")) as file:
             slurm_settings = yaml.full_load(file)
@@ -875,7 +876,7 @@ def readRatio(work_dir, genome, threads, bed, slurm=False):
         mem = str(slurm_settings["TT-Seq"]["readRatio_mem"])
         slurm_time = str(slurm_settings["TT-Seq"]["readRatio_time"])
         account = slurm_settings["groupname"]
-        partition = slurm_settings["TT-Seq"]["readRatio_partition"]
+        partition = slurm_settings["partition"]
         
         #load bed file location
         with open(os.path.join(script_dir,"yaml","tt-seq.yaml")) as file:
@@ -885,19 +886,55 @@ def readRatio(work_dir, genome, threads, bed, slurm=False):
         #create csv file with commands
         os.makedirs(os.path.join(work_dir,"slurm"), exist_ok = True)
         
-        csv = os.path.join(work_dir,"slurm",f"slurm_bedtools-intersect_{genome}.csv")
+        csv = os.path.join(work_dir,"slurm",f"slurm_readRatio_{genome}.csv")
         if os.path.exists(csv):
             os.remove(csv)
         
         csv = open(csv, "a")  
         for bam in file_list:
-            #base bedtools command
-            command = ["bedtools", "intersect", "-sorted","a", bed, "-b" ]
-            command.append(bam)
-            csv.write(" ".join(command) +"\n")
+            out_bed = os.path.join(work_dir, "readRatio", os.path.basename(bam).replace("_merged_dedup.bam",".bed"))
+            if not utils.file_exists(out_bed):
+                #base bedtools command
+                command = ["bedtools", "intersect", "-sorted","a", bed, "-b" ]
+                #create final command
+                command.extend([bam, ">", out_bed])
+                csv.write(" ".join(command) +"\n")
+            else:
+                continue
         csv.close()
         
+        #create output directory
+        os.makedirs(os.path.join(work_dir, "readRatio"), exist_ok = True)
+        
         #create SLURM script
+        print("Generating SLURM script")
+        csv = os.path.join(work_dir,"slurm",f"slurm_readRatio_{genome}.csv")
+        commands = str(subprocess.check_output(f"cat {csv} | wc -l", shell = True).decode("utf-8"))
+        script_ = os.path.join(work_dir,"slurm","slurm_readRatio.sh")
+        script = open(script_, "w")  
+        script.write("#!/bin/bash" + "\n")
+        script.write("\n")
+        script.write(f"#SBATCH -A {account}\n")
+        script.write("#SBATCH --mail-type=BEGIN,FAIL,END\n")
+        script.write(f"#SBATCH -p {partition}\n")
+        script.write(f"#SBATCH -D {work_dir}\n")
+        script.write("#SBATCH -o slurm/slurm_readRatio_%a.log" + "\n")
+        script.write(f"#SBATCH -c {threads}\n")
+        script.write("#SBATCH -t {slurm_time}\n")
+        script.write("#SBATCH --mem={mem}\n")
+        script.write("#SBATCH -J bedtools-intersect\n")
+        script.write("#SBATCH -a 1-{commands}\n")
+        script.write("\n")
+        script.write("sed -n ${SLURM_ARRAY_TASK_ID}p " + csv +" | bash\n")
+        script.close()
+        
+        print("Submitting SLURM script to cluster")
+        job_id = subprocess.check_output(f"sbatch {script} | cut -d ' ' -f 4", shell = True)
+        print(f"Submitted SLURM script to cluster (job ID {job_id})")
+        
+        #
+        
+        
 
 def DESeq2(work_dir, script_dir, genome, slurm=False):
     '''
