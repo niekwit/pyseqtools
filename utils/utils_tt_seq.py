@@ -881,6 +881,7 @@ def readRatio(work_dir, genome, slurm=False, threads = "1"):
         with open(os.path.join(script_dir,"yaml","tt-seq.yaml")) as file:
             ttseq_settings = yaml.full_load(file)
         bed = ttseq_settings["readRatio"]["bed"]
+        genome_file = ttseq_settings["genome_file"][genome]
         
         #create csv file with commands
         os.makedirs(os.path.join(work_dir,"slurm"), exist_ok = True)
@@ -894,7 +895,7 @@ def readRatio(work_dir, genome, slurm=False, threads = "1"):
             out_bed = os.path.join(work_dir, "readRatio", os.path.basename(bam).replace("_merged_dedup.bam",".bed"))
             if not utils.file_exists(out_bed):
                 #base bedtools command
-                command = ["bedtools", "intersect", "-sorted", "-s", "-a", bed, "-b" ]
+                command = ["bedtools", "intersect", "-sorted", "-g", genome_file, "-s", "-a", bed, "-b" ]
                 #create final command
                 command.extend([bam, ">", out_bed])
                 csv.write(" ".join(command) +"\n")
