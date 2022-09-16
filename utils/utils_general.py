@@ -936,18 +936,10 @@ def trimSLURM(script_dir, work_dir, module, pe_tags):
 
     """
     puts(colored.green("Trimming paired-end fastq files"))
-    
-    if module == "tt-seq":
-        module = "TT-Seq"
-    elif module == "rna-seq":
-        module == "RNA-Seq"
-    elif module == "chip-seq":
-        module = "ChIP-Seq"
-    
+       
     if pe_tags != None:
         fwd_tag = pe_tags.split(",")[0]
         rev_tag = pe_tags.split(",")[1]
-    
     
     #create output directories
     read1_list = glob.glob(os.path.join(work_dir,"raw-data","*" + fwd_tag))
@@ -961,16 +953,13 @@ def trimSLURM(script_dir, work_dir, module, pe_tags):
             slurm_settings = yaml.full_load(file)
     
     #load slurm parameters
-    threads = str(slurm_settings[module]["Trim_galore_CPU"])
-    trim_mem = str(slurm_settings[module]["Trim_galore_mem"])
-    trim_time = str(slurm_settings[module]["Trim_galore_time"])
+    threads = str(slurm_settings["Trim_galore_CPU"])
+    trim_mem = str(slurm_settings["Trim_galore_mem"])
+    trim_time = str(slurm_settings["Trim_galore_time"])
     account = slurm_settings["groupname"]
-    partition = slurm_settings[module]["partition"]
-    #email = slurm_settings["email"]
-    
-    
+    partition = slurm_settings["partition"]
+        
     #write trim commands to file for slurm job array
-    #trim_galore should be in $PATH
     csv = os.path.join(work_dir,"slurm","slurm_trim.csv")
     if os.path.exists(csv):
         os.remove(csv)
