@@ -446,11 +446,11 @@ def STAR(work_dir, threads, script_dir, rna_seq_settings, genome, pe_tags, slurm
     
     if slurm == True:
         if alignPerformedCluster(work_dir, genome) == False:
-            align(work_dir, index, threads, genome, slurm)
+            align(work_dir, index, threads, genome, pe_tags,slurm)
         else:
             print(f"Skipping STAR alignment, all output BAM files for {genome} already detected")
     else:
-        align(work_dir, index, threads, genome)
+        align(work_dir, index, threads, genome, pe_tags)
 
 '''    
 def hisat2(work_dir, rna_seq_settings, threads, genome):
