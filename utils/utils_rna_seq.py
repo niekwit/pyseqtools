@@ -301,8 +301,8 @@ def STAR(work_dir, threads, script_dir, rna_seq_settings, genome, pe_tags, slurm
         #get trimmed fastq files
         #check if data is paired-end
         if pe_tags != None:
-            #fwd_tag = pe_tags.split(",")[0]
-            #rev_tag = pe_tags.split(",")[1]
+            fwd_tag = pe_tags.split(",")[0]
+            rev_tag = pe_tags.split(",")[1]
             file_list = glob.glob(os.path.join(work_dir,"trim","*_val_1.fq.gz"))
         
         #create empty command file for SLURM
