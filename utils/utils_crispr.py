@@ -179,7 +179,7 @@ def count(library,
         sg_length = library[crispr_library]["sg_length"]
         sg_length = str(sg_length)
         index_path = library[crispr_library]["index_path"]
-        clip_seq = library[crispr_library]["clip_seq"]
+        #clip_seq = library[crispr_library]["clip_seq"]
         mismatch = str(mismatch)
     except KeyError:
         sys.exit("ERROR: CRISPR library not specified in command line")
@@ -520,8 +520,8 @@ def mageck(work_dir,script_dir,cnv,fdr):
             return(True)
 
     for i in sample_range:
-        test_sample=df.loc[i]["t"]
-        control_sample=df.loc[i]["c"]
+        test_sample=str(df.loc[i]["t"])
+        control_sample=str(df.loc[i]["c"])
         mageck_output=test_sample+"_vs_"+control_sample
 
         if not utils.file_exists(os.path.join(work_dir,"mageck",mageck_output)):
