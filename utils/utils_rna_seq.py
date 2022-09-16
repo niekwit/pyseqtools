@@ -290,15 +290,20 @@ def plotPCA(work_dir,script_dir):
         return(None)
   
 
-def STAR(work_dir, threads, script_dir, rna_seq_settings, genome, slurm=False, job_id_trim=None):
+def STAR(work_dir, threads, script_dir, rna_seq_settings, genome, pe_tags, slurm=False, job_id_trim=None):
     '''
     Alignment for RNA-Seq with STAR
     '''
+      
     
     #function for alignment with STAR
-    def align(work_dir, index, threads, genome, slurm=False):
+    def align(work_dir, index, threads, genome, pe_tags, slurm=False):
         #get trimmed fastq files
-        file_list = glob.glob(os.path.join(work_dir,"trim","*_val_1.fq.gz"))
+        #check if data is paired-end
+        if pe_tags != None:
+            #fwd_tag = pe_tags.split(",")[0]
+            #rev_tag = pe_tags.split(",")[1]
+            file_list = glob.glob(os.path.join(work_dir,"trim","*_val_1.fq.gz"))
         
         #create empty command file for SLURM
         if slurm == True:
@@ -447,7 +452,7 @@ def STAR(work_dir, threads, script_dir, rna_seq_settings, genome, slurm=False, j
     else:
         align(work_dir, index, threads, genome)
 
-    
+'''    
 def hisat2(work_dir, rna_seq_settings, threads, genome):
     read1_list = glob.glob(os.path.join(work_dir,"trim","*_R1_001_val_1.fq.gz"))
     hisat2_index = rna_seq_settings["HISAT2_index"][genome]
@@ -462,7 +467,7 @@ def hisat2(work_dir, rna_seq_settings, threads, genome):
                       ">", bam]
             utils.write2log(work_dir, " ".join(hisat2))
             subprocess.call(hisat2)
-    
+'''
 
 
 def diff_expr(work_dir,gtf,script_dir,species,pvalue,genome, slurm=False):

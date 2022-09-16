@@ -139,6 +139,10 @@ def main():
                              action = 'store_true',
                              required = False,
                              help = "Quality trimming of data using Trim_galore!")
+    parser_rnaseq.add_argument("--peTags",
+                               required = False,
+                               default = None,
+                               help = "Comma-separated paired-end file tags (e.g. _R1_001.fq.gz,_R2_001.fq.gz)")
     parser_rnaseq.add_argument("-a", "--align",
                                required = False,
                                choices = ["salmon","star"],
@@ -561,6 +565,7 @@ def main():
         scaleFactors = args["scaleFactors"]
         indexBAM = args["indexBAM"]
         sortBAM = args["sortBAM"]
+        pe_tags = args["peTags"]
         
         gtf = rna_seq_settings["gtf"][genome]
         slurm = args["slurm"]        
@@ -594,7 +599,7 @@ def main():
             align = args["align"]
             if align != None:
                 if align.lower() == "salmon":
-                    utils.trim(script_dir, threads, work_dir)
+                    utils.trim(script_dir, threads, work_dir, pe_tags)
                     salmon_index = rna_seq_settings["salmon_index"][reference]
                     gtf = rna_seq_settings["salmon_gtf"][reference]
                     fasta = rna_seq_settings["FASTA"][reference]
@@ -611,8 +616,14 @@ def main():
                     rnaseq_utils.diff_expr(work_dir, gtf, script_dir, species, pvalue, reference)
                     rnaseq_utils.plotVolcano(work_dir)
                 elif align.lower() == "star":
-                    rnaseq_utils.trim(threads, work_dir)
-                    rnaseq_utils.STAR(work_dir, threads, script_dir, rna_seq_settings, reference, slurm)
+                    rnaseq_utils.trim(script_dir, threads, work_dir, pe_tags)
+                    rnaseq_utils.STAR(work_dir, 
+                                      threads, 
+                                      script_dir, 
+                                      rna_seq_settings, 
+                                      reference, 
+                                      pe_tags, 
+                                      slurm)
                 
             
             go = args["go"]
@@ -645,7 +656,7 @@ def main():
                  species = "mouse"
                           
              if trim == True:
-                 utils.trimSLURM(script_dir, work_dir,module)
+                 utils.trimSLURM(script_dir, work_dir,module, pe_tags)
                  
              if indexBAM == True:
                  utils.indexBam(work_dir, threads, reference, slurm, script_dir)

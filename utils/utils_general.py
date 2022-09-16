@@ -827,7 +827,7 @@ def getEND(work_dir):
     else:
         return("SE")
 
-def trim(script_dir, threads, work_dir):
+def trim(script_dir, threads, work_dir, pe_tags):
 
     #check for trim_galore
     path = os.environ["PATH"]
@@ -930,7 +930,7 @@ def trim(script_dir, threads, work_dir):
         trimSE(work_dir, threads)
 
 
-def trimSLURM(script_dir, work_dir, module):
+def trimSLURM(script_dir, work_dir, module, pe_tags):
     """
     Creates SLURM bash script for PE-end quality trimming using Trim_galore
 
@@ -944,9 +944,13 @@ def trimSLURM(script_dir, work_dir, module):
     elif module == "chip-seq":
         module = "ChIP-Seq"
     
+    if pe_tags != None:
+        fwd_tag = pe_tags.split(",")[0]
+        rev_tag = pe_tags.split(",")[1]
+    
+    
     #create output directories
-    extension = get_extension(work_dir)
-    read1_list = glob.glob(os.path.join(work_dir,"raw-data","*R1_001." + extension))
+    read1_list = glob.glob(os.path.join(work_dir,"raw-data","*" + fwd_tag))
     os.makedirs(os.path.join(work_dir, "trim"), exist_ok=True)
     os.makedirs(os.path.join(work_dir, "slurm"), exist_ok=True)
     
@@ -972,8 +976,8 @@ def trimSLURM(script_dir, work_dir, module):
         os.remove(csv)
     
     for read1 in read1_list:
-        read2 = read1.replace("R1_001." + extension,"R2_001." + extension)
-        out_file1 = read1.split(".",1)[0] + "_val_1.fq.gz"
+        read2 = read1.replace(fwd_tag, rev_tag)
+        out_file1 = read1.replace(fwd_tag,"_val_1.fq.gz")
         out_file1 = out_file1.replace("raw-data", "trim")
         
         if not file_exists(out_file1):
