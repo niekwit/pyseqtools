@@ -297,7 +297,7 @@ def STAR(work_dir, threads, script_dir, rna_seq_settings, genome, pe_tags, slurm
       
     
     #function for alignment with STAR
-    def align(work_dir, index, threads, genome, pe_tags, slurm=False):
+    def align(work_dir, index, threads, genome, pe_tags, slurm):
         #get trimmed fastq files
         #check if data is paired-end
         if pe_tags != None:
@@ -450,7 +450,7 @@ def STAR(work_dir, threads, script_dir, rna_seq_settings, genome, pe_tags, slurm
         else:
             print(f"Skipping STAR alignment, all output BAM files for {genome} already detected")
     else:
-        align(work_dir, index, threads, genome, pe_tags)
+        align(work_dir, index, threads, genome, pe_tags, slurm)
 
 '''    
 def hisat2(work_dir, rna_seq_settings, threads, genome):
