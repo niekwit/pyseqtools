@@ -44,22 +44,38 @@ for (i in samples){
 
 df.plot <- melt(df.ratio)
 
-p <- ggplot(df.plot, aes(x=variable, y=value)) + 
-  geom_violin() +
-  scale_y_continuous(trans='log10')
+p <- ggplot(df.plot, aes(x=variable, y=value, fill=variable)) + 
+  scale_fill_manual(values=c("lightskyblue", "tomato", "lightskyblue", "tomato")) +
+  geom_violin(trim=FALSE) +
+  geom_boxplot(width=0.1) +
+  theme_bw() +
+  scale_y_continuous(trans='log10') +
+  labs(x = NULL,
+       y = "TES / TSS ratio") +
+  labs(title = "Global TES/TES ratios for all genes") + 
+  theme(text=element_text(size=20)) + 
+  guides(fill="none")
 
 
 #load data for gene annotation
 mart <- useMart("ensembl")
 mart <- useDataset("hsapiens_gene_ensembl", mart = mart)
 
-genes.table <- getBM(filters = "ensembl_gene_id", attributes = c("ensembl_gene_id", "external_gene_name","description",
+genes.table <- getBM(filters = "ensembl_gene_id", 
+                     attributes = c("ensembl_gene_id", "external_gene_name","description",
                                                                  "gene_biotype", "chromosome_name","start_position",
                                                                  "end_position", "percentage_gene_gc_content"), 
-                     values = df.ratio$ensembl_gene_id, mart = mart)
+                     values = df.ratio$ensembl_gene_id, 
+                     mart = mart)
 genes.table$gene_length <- genes.table$end_position - genes.table$start_position
 
 df.ratio <- left_join(df.ratio, genes.table, by="ensembl_gene_id")
+
+write.table(df.ratio, 
+            file=file.path(work.dir, "readRatio", genome ,"readRatios.txt"), 
+            quote=FALSE, 
+            row.names=FALSE,
+            sep="\t")
 
 if (length(count.list) == 0){
   bam.list <- Sys.glob(file.path(work.dir, "bam", genome, "*bam"))
