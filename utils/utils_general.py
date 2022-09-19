@@ -970,7 +970,7 @@ def trimSLURM(script_dir, work_dir, module, pe_tags):
         out_file1 = out_file1.replace("raw-data", "trim")
         
         if not file_exists(out_file1):
-            base_name = read1.replace(fwd_tag,"")
+            base_name = os.path.basename(read1.replace(fwd_tag,""))
             trim_galore = ["trim_galore","-j", str(threads), "-o",
                            os.path.join(work_dir,"trim"), "--paired", read1, read2,
                            "--basename", base_name, "\n"]
