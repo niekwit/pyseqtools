@@ -566,9 +566,10 @@ def main():
         indexBAM = args["indexBAM"]
         sortBAM = args["sortBAM"]
         pe_tags = args["peTags"]
+        slurm = args["slurm"] 
         
         gtf = rna_seq_settings["gtf"][genome]
-        slurm = args["slurm"]        
+        print(slurm)       
 
         ####set thread count for processing
         if slurm == False:
