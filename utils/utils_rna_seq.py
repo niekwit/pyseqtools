@@ -290,7 +290,7 @@ def plotPCA(work_dir,script_dir):
         return(None)
   
 
-def STAR(work_dir, threads, script_dir, rna_seq_settings, genome, pe_tags, slurm=False, job_id_trim=None):
+def STAR(work_dir, threads, script_dir, rna_seq_settings, genome, pe_tags, slurm, job_id_trim=None):
     '''
     Alignment for RNA-Seq with STAR
     '''
@@ -312,10 +312,10 @@ def STAR(work_dir, threads, script_dir, rna_seq_settings, genome, pe_tags, slurm
 
                      
         for read1 in file_list:
-            read2 = read1.replace("_R1_001_val_1.fq.gz","_R2_001_val_2.fq.gz")
+            read2 = read1.replace(fwd_tag,rev_tag)
             
             #create sample name
-            sample = os.path.basename(read1).replace("_R1_001_val_1.fq.gz","")
+            sample = os.path.basename(read1).replace("_val_1.fq.gz","")
             
             #create temp dir path for STAR and make sure it does not exist
             if slurm == False:
