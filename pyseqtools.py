@@ -569,10 +569,9 @@ def main():
         slurm = args["slurm"] 
         
         gtf = rna_seq_settings["gtf"][genome]
-        print(slurm)       
-
-        ####set thread count for processing
+        
         if slurm == False:
+            ####set thread count for processing
             max_threads = str(multiprocessing.cpu_count())
             threads = args["threads"]
             if threads == "max":
@@ -588,10 +587,9 @@ def main():
                 utils.fastqc(script_dir, work_dir, threads, file_extension)
                 
             ###Set species variable
-            reference = args["genome"]
-            if "hg" in reference or reference == "gencode-v35":
+            if "hg" in genome or genome == "gencode-v35":
                 species = "human"
-            elif "mm" in reference or reference == "gencode.vM1.pc_transcripts":
+            elif "mm" in genome or genome == "gencode.vM1.pc_transcripts":
                 species = "mouse"
 
 
@@ -601,9 +599,9 @@ def main():
             if align != None:
                 if align.lower() == "salmon":
                     utils.trim(script_dir, threads, work_dir, pe_tags)
-                    salmon_index = rna_seq_settings["salmon_index"][reference]
-                    gtf = rna_seq_settings["salmon_gtf"][reference]
-                    fasta = rna_seq_settings["FASTA"][reference]
+                    salmon_index = rna_seq_settings["salmon_index"][genome]
+                    gtf = rna_seq_settings["salmon_gtf"][genome]
+                    fasta = rna_seq_settings["FASTA"][genome]
                     rnaseq_utils.salmon(salmon_index,
                                         str(threads),
                                         work_dir,
@@ -611,10 +609,10 @@ def main():
                                         fasta,
                                         script_dir,
                                         rna_seq_settings,
-                                        reference)
+                                        genome)
                     rnaseq_utils.plotMappingRate(work_dir)
                     rnaseq_utils.plotPCA(work_dir, script_dir)
-                    rnaseq_utils.diff_expr(work_dir, gtf, script_dir, species, pvalue, reference)
+                    rnaseq_utils.diff_expr(work_dir, gtf, script_dir, species, pvalue, genome)
                     rnaseq_utils.plotVolcano(work_dir)
                 elif align.lower() == "star":
                     rnaseq_utils.trim(script_dir, threads, work_dir, pe_tags)
@@ -622,7 +620,7 @@ def main():
                                       threads, 
                                       script_dir, 
                                       rna_seq_settings, 
-                                      reference, 
+                                      genome, 
                                       pe_tags, 
                                       slurm)
                 
@@ -632,13 +630,13 @@ def main():
             pvalue = args["pvalue"]
             
             if deseq2 == True:
-                rnaseq_utils.diff_expr(work_dir,gtf,script_dir,species,pvalue,reference, slurm)
+                rnaseq_utils.diff_expr(work_dir,gtf,script_dir,species,pvalue,genome, slurm)
                 
             if scaleFactors == True:
                 tt_seq_utils.sizeFactors(script_dir, work_dir, slurm)
             
             if bigwig == True:
-                rnaseq_utils.BigWig(work_dir, threads, reference, rna_seq_settings, slurm)   
+                rnaseq_utils.BigWig(work_dir, threads, genome, rna_seq_settings, slurm)   
             
             if TE == True:
                 rnaseq_utils.retroElements(work_dir, script_dir, rna_seq_settings, threads, genome, slurm)
@@ -650,32 +648,31 @@ def main():
              
              
              ###Set species variable
-             reference = args["genome"]
-             if "hg" in reference or reference == "gencode-v35":
+             if "hg" in genome or genome == "gencode-v35":
                  species = "human"
-             elif "mm" in reference or reference == "gencode.vM1.pc_transcripts":
+             elif "mm" in genome or genome == "gencode.vM1.pc_transcripts":
                  species = "mouse"
                           
              if trim == True:
                  utils.trimSLURM(script_dir, work_dir,module, pe_tags)
                  
              if indexBAM == True:
-                 utils.indexBam(work_dir, threads, reference, slurm, script_dir)
+                 utils.indexBam(work_dir, threads, genome, slurm, script_dir)
                  
              if sortBAM == True:
                  tt_seq_utils.bamSortSLURM(work_dir, genome)
              
              if align == "star":
-                 rnaseq_utils.STAR(work_dir, threads, script_dir, rna_seq_settings, genome, slurm)
+                 rnaseq_utils.STAR(work_dir, threads, script_dir, rna_seq_settings, genome, pe_tags, slurm)
                  
              if deseq2 == True:
-                 rnaseq_utils.diff_expr(work_dir,gtf,script_dir,species,pvalue,reference, slurm)
+                 rnaseq_utils.diff_expr(work_dir,gtf,script_dir,species,pvalue,genome, slurm)
                  
              if scaleFactors == True:
                  tt_seq_utils.sizeFactors(script_dir, work_dir, slurm)
              
              if bigwig == True:
-                 rnaseq_utils.BigWig(work_dir, threads, reference, rna_seq_settings, slurm)   
+                 rnaseq_utils.BigWig(work_dir, threads, genome, rna_seq_settings, slurm)   
              
              if TE == True:
                  rnaseq_utils.retroElements(work_dir, script_dir, rna_seq_settings, threads, genome, slurm)
