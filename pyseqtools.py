@@ -441,17 +441,17 @@ def main():
                                           "GO_Cellular_Component_2021",
                                           "GO_Biological_Process_2021"],
                                help = "Gene sets used for GO analysis (default is GO_Molecular_Function_2021, GO_Cellular_Component_2021, and GO_Biological_Process_2021). Gene sets can be found on https://maayanlab.cloud/Enrichr/#stats")
-    parser_rnaseq.add_argument("-p", "--pvalue",
+    parser_3endseq.add_argument("-p", "--pvalue",
                                required = False,
                                metavar = "<P value>",
                                default = str(0.001),
                                help = "Set P value cut off (default is 0.001)")
-    parser_rnaseq.add_argument("--fastqc",
+    parser_3endseq.add_argument("--fastqc",
                                required = False,
                                action = 'store_true',
                                default = False,
                                help = "Run FastQC/MultiQC")
-    parser_rnaseq.add_argument("--slurm",
+    parser_3endseq.add_argument("--slurm",
                              required = False,
                              action = 'store_true',
                              help = "Submit jobs to Cambridge HPC using SLURM")
