@@ -444,7 +444,7 @@ def main():
     parser_rnaseq.add_argument("-p", "--pvalue",
                                required = False,
                                metavar = "<P value>",
-                               default = 0.001,
+                               default = str(0.001),
                                help = "Set P value cut off (default is 0.001)")
     parser_rnaseq.add_argument("--fastqc",
                                required = False,
