@@ -7,38 +7,7 @@ import argparse
 import multiprocessing
 import timeit
 import time
-#import pkg_resources
-#from platform import python_version
 
-'''
-def checkPythonPackages(): #check for required python packages; installs if absent
-    #check if Python >= 3.7 (required for GitPython)
-    try:
-        version = float(python_version().rsplit(".",1)[0])
-        if version < 3.7:
-            sys.exit("ERROR: please update to at least Python 3.7")
-    except:
-        pass
-
-    #check packages
-    required = {"shyaml", "pyyaml", "pandas", "numpy",
-                "matplotlib", "seaborn", "multiqc",
-                "cutadapt", "tqdm","gseapy",
-                "matplotlib-venn", "pysam", "deeptools",
-                "macs3", "pybedtools"}
-    installed = {pkg.key for pkg in pkg_resources.working_set}
-    missing = required - installed
-    if missing:
-        python = sys.executable
-        print("Installing missing required Python3 packages")
-        try:
-            install_command = [python, '-m', 'pip', 'install', *missing]
-            subprocess.check_call(install_command, stdout=subprocess.DEVNULL)
-        except:
-            sys.exit("ERROR: package installation failed")
-    else:
-        pass
-'''
 
 def main():
 
@@ -410,6 +379,82 @@ def main():
                              action = 'store_true',
                              help = "Submit jobs to Cambridge HPC using SLURM")
     
+    # create the parser for 3end-Seq
+    parser_3endseq = subparsers.add_parser('3end-seq',
+                                          description = "Analysis pipeline for 3end-Seq experiments",
+                                          help='3end-Seq analysis')
+
+    parser_3endseq.add_argument("-t", "--threads",
+                               required = False,
+                               default = 1,
+                               metavar = "<int>",
+                               help = "Number of CPU threads to use (default is 1). Use max to apply all available CPU threads. For Salmon 8-12 threads are optimal")
+    parser_3endseq.add_argument("-g", "--genome",
+                               required = False,
+                               choices = rna_seq_genomeList,
+                               help = "Reference genome")
+    parser_3endseq.add_argument("--trim",
+                             action = 'store_true',
+                             required = False,
+                             help = "Quality trimming of data using Trim_galore!")
+    parser_3endseq.add_argument("--peTags",
+                               required = False,
+                               default = None,
+                               help = "Comma-separated paired-end file tags (e.g. _R1_001.fq.gz,_R2_001.fq.gz)")
+    parser_3endseq.add_argument("-a", "--align",
+                               required = False,
+                               choices = ["salmon","star"],
+                               help = "Program to align fastq files")
+    parser_3endseq.add_argument("--indexBAM",
+                             required = False,
+                             action = 'store_true',
+                             help = "Index BAM files with samtools")
+    parser_3endseq.add_argument("--sortBAM",
+                             required = False,
+                             action = 'store_true',
+                             help = "Sort BAM files with samtools")
+    parser_3endseq.add_argument("-f", "--scaleFactors",
+                             required = False,
+                             action = 'store_true',
+                             help = "Calculate scale factors from yeast spike-in RNA with DESeq2")
+    parser_3endseq.add_argument("--deseq2",
+                             required = False,
+                             action = 'store_true',
+                             help = "Calculate differential genes using DESeq2")
+    parser_3endseq.add_argument("-b", "--bigwig",
+                             required = False,
+                             action = 'store_true',
+                             help = "Create BigWig files using bamCoverage (requires indexed BAM files")
+
+    parser_3endseq.add_argument("--TE",
+                               required = False,
+                               action = 'store_true',
+                               help = "Transposable element expression analysis (Requires STAR alignment)")
+    parser_3endseq.add_argument("--go",
+                               required = False,
+                               action = 'store_true',
+                               help = "Gene set enrichment analysis with Enrichr")
+    parser_3endseq.add_argument("--gene-sets",
+                               required = False,
+                               metavar = "<GO gene set>",
+                               default = ["GO_Molecular_Function_2021",
+                                          "GO_Cellular_Component_2021",
+                                          "GO_Biological_Process_2021"],
+                               help = "Gene sets used for GO analysis (default is GO_Molecular_Function_2021, GO_Cellular_Component_2021, and GO_Biological_Process_2021). Gene sets can be found on https://maayanlab.cloud/Enrichr/#stats")
+    parser_rnaseq.add_argument("-p", "--pvalue",
+                               required = False,
+                               metavar = "<P value>",
+                               default = 0.001,
+                               help = "Set P value cut off (default is 0.001)")
+    parser_rnaseq.add_argument("--fastqc",
+                               required = False,
+                               action = 'store_true',
+                               default = False,
+                               help = "Run FastQC/MultiQC")
+    parser_rnaseq.add_argument("--slurm",
+                             required = False,
+                             action = 'store_true',
+                             help = "Submit jobs to Cambridge HPC using SLURM")
 
     #create subparser for gene symbol conversion
     parser_conversion = subparsers.add_parser('genesymconv',
@@ -567,8 +612,7 @@ def main():
         sortBAM = args["sortBAM"]
         pe_tags = args["peTags"]
         slurm = args["slurm"] 
-        
-        gtf = rna_seq_settings["gtf"][genome]
+               
         
         if slurm == False:
             ####set thread count for processing
@@ -598,6 +642,7 @@ def main():
             align = args["align"]
             if align != None:
                 if align.lower() == "salmon":
+                    gtf = rna_seq_settings["gtf"][genome]
                     utils.trim(script_dir, threads, work_dir, pe_tags)
                     salmon_index = rna_seq_settings["salmon_index"][genome]
                     gtf = rna_seq_settings["salmon_gtf"][genome]
@@ -1092,10 +1137,10 @@ if __name__ == "__main__":
 
     main()
 
-
     #print total run time
     stop = timeit.default_timer()
     total_time = stop - start
     ty_res = time.gmtime(total_time)
     res = time.strftime("%H:%M:%S",ty_res)
     print('Total run time: ', res)
+
