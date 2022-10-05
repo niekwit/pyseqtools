@@ -401,13 +401,13 @@ def STAR(work_dir, threads, script_dir, rna_seq_settings, genome, slurm, job_id_
             #run slurm script
             if job_id_trim is None:
                 script = os.path.join(work_dir,"slurm",f"slurm_STAR_{genome}.sh")
-                print("Submitting slurm script to cluster")
+                print("Submitting SLURM script to cluster")
                 job_id_align = subprocess.check_output(f"sbatch {script} | cut -d ' ' -f 4", shell = True)
-                return(job_id_align)
+                print(f"Submitted SLURM script to cluster (job ID {job_id_align})")
             else:
                 print("Submitting slurm script to cluster")
                 job_id_align = subprocess.check_output(f"sbatch --dependency=afterok:{job_id_trim} {script} | cut -d ' ' -f 4", shell = True)  
-                return(job_id_align)
+                print(f"Submitted SLURM script to cluster (job ID {job_id_align})")
             
             #sort BAM files
             ttseq.bamSortSLURM(work_dir, job_id_align, genome)
@@ -858,13 +858,97 @@ def BigWig(work_dir, threads, genome, rna_seq_settings, slurm=False):
         print(f"Submitted SLURM script to cluster (job ID {job_id_bigwig})")
         
         
-def miso(work_dir):
+def isoformAnalysis(work_dir, rna_seq_settings, genome, slurm):
     '''
-    
+    Alternative isoform analysis using RSEM
 
     '''
-    pass      
+    #load sample info
+    sample_info = pd.read_csv(os.path.join(work_dir,"samples.csv"))
+    samples = list(sample_info["sample"])
+    
+    if slurm == True:
+        #load SLURM settings
+        with open(os.path.join(os.path.dirname(script_dir),"yaml","slurm.yaml")) as file:
+            slurm_settings = yaml.full_load(file)
+        threads = str(slurm_settings["RNA-Seq"]["rsem_CPU"])
+        mem = str(slurm_settings["RNA-Seq"]["rsem_mem"])
+        slurm_time = str(slurm_settings["RNA-Seq"]["rsem_time"])
+        account = slurm_settings["groupname"]
+        partition = slurm_settings["partition"]
+        strand = slurm_settings["RNA-Seq"]["rsem_strand"]
         
+        #load STAR index
+        star_index = rna_seq_settings["STAR_index"][genome]
+        
+        #create directory for SLURM commands
+        os.makedirs(os.path.join(work_dir,"slurm","RSEM"), exist_ok=True)
+        
+        #create commands for RSEM pipeline for each sample and add to csv file
+        csv = os.path.join(work_dir,"slurm","RSEM",f"slurm_RSEM_{genome}.csv")
+        
+        
+        for sample in samples:
+            #RSEM
+            csv = open(csv, "a")  
+            trimmed_files = glob.glob(os.path.join(work_dir,"trim",f"{sample}*.fq.gz"))
+            read1 = [i for i in trimmed_files if "_val_1.fq.gz" in i][0]
+            read2 = [i for i in trimmed_files if "_val_2.fq.gz" in i][0]
+            
+            rsem = ["rsem-calculate-expression", "--paired-end","--star", "-p", threads,
+                    "--strandedness", strand, "--output-genome-bam", "--star-output-genome-bam",
+                    "--calc-ci", "--ci-memory", "10240", "--estimate-rspd", "--star-gzipped-read-file",
+                    "--time", read1, read2, star_index, sample]
+            csv.write(" ".join(rsem) +"\n")
+            csv.close()
+            
+            #PICARD read group
+            
+            
+            #PICARD reorder
+            
+            
+            #samtools sort temp
+            
+            
+            #samtools index
+            
+            
+            #PICARD mark duplicates sorted
+        
+            #PICARD alignment metrics        
+        
+        
+        
+        #create slurm bash script 
+        print("Generating SLURM script for RSEM")
+        csv_rsem = os.path.join(work_dir,"slurm",f"slurm_RSEM_{genome}.csv")
+        commands = subprocess.check_output(f"cat {csv} | wc -l", shell = True).decode("utf-8")
+        #bigwig_dir = os.path.join(work_dir,"bigwig", genome)
+        slurm_log = os.path.join(work_dir, "slurm",'slurm_RSEM_%a.log')
+        script_ = os.path.join(work_dir,"slurm",f"slurm_RSEM_{genome}.sh")
+        script = open(script_, "w")  
+        script.write("#!/bin/bash" + "\n")
+        script.write("\n")
+        script.write(f"#SBATCH -A {account}\n")
+        script.write("#SBATCH --mail-type=BEGIN,FAIL,END" + "\n")
+        script.write(f"#SBATCH -p {partition}\n")
+        script.write(f"#SBATCH -D {work_dir}\n")
+        script.write(f"#SBATCH -o {slurm_log}\n")
+        script.write(f"#SBATCH -c {threads}\n")
+        script.write(f"#SBATCH -t {slurm_time}\n")
+        script.write(f"#SBATCH --mem={mem}\n")
+        script.write("#SBATCH -J RSEM\n")
+        script.write(f"#SBATCH -a 1-{commands}\n")
+        script.write("\n")
+        script.write("sed -n ${SLURM_ARRAY_TASK_ID}p " + f"{csv_rsem} | bash\n")
+        script.close()
+        
+        #submit job to cluster
+        job_id_bigwig = subprocess.check_output(f"sbatch {script_} | cut -d ' ' -f 4", shell = True)
+        job_id_bigwig = job_id_bigwig.decode("UTF-8").replace("\n","")
+        print(f"Submitted SLURM script to cluster (job ID {job_id_bigwig})")
+            
         
         
         
