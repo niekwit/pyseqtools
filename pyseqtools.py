@@ -711,6 +711,7 @@ def main():
                  rnaseq_utils.STAR(work_dir, threads, script_dir, rna_seq_settings, genome, slurm)
                  
              if deseq2 == True:
+                 gtf = rna_seq_settings["gtf"][genome.split("_")[0]]
                  rnaseq_utils.diff_expr(work_dir,gtf,script_dir,species,pvalue,genome, slurm)
                  
              if scaleFactors == True:
