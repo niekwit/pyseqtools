@@ -297,7 +297,7 @@ def STAR(work_dir, threads, script_dir, rna_seq_settings, genome, slurm, job_id_
     #genome = genome.split("_")[0]
     
     #function for alignment with STAR
-    def align(work_dir, index, threads, genome, pe_tags, slurm):
+    def align(work_dir, index, threads, genome, slurm):
         #get trimmed fastq files
         file_list = glob.glob(os.path.join(work_dir,"trim","*_val_1.fq.gz"))
         
@@ -442,11 +442,11 @@ def STAR(work_dir, threads, script_dir, rna_seq_settings, genome, slurm, job_id_
     
     if slurm == True:
         if alignPerformedCluster(work_dir, genome) == False:
-            align(work_dir, index, threads, genome, pe_tags,slurm)
+            align(work_dir, index, threads, genome, slurm)
         else:
             print(f"Skipping STAR alignment, all output BAM files for {genome} already detected")
     else:
-        align(work_dir, index, threads, genome, pe_tags, slurm)
+        align(work_dir, index, threads, genome, slurm)
 
 '''    
 def hisat2(work_dir, rna_seq_settings, threads, genome):
