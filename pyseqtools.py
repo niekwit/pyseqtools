@@ -708,7 +708,7 @@ def main():
                  tt_seq_utils.bamSortSLURM(work_dir, genome)
              
              if align == "star":
-                 rnaseq_utils.STAR(work_dir, threads, script_dir, rna_seq_settings, genome, pe_tags, slurm)
+                 rnaseq_utils.STAR(work_dir, threads, script_dir, rna_seq_settings, genome, slurm)
                  
              if deseq2 == True:
                  rnaseq_utils.diff_expr(work_dir,gtf,script_dir,species,pvalue,genome, slurm)

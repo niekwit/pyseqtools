@@ -290,20 +290,16 @@ def plotPCA(work_dir,script_dir):
         return(None)
   
 
-def STAR(work_dir, threads, script_dir, rna_seq_settings, genome, pe_tags, slurm, job_id_trim=None):
+def STAR(work_dir, threads, script_dir, rna_seq_settings, genome, slurm, job_id_trim=None):
     '''
-    Alignment for RNA-Seq with STAR
+    Alignment for RNA-Seq with STAR from trimmed paired-end data
     '''
-      
+    #genome = genome.split("_")[0]
     
     #function for alignment with STAR
     def align(work_dir, index, threads, genome, pe_tags, slurm):
         #get trimmed fastq files
-        #check if data is paired-end
-        if pe_tags != None:
-            fwd_tag = pe_tags.split(",")[0]
-            rev_tag = pe_tags.split(",")[1]
-            file_list = glob.glob(os.path.join(work_dir,"trim","*_val_1.fq.gz"))
+        file_list = glob.glob(os.path.join(work_dir,"trim","*_val_1.fq.gz"))
         
         #create empty command file for SLURM
         if slurm == True:
@@ -312,7 +308,7 @@ def STAR(work_dir, threads, script_dir, rna_seq_settings, genome, pe_tags, slurm
 
                      
         for read1 in file_list:
-            read2 = read1.replace(fwd_tag,rev_tag)
+            read2 = read1.replace("_val_1.fq.gz","_val_2.fq.gz")
             
             #create sample name
             sample = os.path.basename(read1).replace("_val_1.fq.gz","")
@@ -862,7 +858,12 @@ def BigWig(work_dir, threads, genome, rna_seq_settings, slurm=False):
         print(f"Submitted SLURM script to cluster (job ID {job_id_bigwig})")
         
         
-        
+def miso(work_dir):
+    '''
+    
+
+    '''
+    pass      
         
         
         
