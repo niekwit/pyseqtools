@@ -863,6 +863,9 @@ def isoformAnalysis(work_dir, rna_seq_settings, genome, slurm):
     Alternative isoform analysis using RSEM
 
     '''
+    
+    puts(colored.green("Alternative isoform analysis using RSEM and MISO"))
+    
     #load sample info
     sample_info = pd.read_csv(os.path.join(work_dir,"samples.csv"))
     samples = list(sample_info["sample"])
@@ -920,7 +923,7 @@ def isoformAnalysis(work_dir, rna_seq_settings, genome, slurm):
         
         #create slurm bash script 
         print("Generating SLURM script for RSEM")
-        csv_rsem = os.path.join(work_dir,"slurm",f"slurm_RSEM_{genome}.csv")
+        csv_rsem = os.path.join(work_dir,"slurm", "RSEM", f"slurm_RSEM_{genome}.csv")
         commands = subprocess.check_output(f"cat {csv_rsem} | wc -l", shell = True).decode("utf-8")
         #bigwig_dir = os.path.join(work_dir,"bigwig", genome)
         slurm_log = os.path.join(work_dir, "slurm",'slurm_RSEM_%a.log')
