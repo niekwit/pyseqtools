@@ -885,11 +885,9 @@ def isoformAnalysis(work_dir, rna_seq_settings, genome, slurm):
         os.makedirs(os.path.join(work_dir,"slurm","RSEM"), exist_ok=True)
         
         #create commands for RSEM pipeline for each sample and add to csv file
-        csv = os.path.join(work_dir,"slurm","RSEM",f"slurm_RSEM_{genome}.csv")
-        
-        
         for sample in samples:
             #RSEM
+            csv = os.path.join(work_dir,"slurm","RSEM",f"slurm_RSEM_{genome}.csv")
             csv = open(csv, "a")  
             trimmed_files = glob.glob(os.path.join(work_dir,"trim",f"{sample}*.fq.gz"))
             read1 = [i for i in trimmed_files if "_val_1.fq.gz" in i][0]
