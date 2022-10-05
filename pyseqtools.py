@@ -116,6 +116,10 @@ def main():
                                required = False,
                                choices = ["salmon","star"],
                                help = "Program to align fastq files")
+    parser_rnaseq.add_argument("--isoformAnalysis",
+                             required = False,
+                             action = 'store_true',
+                             help = "Alternative isoform analysis with RSEM/MISO")
     parser_rnaseq.add_argument("--indexBAM",
                              required = False,
                              action = 'store_true',
@@ -600,6 +604,7 @@ def main():
         module = args["module"]
         genome = args["genome"]
         align = args["align"]
+        isoformAnalysis = args["isoformAnalysis"]
         threads = args["threads"]
         deseq2 = args["deseq2"]
         TE = args["TE"]
@@ -690,9 +695,8 @@ def main():
                 gene_sets=args["gene_sets"]
                 rnaseq_utils.geneSetEnrichment(work_dir, pvalue, gene_sets)
         else:
-             
-             
-             ###Set species variable
+                          
+             #Set species variable
              if "hg" in genome or genome == "gencode-v35":
                  species = "human"
              elif "mm" in genome or genome == "gencode.vM1.pc_transcripts":
@@ -710,6 +714,9 @@ def main():
              if align == "star":
                  rnaseq_utils.STAR(work_dir, threads, script_dir, rna_seq_settings, genome, slurm)
                  
+             if isoformAnalysis == True:
+                 rnaseq_utils.isoformAnalysis(work_dir, rna_seq_settings, genome, slurm)
+                
              if deseq2 == True:
                  gtf = rna_seq_settings["gtf"][genome.split("_")[0]]
                  rnaseq_utils.diff_expr(work_dir,gtf,script_dir,species,pvalue,genome, slurm)
