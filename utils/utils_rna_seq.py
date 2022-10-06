@@ -860,7 +860,7 @@ def BigWig(work_dir, threads, genome, rna_seq_settings, slurm=False):
         
 def isoformAnalysis(work_dir, rna_seq_settings, genome, slurm):
     '''
-    Alternative isoform analysis using RSEM
+    Alternative isoform analysis using RSEM, based on CRICK
 
     '''
     
@@ -894,12 +894,9 @@ def isoformAnalysis(work_dir, rna_seq_settings, genome, slurm):
         #based on CRICK scripts
         for sample in samples:
             #create temporary directory
-            os.makedirs(os.path.join(work_dir,f"temp{sample}"), exist_ok=True)
-            
-             
-            
-            
-                 
+            temp_dir = os.path.join(work_dir,f"temp.{sample}")
+            os.makedirs(temp_dir, exist_ok=True)
+                             
             #RSEM
             csv_rsem = os.path.join(work_dir,"slurm","RSEM",f"slurm_RSEM_{genome}.csv")
             csv_ = open(csv_rsem, "a")  
@@ -908,27 +905,39 @@ def isoformAnalysis(work_dir, rna_seq_settings, genome, slurm):
             read1 = [i for i in trimmed_files if "_val_1.fq.gz" in i][0]
             read2 = [i for i in trimmed_files if "_val_2.fq.gz" in i][0]
             
-            rsem = ["rsem-calculate-expression", "--paired-end","--star", "-p", threads,
-                    "--strandedness", strand, "--output-genome-bam", "--star-output-genome-bam",
+            command = ["rsem-calculate-expression", "--paired-end","--star", "-p", threads,
+                    "--strandedness", strand, "--star-output-genome-bam",
                     "--calc-ci", "--ci-memory", "10240", "--estimate-rspd", "--star-gzipped-read-file",
                     "--time", read1, read2, star_index, sample]
-            csv_.write(" ".join(rsem) +"\n")
+            csv_.write(" ".join(command) +"\n")
             csv_.close()
             '''
             #PICARD AddOrReplaceReadGroups
-                                   
             csv_readgroup = os.path.join(work_dir,"slurm","RSEM",f"slurm_readgroups_{genome}.csv")
-            csv_ = open(csv_rsem, "a")  
+            csv_ = open(csv_readgroup, "a")  
             
             rsem_genome_bam = os.path.join(rsem_dir, f"{sample}.STAR.genome.bam")
+            temp_bam = os.path.join(temp_dir, sample, ".bam")
             
-            readgroup = ["picard", f"INPUT={rsem_genome_bam}", f"OUTPUT={}"]
+            command = ["picard", f"INPUT={rsem_genome_bam}", f"OUTPUT={temp_bam}",
+                         f"RGID={sample}", f"RGLB={sample}", "RGPL=illumina",
+                         f"RGPU={sample}", f"RGSM={sample}", "MAX_RECORDS_IN_RAM=2000000",
+                         "VALIDATION_STRINGENCY=LENIENT", f"TMP_DIR={temp_dir}"]
             
-            csv_.write(" ".join(rsem) +"\n")
+            csv_.write(" ".join(command) +"\n")
             csv_.close()
             
             #PICARD reorder
+            csv_reorder = os.path.join(work_dir,"slurm","RSEM",f"slurm_reorder_{genome}.csv")
+            csv_ = open(csv_readgroup, "a")  
             
+            temp_bam_ordered = temp_bam.replace(".bam",".ordered.bam")
+            fasta = ""
+                        
+            command = ["picard", f"INPUT={temp_bam}", f"OUTPUT={temp_bam}", f"REFERENCE={fasta}"]
+            
+            csv_.write(" ".join(command) +"\n")
+            csv_.close()
             
             #samtools sort temp
             
@@ -963,7 +972,13 @@ def isoformAnalysis(work_dir, rna_seq_settings, genome, slurm):
         script.write("#SBATCH -J RSEM\n")
         script.write(f"#SBATCH -a 1-{commands}\n")
         script.write("\n")
+        
         script.write("sed -n ${SLURM_ARRAY_TASK_ID}p " + f"{csv_rsem} | bash\n")
+        
+        
+        
+        
+        
         script.close()
         
         #submit job to cluster
