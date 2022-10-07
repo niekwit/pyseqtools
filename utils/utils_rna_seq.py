@@ -860,7 +860,7 @@ def BigWig(work_dir, threads, genome, rna_seq_settings, slurm=False):
         
 def isoformAnalysis(work_dir, rna_seq_settings, genome, slurm):
     '''
-    Alternative isoform analysis using RSEM, based on CRICK
+    Alternative isoform analysis using RSEM/MISO, based on CRICK scripts
 
     '''
     
@@ -868,7 +868,6 @@ def isoformAnalysis(work_dir, rna_seq_settings, genome, slurm):
     
     #load sample info
     sample_info = pd.read_csv(os.path.join(work_dir,"samples.csv"))
-    samples = list(sample_info["sample"])
     
     if slurm == True:
         #load SLURM settings
@@ -881,7 +880,7 @@ def isoformAnalysis(work_dir, rna_seq_settings, genome, slurm):
         partition = slurm_settings["partition"]
         strand = slurm_settings["RNA-Seq"]["rsem_strand"]
         
-        #load STAR index
+        #load STAR index (IMPORTANT: created via RSEM!)
         star_index = rna_seq_settings["RSEM_STAR_index"][genome]
         
         #create directory for SLURM commands
@@ -890,79 +889,59 @@ def isoformAnalysis(work_dir, rna_seq_settings, genome, slurm):
         #create directory for all RSEM pipeline output
         rsem_dir = os.path.join(work_dir,"rsem", genome)
         
-        #create commands for RSEM pipeline for each sample and add to csv file
-        #based on CRICK scripts
-        for sample in samples:
-            #create temporary directory
-            temp_dir = os.path.join(work_dir,f"temp.{sample}")
-            os.makedirs(temp_dir, exist_ok=True)
-                             
-            #RSEM
+        #get unique conditions
+        conditions = list(set(sample_info["genotype"]))
+        
+        #run RSEM
+        for condition in conditions:
+            ###create csv files with all commands (for SLURM array script)###
+            #merge replicate fastq files by genotype
+            read1 = glob.glob(os.path.join(work_dir,"trim",f"{condition}*_val_1.fq.gz"))
+            read1.sort()
+            read2 = glob.glob(os.path.join(work_dir,"trim",f"{condition}*_val_2.fq.gz"))
+            read2.sort()
+            
+            csv_merge1 = os.path.join(work_dir, "slurm", "RSEM", "slurm_merge1.csv")
+            csv_ = open(csv_merge1, "a")
+            
+            read1_merged = os.path.join(work_dir, "trim", f"{condition}_merged_val_1.fq.gz")
+            command = ["cat", " ".join(read1), ">", read1_merged]
+            
+            csv_.write(" ".join(command) +"\n")
+            csv_.close()
+            
+            csv_merge2 = os.path.join(work_dir, "slurm", "RSEM", "slurm_merge2.csv")
+            csv_ = open(csv_merge2, "a")
+            
+            read2_merged = os.path.join(work_dir, "trim", f"{condition}_merged_val_2.fq.gz")
+            command = ["cat", " ".join(read2), ">", read2_merged]
+            
+            csv_.write(" ".join(command) +"\n")
+            csv_.close()
+            
+            #run RSEM
             csv_rsem = os.path.join(work_dir,"slurm","RSEM",f"slurm_RSEM_{genome}.csv")
             csv_ = open(csv_rsem, "a")  
-            
-            trimmed_files = glob.glob(os.path.join(work_dir,"trim",f"{sample}*.fq.gz"))
-            read1 = [i for i in trimmed_files if "_val_1.fq.gz" in i][0]
-            read2 = [i for i in trimmed_files if "_val_2.fq.gz" in i][0]
-            
+                        
             command = ["rsem-calculate-expression", "--paired-end","--star", "-p", threads,
                     "--strandedness", strand, "--star-output-genome-bam",
                     "--calc-ci", "--ci-memory", "10240", "--estimate-rspd", "--star-gzipped-read-file",
-                    "--time", read1, read2, star_index, sample]
+                    "--time", read1_merged, read2_merged, star_index, condition]
             csv_.write(" ".join(command) +"\n")
             csv_.close()
-            '''
-            #PICARD AddOrReplaceReadGroups
-            csv_readgroup = os.path.join(work_dir,"slurm","RSEM",f"slurm_readgroups_{genome}.csv")
-            csv_ = open(csv_readgroup, "a")  
-            
-            rsem_genome_bam = os.path.join(rsem_dir, f"{sample}.STAR.genome.bam")
-            temp_bam = os.path.join(temp_dir, sample, ".bam")
-            
-            command = ["picard", f"INPUT={rsem_genome_bam}", f"OUTPUT={temp_bam}",
-                         f"RGID={sample}", f"RGLB={sample}", "RGPL=illumina",
-                         f"RGPU={sample}", f"RGSM={sample}", "MAX_RECORDS_IN_RAM=2000000",
-                         "VALIDATION_STRINGENCY=LENIENT", f"TMP_DIR={temp_dir}"]
-            
-            csv_.write(" ".join(command) +"\n")
-            csv_.close()
-            
-            #PICARD reorder
-            csv_reorder = os.path.join(work_dir,"slurm","RSEM",f"slurm_reorder_{genome}.csv")
-            csv_ = open(csv_readgroup, "a")  
-            
-            temp_bam_ordered = temp_bam.replace(".bam",".ordered.bam")
-            fasta = ""
-                        
-            command = ["picard", f"INPUT={temp_bam}", f"OUTPUT={temp_bam}", f"REFERENCE={fasta}"]
-            
-            csv_.write(" ".join(command) +"\n")
-            csv_.close()
-            
-            #samtools sort temp
-            
-            
-            #samtools index
-            
-            
-            #PICARD mark duplicates sorted
         
-            #PICARD alignment metrics        
-            '''
-        
-        
-        #create slurm bash script 
+        #create SLURM bash script 
         print("Generating SLURM script for RSEM")
         csv_rsem = os.path.join(work_dir,"slurm", "RSEM", f"slurm_RSEM_{genome}.csv")
         commands = subprocess.check_output(f"cat {csv_rsem} | wc -l", shell = True).decode("utf-8")
         os.makedirs(rsem_dir, exist_ok=True)
-        slurm_log = os.path.join(work_dir, "slurm",'slurm_RSEM_%a.log')
-        script_ = os.path.join(work_dir,"slurm", "RSEM",f"slurm_RSEM_{genome}.sh")
+        slurm_log = os.path.join(work_dir, "slurm", 'slurm_RSEM_%a.log')
+        script_ = os.path.join(work_dir, "slurm", "RSEM", f"slurm_RSEM_{genome}.sh")
         script = open(script_, "w")  
-        script.write("#!/bin/bash" + "\n")
+        script.write("#!/bin/bash\n")
         script.write("\n")
         script.write(f"#SBATCH -A {account}\n")
-        script.write("#SBATCH --mail-type=BEGIN,FAIL,END" + "\n")
+        script.write("#SBATCH --mail-type=BEGIN,FAIL,END\n")
         script.write(f"#SBATCH -p {partition}\n")
         script.write(f"#SBATCH -D {rsem_dir}\n")
         script.write(f"#SBATCH -o {slurm_log}\n")
@@ -973,18 +952,23 @@ def isoformAnalysis(work_dir, rna_seq_settings, genome, slurm):
         script.write(f"#SBATCH -a 1-{commands}\n")
         script.write("\n")
         
+        script.write("#Merge fq.gz files\n")
+        script.write("echo 'Merging replicate genotype fq.gz files'\n")
+        script.write("sed -n ${SLURM_ARRAY_TASK_ID}p " + f"{csv_merge1} | bash\n")
+        script.write("sed -n ${SLURM_ARRAY_TASK_ID}p " + f"{csv_merge2} | bash\n")
+        script.write("echo 'Merging replicate genotype fq.gz files completed'\n")
+        
+        script.write("#Run RSEM\n")
+        script.write("echo 'Running RSEM'\n")
         script.write("sed -n ${SLURM_ARRAY_TASK_ID}p " + f"{csv_rsem} | bash\n")
-        
-        
-        
-        
-        
+        script.write("echo 'RSEM done'\n")
+           
         script.close()
         
         #submit job to cluster
-        job_id_bigwig = subprocess.check_output(f"sbatch {script_} | cut -d ' ' -f 4", shell = True)
-        job_id_bigwig = job_id_bigwig.decode("UTF-8").replace("\n","")
-        print(f"Submitted SLURM script to cluster (job ID {job_id_bigwig})")
+        job_id_rsem = subprocess.check_output(f"sbatch {script_} | cut -d ' ' -f 4", shell = True)
+        job_id_rsem = job_id_rsem.decode("UTF-8").replace("\n","")
+        print(f"Submitted SLURM script to cluster (job ID {job_id_rsem})")
             
         
         
