@@ -895,8 +895,10 @@ def isoformAnalysis(work_dir, rna_seq_settings, genome, slurm):
         #remove pre-existing command files
         csv_merge1 = os.path.join(work_dir, "slurm", "RSEM", "merge1.csv")
         csv_merge2 = os.path.join(work_dir, "slurm", "RSEM", "merge2.csv")
-        csv_rsem = os.path.join(work_dir,"slurm","RSEM",f"RSEM_{genome}.csv")
-        script_ = os.path.join(work_dir, "slurm", "RSEM", f"RSEM_{genome}.sh")
+        csv_rsem = os.path.join(work_dir,"slurm", "RSEM", f"RSEM_{genome}.csv")
+        csv_sort = os.path.join(work_dir,"slurm", "RSEM", "sort.csv")
+        csv_index = os.path.join(work_dir,"slurm", "RSEM", "index.csv")
+        script_ = os.path.join(work_dir, "slurm", "RSEM",  f"RSEM_{genome}.sh")
         
         try:
             os.remove(csv_merge1)
@@ -940,6 +942,25 @@ def isoformAnalysis(work_dir, rna_seq_settings, genome, slurm):
                     "--time", read1_merged, read2_merged, star_index, condition]
             csv_.write(" ".join(command) +"\n")
             csv_.close()
+            
+            #sort BAM file
+            rsem_bam = os.path.join(rsem_dir, f"{condition}.STAR.genome.bam")
+            sorted_bam = rsem_bam.replace(".STAR.genome.bam","_sorted.bam")
+            
+            csv_ = open(csv_sort, "a")  
+            
+            command = ["samtools", "sort", "--threads", threads, "-o", sorted_bam, rsem_bam]
+            
+            csv_.write(" ".join(command) + "\n")
+            csv_.close()
+            
+            #index sorted BAM file
+            csv_ = open(csv_index, "a")  
+            
+            command = ["samtools", "index", "--threads", sorted_bam]
+            
+            csv_.write(" ".join(command) + "\n")
+            csv_.close()
         
         #create SLURM bash script 
         print("Generating SLURM script for RSEM")
@@ -947,8 +968,8 @@ def isoformAnalysis(work_dir, rna_seq_settings, genome, slurm):
         os.makedirs(rsem_dir, exist_ok=True)
         slurm_log = os.path.join(work_dir, "slurm", 'RSEM_%a.log')
         script = open(script_, "w")  
-        script.write("#!/bin/bash\n")
-        script.write("\n")
+        script.write("#!/bin/bash\n\n")
+        
         script.write(f"#SBATCH -A {account}\n")
         script.write("#SBATCH --mail-type=BEGIN,FAIL,END\n")
         script.write(f"#SBATCH -p {partition}\n")
@@ -960,16 +981,22 @@ def isoformAnalysis(work_dir, rna_seq_settings, genome, slurm):
         script.write("#SBATCH -J RSEM\n")
         script.write(f"#SBATCH -a 1-{commands}\n")
         
-        script.write("#Merge fq.gz files\n")
         script.write("echo 'Merging replicate genotype fq.gz files'\n")
         script.write("sed -n ${SLURM_ARRAY_TASK_ID}p " + f"{csv_merge1} | bash\n")
         script.write("sed -n ${SLURM_ARRAY_TASK_ID}p " + f"{csv_merge2} | bash\n")
         script.write("echo 'Merging replicate genotype fq.gz files completed'\n\n")
         
-        script.write("#Run RSEM\n")
         script.write("echo 'Running RSEM'\n")
         script.write("sed -n ${SLURM_ARRAY_TASK_ID}p " + f"{csv_rsem} | bash\n")
-        script.write("echo 'RSEM done'\n")
+        script.write("echo 'RSEM done'\n\n")
+        
+        script.write("echo 'samtools sort'\n")
+        script.write("sed -n ${SLURM_ARRAY_TASK_ID}p " + f"{csv_sort} | bash\n")
+        script.write("echo 'Sorting done'\n\n")
+        
+        script.write("echo 'samtools index'\n")
+        script.write("sed -n ${SLURM_ARRAY_TASK_ID}p " + f"{csv_index} | bash\n")
+        script.write("echo 'Indexing done'\n")
            
         script.close()
         
