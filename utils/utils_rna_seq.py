@@ -902,7 +902,7 @@ def isoformAnalysis(work_dir, rna_seq_settings, genome, slurm):
             read2.sort()
             
             csv_merge1 = os.path.join(work_dir, "slurm", "RSEM", "merge1.csv")
-            csv_ = open(csv_merge1, "a")
+            csv_ = open(csv_merge1, "w")
             
             read1_merged = os.path.join(work_dir, "trim", f"{condition}_merged_val_1.fq.gz")
             command = ["cat", " ".join(read1), ">", read1_merged]
@@ -911,7 +911,7 @@ def isoformAnalysis(work_dir, rna_seq_settings, genome, slurm):
             csv_.close()
             
             csv_merge2 = os.path.join(work_dir, "slurm", "RSEM", "merge2.csv")
-            csv_ = open(csv_merge2, "a")
+            csv_ = open(csv_merge2, "w")
             
             read2_merged = os.path.join(work_dir, "trim", f"{condition}_merged_val_2.fq.gz")
             command = ["cat", " ".join(read2), ">", read2_merged]
@@ -921,7 +921,7 @@ def isoformAnalysis(work_dir, rna_seq_settings, genome, slurm):
             
             #run RSEM
             csv_rsem = os.path.join(work_dir,"slurm","RSEM",f"RSEM_{genome}.csv")
-            csv_ = open(csv_rsem, "a")  
+            csv_ = open(csv_rsem, "w")  
                         
             command = ["rsem-calculate-expression", "--paired-end","--star", "-p", threads,
                     "--strandedness", strand, "--star-output-genome-bam",
@@ -935,7 +935,7 @@ def isoformAnalysis(work_dir, rna_seq_settings, genome, slurm):
         csv_rsem = os.path.join(work_dir,"slurm", "RSEM", f"RSEM_{genome}.csv")
         commands = subprocess.check_output(f"cat {csv_rsem} | wc -l", shell = True).decode("utf-8")
         os.makedirs(rsem_dir, exist_ok=True)
-        slurm_log = os.path.join(work_dir, "slurm", 'slurm_RSEM_%a.log')
+        slurm_log = os.path.join(work_dir, "slurm", 'RSEM_%a.log')
         script_ = os.path.join(work_dir, "slurm", "RSEM", f"RSEM_{genome}.sh")
         script = open(script_, "w")  
         script.write("#!/bin/bash\n")
@@ -950,13 +950,12 @@ def isoformAnalysis(work_dir, rna_seq_settings, genome, slurm):
         script.write(f"#SBATCH --mem={mem}\n")
         script.write("#SBATCH -J RSEM\n")
         script.write(f"#SBATCH -a 1-{commands}\n")
-        script.write("\n")
         
         script.write("#Merge fq.gz files\n")
         script.write("echo 'Merging replicate genotype fq.gz files'\n")
         script.write("sed -n ${SLURM_ARRAY_TASK_ID}p " + f"{csv_merge1} | bash\n")
         script.write("sed -n ${SLURM_ARRAY_TASK_ID}p " + f"{csv_merge2} | bash\n")
-        script.write("echo 'Merging replicate genotype fq.gz files completed'\n")
+        script.write("echo 'Merging replicate genotype fq.gz files completed'\n\n")
         
         script.write("#Run RSEM\n")
         script.write("echo 'Running RSEM'\n")
