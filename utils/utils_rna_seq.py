@@ -896,31 +896,31 @@ def isoformAnalysis(work_dir, rna_seq_settings, genome, slurm):
         for condition in conditions:
             ###create csv files with all commands (for SLURM array script)###
             #merge replicate fastq files by genotype
-            read1 = glob.glob(os.path.join(work_dir,"trim",f"{condition}*_val_1.fq.gz"))
+            read1 = glob.glob(os.path.join(work_dir, "trim", f"{condition}*_val_1.fq.gz"))
             read1.sort()
-            read2 = glob.glob(os.path.join(work_dir,"trim",f"{condition}*_val_2.fq.gz"))
+            read2 = glob.glob(os.path.join(work_dir, "trim", f"{condition}*_val_2.fq.gz"))
             read2.sort()
             
-            csv_merge1 = os.path.join(work_dir, "slurm", "RSEM", "slurm_merge1.csv")
+            csv_merge1 = os.path.join(work_dir, "slurm", "RSEM", "merge1.csv")
             csv_ = open(csv_merge1, "a")
             
             read1_merged = os.path.join(work_dir, "trim", f"{condition}_merged_val_1.fq.gz")
             command = ["cat", " ".join(read1), ">", read1_merged]
             
-            csv_.write(" ".join(command) +"\n")
+            csv_.write(" ".join(command))
             csv_.close()
             
-            csv_merge2 = os.path.join(work_dir, "slurm", "RSEM", "slurm_merge2.csv")
+            csv_merge2 = os.path.join(work_dir, "slurm", "RSEM", "merge2.csv")
             csv_ = open(csv_merge2, "a")
             
             read2_merged = os.path.join(work_dir, "trim", f"{condition}_merged_val_2.fq.gz")
             command = ["cat", " ".join(read2), ">", read2_merged]
             
-            csv_.write(" ".join(command) +"\n")
+            csv_.write(" ".join(command))
             csv_.close()
             
             #run RSEM
-            csv_rsem = os.path.join(work_dir,"slurm","RSEM",f"slurm_RSEM_{genome}.csv")
+            csv_rsem = os.path.join(work_dir,"slurm","RSEM",f"RSEM_{genome}.csv")
             csv_ = open(csv_rsem, "a")  
                         
             command = ["rsem-calculate-expression", "--paired-end","--star", "-p", threads,
@@ -932,11 +932,11 @@ def isoformAnalysis(work_dir, rna_seq_settings, genome, slurm):
         
         #create SLURM bash script 
         print("Generating SLURM script for RSEM")
-        csv_rsem = os.path.join(work_dir,"slurm", "RSEM", f"slurm_RSEM_{genome}.csv")
+        csv_rsem = os.path.join(work_dir,"slurm", "RSEM", f"RSEM_{genome}.csv")
         commands = subprocess.check_output(f"cat {csv_rsem} | wc -l", shell = True).decode("utf-8")
         os.makedirs(rsem_dir, exist_ok=True)
         slurm_log = os.path.join(work_dir, "slurm", 'slurm_RSEM_%a.log')
-        script_ = os.path.join(work_dir, "slurm", "RSEM", f"slurm_RSEM_{genome}.sh")
+        script_ = os.path.join(work_dir, "slurm", "RSEM", f"RSEM_{genome}.sh")
         script = open(script_, "w")  
         script.write("#!/bin/bash\n")
         script.write("\n")
