@@ -938,7 +938,7 @@ def isoformAnalysis(work_dir, rna_seq_settings, genome, slurm):
                         
             command = ["rsem-calculate-expression", "--paired-end","--star", "-p", threads,
                     "--strandedness", strand, "--star-output-genome-bam",
-                    "--calc-ci", "--ci-memory", "10240", "--estimate-rspd", "--star-gzipped-read-file",
+                    "--estimate-rspd", "--star-gzipped-read-file",
                     "--time", read1_merged, read2_merged, star_index, condition]
             csv_.write(" ".join(command) +"\n")
             csv_.close()
