@@ -915,7 +915,7 @@ def isoformAnalysis(work_dir, rna_seq_settings, genome, slurm):
             read2 = glob.glob(os.path.join(work_dir, "trim", f"{condition}*_val_2.fq.gz"))
             read2.sort()
                         
-            csv_ = open(csv_merge1, "w")
+            csv_ = open(csv_merge1, "a")
             
             read1_merged = os.path.join(work_dir, "trim", f"{condition}_merged_val_1.fq.gz")
             command = ["cat", " ".join(read1), ">", read1_merged]
@@ -923,7 +923,7 @@ def isoformAnalysis(work_dir, rna_seq_settings, genome, slurm):
             csv_.write(" ".join(command))
             csv_.close()
                         
-            csv_ = open(csv_merge2, "w")
+            csv_ = open(csv_merge2, "a")
             
             read2_merged = os.path.join(work_dir, "trim", f"{condition}_merged_val_2.fq.gz")
             command = ["cat", " ".join(read2), ">", read2_merged]
