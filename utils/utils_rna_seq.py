@@ -920,7 +920,7 @@ def isoformAnalysis(work_dir, rna_seq_settings, genome, slurm):
             read1_merged = os.path.join(work_dir, "trim", f"{condition}_merged_val_1.fq.gz")
             command = ["cat", " ".join(read1), ">", read1_merged]
             
-            csv_.write(" ".join(command))
+            csv_.write(" ".join(command), "\n")
             csv_.close()
                         
             csv_ = open(csv_merge2, "a")
@@ -928,7 +928,7 @@ def isoformAnalysis(work_dir, rna_seq_settings, genome, slurm):
             read2_merged = os.path.join(work_dir, "trim", f"{condition}_merged_val_2.fq.gz")
             command = ["cat", " ".join(read2), ">", read2_merged]
             
-            csv_.write(" ".join(command))
+            csv_.write(" ".join(command), "\n")
             csv_.close()
             
             #run RSEM
