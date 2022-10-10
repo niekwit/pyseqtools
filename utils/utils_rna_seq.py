@@ -957,7 +957,7 @@ def isoformAnalysis(work_dir, rna_seq_settings, genome, slurm):
             #index sorted BAM file
             csv_ = open(csv_index, "a")  
             
-            command = ["samtools", "index", "--threads", threads, sorted_bam]
+            command = ["samtools", "index", "-@", threads, sorted_bam]
             
             csv_.write(" ".join(command) + "\n")
             csv_.close()
