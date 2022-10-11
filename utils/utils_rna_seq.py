@@ -898,13 +898,15 @@ def isoformAnalysis(work_dir, rna_seq_settings, genome, slurm):
         csv_rsem = os.path.join(work_dir,"slurm", "RSEM", f"RSEM_{genome}.csv")
         csv_sort = os.path.join(work_dir,"slurm", "RSEM", "sort.csv")
         csv_index = os.path.join(work_dir,"slurm", "RSEM", "index.csv")
-        script_ = os.path.join(work_dir, "slurm", "RSEM",  f"RSEM_{genome}.sh")
+        csv_picard = os.path.join(work_dir,"slurm", "picard.csv")
+        csv_miso = os.path.join(work_dir,"slurm", "miso.csv")
+        script_ = os.path.join(work_dir, "slurm", f"alt_spl_{genome}.sh")
         
         try:
-            os.remove(csv_merge1)
-            os.remove(csv_merge2)
-            os.remove(csv_rsem)
-            os.remove(script_)
+            remove_csvs = [csv_merge1, csv_merge2, csv_rsem, csv_sort, 
+                           csv_index, csv_miso, csv_picard]
+            for csv in remove_csvs:
+                os.remove(csv)
         except FileNotFoundError:
             pass
         
@@ -961,7 +963,34 @@ def isoformAnalysis(work_dir, rna_seq_settings, genome, slurm):
             
             csv_.write(" ".join(command) + "\n")
             csv_.close()
-        
+            
+            #determine insert length distribution and SD
+            picard_dir = os.path.join(work_dir, "picard")
+            os.makedirs(picard_dir, exist_ok=True)
+            insert_sizes = os.path.join(picard_dir, f"{condition}.insert_sizes.txt")
+            insert_sizes_pdf = os.path.join(picard_dir, f"{condition}.insert_sizes.pdf")
+            
+            csv_ = open(csv_picard, "a")  
+            
+            command = ["picard", "CollectInsertSizeMetrics", f"I={sorted_bam}",
+                       f"O={insert_sizes}", f"H={insert_sizes_pdf}", "M=0.5",
+                       "MAX_RECORDS_IN_RAM=2000000", "VALIDATION_STRINGENCY=LENIENT"]
+            
+            csv_.write(" ".join(command) + "\n")
+            csv_.close()
+            
+            
+            '''
+            #run MISO (make sure the GFF3 file is indexed first)
+            gff_index = rna_seq_settings["MISO_index"][genome.split("_")[0]]
+            csv_ = open(csv_miso, "a")  
+            
+            command = ["miso", "--run", "-p", threads, "--read-len", genome.split("_")[1],
+                       ]
+            
+            csv_.write(" ".join(command) + "\n")
+            csv_.close()
+            '''
         #create SLURM bash script 
         print("Generating SLURM script for RSEM")
         commands = subprocess.check_output(f"cat {csv_rsem} | wc -l", shell = True).decode("utf-8")
@@ -990,14 +1019,26 @@ def isoformAnalysis(work_dir, rna_seq_settings, genome, slurm):
         script.write("sed -n ${SLURM_ARRAY_TASK_ID}p " + f"{csv_rsem} | bash\n")
         script.write("echo 'RSEM done'\n\n")
         
-        script.write("echo 'samtools sort'\n")
+        script.write("echo 'Running samtools sort'\n")
         script.write("sed -n ${SLURM_ARRAY_TASK_ID}p " + f"{csv_sort} | bash\n")
         script.write("echo 'Sorting done'\n\n")
         
-        script.write("echo 'samtools index'\n")
+        script.write("echo 'Running samtools index'\n")
         script.write("sed -n ${SLURM_ARRAY_TASK_ID}p " + f"{csv_index} | bash\n")
         script.write("echo 'Indexing done'\n")
-           
+        
+        script.write("echo 'Running PICARD CollectInsertSizeMetrics'\n")
+        script.write("sed -n ${SLURM_ARRAY_TASK_ID}p " + f"{csv_picard} | bash\n")
+        script.write("echo 'PICARD CollectInsertSizeMetrics done'\n")
+        
+        '''
+        script.write("echo 'Running MISO'\n")
+        script.write("source ~/.bashrc\n")
+        script.write("conda deactivate\n")
+        script.write("conda activate miso\n")
+        script.write("sed -n ${SLURM_ARRAY_TASK_ID}p " + f"{csv_miso} | bash\n")
+        script.write("echo 'MISO done'\n")
+        '''  
         script.close()
         
         #submit job to cluster
