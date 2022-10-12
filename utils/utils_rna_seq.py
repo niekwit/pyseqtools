@@ -1037,7 +1037,7 @@ def isoformAnalysis(work_dir, rna_seq_settings, genome, slurm):
         script.close()
         
         #submit RSEM job to cluster
-        job_id_rsem = subprocess.check_output(f"nohup sbatch {script_rsem} | cut -d ' ' -f 4 &", shell = True)
+        job_id_rsem = subprocess.check_output(f"sbatch {script_rsem} | cut -d ' ' -f 4", shell = True)
         job_id_rsem = job_id_rsem.decode("UTF-8").replace("\n","")
         print(f"Submitted RSEM SLURM script to cluster (job ID {job_id_rsem})")
         
@@ -1086,7 +1086,7 @@ def isoformAnalysis(work_dir, rna_seq_settings, genome, slurm):
         script.close()
         
         #submit MISO job to cluster
-        job_id_miso = subprocess.check_output(f"nohup batch {script_miso} | cut -d ' ' -f 4 &", shell = True)
+        job_id_miso = subprocess.check_output(f"batch {script_miso} | cut -d ' ' -f 4", shell = True)
         job_id_miso = job_id_miso.decode("UTF-8").replace("\n","")
         print(f"Submitted MISO SLURM script to cluster (job ID {job_id_miso})")
         
