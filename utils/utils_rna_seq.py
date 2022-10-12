@@ -998,7 +998,7 @@ def isoformAnalysis(work_dir, rna_seq_settings, genome, slurm):
         commands = subprocess.check_output(f"cat {csv_rsem} | wc -l", shell = True).decode("utf-8")
         os.makedirs(rsem_dir, exist_ok=True)
         slurm_log = os.path.join(work_dir, "slurm", 'RSEM_%a.log')
-        script = open(script_miso, "w")  
+        script = open(script_rsem, "w")  
         script.write("#!/bin/bash\n\n")
         
         script.write(f"#SBATCH -A {account}\n")
@@ -1051,7 +1051,7 @@ def isoformAnalysis(work_dir, rna_seq_settings, genome, slurm):
         #create SLURM bash script for MISO (first part)
         os.makedirs(miso_dir, exist_ok=True)
         slurm_log = os.path.join(work_dir, "slurm", 'MISO_%a.log')
-        script = open(script_rsem, "w")  
+        script = open(script_miso, "w")  
         script.write("#!/bin/bash\n\n")
         
         script.write(f"#SBATCH -A {account}\n")
