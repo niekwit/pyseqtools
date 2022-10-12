@@ -902,7 +902,7 @@ def isoformAnalysis(work_dir, rna_seq_settings, genome, slurm):
         csv_picard = os.path.join(work_dir,"slurm", "picard.csv")
         csv_miso = os.path.join(work_dir,"slurm", "miso.csv")
         script_rsem = os.path.join(work_dir, "slurm", f"rsem_{genome}.sh")
-        script_miso = os.path.join(work_dir, "slurm", f"rsem_{genome}.sh")
+        script_miso = os.path.join(work_dir, "slurm", f"miso_{genome}.sh")
         
         try:
             remove_csvs = [csv_merge1, csv_merge2, csv_rsem, csv_sort, 
@@ -1062,7 +1062,7 @@ def isoformAnalysis(work_dir, rna_seq_settings, genome, slurm):
         script.write(f"#SBATCH -c {threads}\n")
         script.write(f"#SBATCH -t {slurm_time}\n")
         script.write(f"#SBATCH --mem={mem}\n")
-        script.write("#SBATCH -J RSEM\n")
+        script.write("#SBATCH -J MISO\n")
         script.write(f"#SBATCH -a 1-{commands}\n")
         script.write("#SBATCH --dependency=afterok:{job_id_rsem}\n\n")
         
@@ -1075,7 +1075,7 @@ def isoformAnalysis(work_dir, rna_seq_settings, genome, slurm):
         script.write("INSERT_SIZE_FILE=$(sed -n ${SLURM_ARRAY_TASK_ID}p " + f"{csv_miso} | awk" + " '{print $2}'\n")
         script.write("INSERT_SIZE=$(sed -n 8p $INSERT_SIZE_FILE | " + "awk '{print $1}')\n")
         script.write("INSERT_SIZE=${SD%.*}\n") #convert to integer
-        script.write(f"SD=$(sed -n 8p {condition}.insert_sizes.txt | " + "awk '{print $7}')\n")
+        script.write("SD=$(sed -n 8p $INSERT_SIZE_FILE | awk '{print $7}')\n")
         script.write("SD=${SD%.*}\n\n") #convert to integer
         
         script.write(" ".join(["miso", "--run", gff_index, "$SORTED_BAM","--output-dir", miso_dir,"-p", threads, 
