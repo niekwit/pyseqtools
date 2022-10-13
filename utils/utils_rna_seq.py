@@ -865,7 +865,7 @@ def rsemIndex(work_dir, script_dir, rna_seq_settings, slurm, rsemIndex):
     genome = rsemIndex[0]
     read_length = rsemIndex[1]
     gtf = rna_seq_settings["gtf"][genome]
-    fasta = rna_seq_settings["fasta"][genome]
+    fasta = rna_seq_settings["FASTA"][genome]
     name = genome + "_" + read_length
     index_name = os.path.join(rsemIndex[2], name, name)
     
