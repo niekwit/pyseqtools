@@ -863,9 +863,9 @@ def rsemIndex(work_dir, script_dir, slurm, rsemIndex):
     Generate index for RSEM STAR alignment
     '''
     if slurm == True:
-        pass
-    else:
         print(rsemIndex)
+    else:
+        pass
         
 def isoformAnalysis(work_dir, rna_seq_settings, genome, slurm):
     '''
@@ -1003,7 +1003,7 @@ def isoformAnalysis(work_dir, rna_seq_settings, genome, slurm):
             
             
             #summarise MISO data
-            miso_summary_dir = os.path.join(work_dir,"miso", genome, condition, "summary")
+            #miso_summary_dir = os.path.join(work_dir,"miso", genome, condition, "summary")
             
         #create SLURM bash script for RSEM/MISO
         print("Generating SLURM scripts")
