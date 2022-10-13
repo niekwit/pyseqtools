@@ -910,7 +910,7 @@ def rsemIndex(work_dir, script_dir, rna_seq_settings, slurm, rsemIndex):
         
         #add index path to rna-seq.yaml
         print("Writing index name to rna-seq.yaml")
-        with open(os.path.join(script_dir, "yaml" ,"rna-seq.yaml")) as f:
+        with open(os.path.join(script_dir, "pyseqtools", yaml,"rna-seq.yaml")) as f:
             doc = yaml.safe_load(f)
         doc["RSEM_STAR_index"][name] = index_name
         with open(os.path.join(script_dir, "yaml","chip-seq.yaml"), "w") as f:
