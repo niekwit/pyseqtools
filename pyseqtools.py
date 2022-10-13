@@ -708,7 +708,7 @@ def main():
                  elif "mm" in genome or genome == "gencode.vM1.pc_transcripts":
                      species = "mouse"
              
-             if len(rsemIndex) == 2:
+             if len(rsemIndex) == 3:
                  rnaseq_utils.rsemIndex(work_dir, script_dir, rna_seq_settings, slurm, rsemIndex)
              
              if trim == True:
