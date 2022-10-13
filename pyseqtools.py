@@ -622,7 +622,7 @@ def main():
         pe_tags = args["peTags"]
         slurm = args["slurm"] 
         rsemIndex = args["rsemIndex"]
-               
+        print(rsemIndex)     
         
         if slurm == False:
             ####set thread count for processing
@@ -708,8 +708,8 @@ def main():
                  elif "mm" in genome or genome == "gencode.vM1.pc_transcripts":
                      species = "mouse"
              
-             if rsemIndex == True:
-                 rnaseq_utils.resemIndex(work_dir, script_dir, slurm)
+             if rsemIndex != [""]:
+                 rnaseq_utils.resemIndex(work_dir, script_dir, slurm, rsemIndex)
              
              if trim == True:
                  utils.trimSLURM(script_dir, work_dir,module, pe_tags)
