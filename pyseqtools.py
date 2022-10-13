@@ -116,6 +116,10 @@ def main():
                                required = False,
                                choices = ["salmon","star"],
                                help = "Program to align fastq files")
+    parser_rnaseq.add_argument("--rsemIndex",
+                             required = False,
+                             nargs='+',
+                             help = "Generate index for STAR alignment via RSEM (--rsemIndex genome read-length")
     parser_rnaseq.add_argument("--isoformAnalysis",
                              required = False,
                              action = 'store_true',
@@ -617,6 +621,7 @@ def main():
         sortBAM = args["sortBAM"]
         pe_tags = args["peTags"]
         slurm = args["slurm"] 
+        rsemIndex = args["rsemIndex"]
                
         
         if slurm == False:
@@ -702,7 +707,10 @@ def main():
                      species = "human"
                  elif "mm" in genome or genome == "gencode.vM1.pc_transcripts":
                      species = "mouse"
-                          
+             
+             if rsemIndex == True:
+                 rnaseq_utils.resemIndex(work_dir, script_dir, slurm)
+             
              if trim == True:
                  utils.trimSLURM(script_dir, work_dir,module, pe_tags)
                  
