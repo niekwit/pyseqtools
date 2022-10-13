@@ -119,7 +119,7 @@ def main():
     parser_rnaseq.add_argument("--rsemIndex",
                              required = False,
                              nargs='+',
-                             help = "Generate index for STAR alignment via RSEM (--rsemIndex genome read-length")
+                             help = "Generate index for STAR alignment via RSEM (--rsemIndex genome read-length out-dir")
     parser_rnaseq.add_argument("--isoformAnalysis",
                              required = False,
                              action = 'store_true',
@@ -709,7 +709,7 @@ def main():
                      species = "mouse"
              
              if len(rsemIndex) == 2:
-                 rnaseq_utils.rsemIndex(work_dir, script_dir, slurm, rsemIndex)
+                 rnaseq_utils.rsemIndex(work_dir, script_dir, rna_seq_settings, slurm, rsemIndex)
              
              if trim == True:
                  utils.trimSLURM(script_dir, work_dir,module, pe_tags)

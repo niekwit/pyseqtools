@@ -858,15 +858,69 @@ def BigWig(work_dir, threads, genome, rna_seq_settings, slurm=False):
         print(f"Submitted SLURM script to cluster (job ID {job_id_bigwig})")
         
 
-def rsemIndex(work_dir, script_dir, slurm, rsemIndex):
+def rsemIndex(work_dir, script_dir, rna_seq_settings, slurm, rsemIndex):
     '''
     Generate index for RSEM STAR alignment
     '''
+    genome = rsemIndex[0]
+    read_length = rsemIndex[1]
+    gtf = rna_seq_settings["gtf"][genome]
+    fasta = rna_seq_settings["fasta"][genome]
+    name = genome + "_" + read_length
+    index_name = os.path.join(rsemIndex[2], name, name)
+    
+    puts(colored.green(f"Generating STAR index via RSEM for {genome} at {index_name}"))
     if slurm == True:
-        print(rsemIndex)
+        #load slurm settings
+        with open(os.path.join(os.path.dirname(script_dir),"yaml","slurm.yaml")) as file:
+            slurm_settings = yaml.full_load(file)
+        threads = str(slurm_settings["RNA-Seq"]["rsem_CPU"])
+        mem = str(slurm_settings["RNA-Seq"]["rsem_mem"])
+        slurm_time = str(slurm_settings["RNA-Seq"]["rsem_time"])
+        account = slurm_settings["groupname"]
+        partition = slurm_settings["partition"]
+        
+        command = ["rsem-prepare-reference", "-p", threads, "--star", "--star-sjdboverhang",
+                   str(int(read_length)-1), "--gtf", gtf, fasta, index_name]
+        command = " ".join(command)
+        
+        #generate slurm script
+        script_index = os.path.join(work_dir, "slurm", "rsem_index.csv")
+        slurm_log = os.path.join(work_dir, "slurm", 'rsem_index.log')
+        script = open(script_index, "w")  
+        script.write("#!/bin/bash\n\n")
+        
+        script.write(f"#SBATCH -A {account}\n")
+        script.write("#SBATCH --mail-type=BEGIN,FAIL,END\n")
+        script.write(f"#SBATCH -p {partition}\n")
+        script.write(f"#SBATCH -o {slurm_log}\n")
+        script.write(f"#SBATCH -c {threads}\n")
+        script.write(f"#SBATCH -t {slurm_time}\n")
+        script.write(f"#SBATCH --mem={mem}\n")
+        script.write("#SBATCH -J rsem_index\n")
+              
+        script.write(f"{command}\n")
+        
+        script.close()
+        
+        #submit script to cluster 
+        job_id = subprocess.check_output(f"sbatch {script_index} | cut -d ' ' -f 4", shell = True)
+        job_id = job_id.decode("UTF-8").replace("\n","")
+        print(f"Submitted SLURM script to cluster (job ID {job_id})")
+        
+        #add index path to rna-seq.yaml
+        print("Writing index name to rna-seq.yaml")
+        with open(os.path.join(script_dir, "yaml" ,"rna-seq.yaml")) as f:
+            doc = yaml.safe_load(f)
+        doc["RSEM_STAR_index"][name] = index_name
+        with open(os.path.join(script_dir, "yaml","chip-seq.yaml"), "w") as f:
+            yaml.dump(doc, f)
+        puts(colored.green("Done!"))
+    
     else:
         pass
-        
+      
+    
 def isoformAnalysis(work_dir, rna_seq_settings, genome, slurm):
     '''
     Alternative isoform analysis using RSEM/MISO, based on CRICK scripts
