@@ -111,7 +111,7 @@ def main():
     parser_rnaseq.add_argument("--peTags",
                                required = False,
                                default = None,
-                               help = "Comma-separated paired-end file tags (e.g. _R1_001.fq.gz,_R2_001.fq.gz)")
+                               help = "Comma-separated paired-end file tags (e.g. _R1_001.fq.gz,_R2_001.fq.gz). Only required when --trim argument is called.")
     parser_rnaseq.add_argument("-a", "--align",
                                required = False,
                                choices = ["salmon","star"],
@@ -697,10 +697,11 @@ def main():
         else:
                           
              #Set species variable
-             if "hg" in genome or genome == "gencode-v35":
-                 species = "human"
-             elif "mm" in genome or genome == "gencode.vM1.pc_transcripts":
-                 species = "mouse"
+             if genome != None:
+                 if "hg" in genome or genome == "gencode-v35":
+                     species = "human"
+                 elif "mm" in genome or genome == "gencode.vM1.pc_transcripts":
+                     species = "mouse"
                           
              if trim == True:
                  utils.trimSLURM(script_dir, work_dir,module, pe_tags)
