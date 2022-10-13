@@ -872,7 +872,7 @@ def rsemIndex(work_dir, script_dir, rna_seq_settings, slurm, rsemIndex):
     puts(colored.green(f"Generating STAR index via RSEM for {genome} at {index_name}"))
     if slurm == True:
         #load slurm settings
-        with open(os.path.join(os.path.dirname(script_dir),"yaml","slurm.yaml")) as file:
+        with open(os.path.join(os.path.dirname(script_dir), "pyseqtools","yaml","slurm.yaml")) as file:
             slurm_settings = yaml.full_load(file)
         threads = str(slurm_settings["RNA-Seq"]["rsem_CPU"])
         mem = str(slurm_settings["RNA-Seq"]["rsem_mem"])
