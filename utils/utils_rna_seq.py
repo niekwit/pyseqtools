@@ -1063,7 +1063,7 @@ def isoformAnalysis(work_dir, rna_seq_settings, genome, slurm):
             #miso_summary_dir = os.path.join(work_dir,"miso", genome, condition, "summary")
             
         #create SLURM bash script for RSEM/MISO
-        print("Generating SLURM scripts")
+        print("Generating SLURM scripts for RSEM and MISO SUMMARY")
         
         commands = subprocess.check_output(f"cat {csv_rsem} | wc -l", shell = True).decode("utf-8")
         os.makedirs(rsem_dir, exist_ok=True)
@@ -1157,7 +1157,8 @@ def isoformAnalysis(work_dir, rna_seq_settings, genome, slurm):
             csv_.close()
         
         #generate slurm script
-        slurm_log = os.path.join(work_dir, "slurm", 'miso_sum_%a.log')
+        print("Generating SLURM scripts for MISO COMPARE")
+        slurm_log = os.path.join(work_dir, "slurm", 'miso_compare_%a.log')
         commands = subprocess.check_output(f"cat {csv_miso_compare} | wc -l", shell = True).decode("utf-8")
         
         script = open(script_miso_sum, "w")  
@@ -1170,7 +1171,7 @@ def isoformAnalysis(work_dir, rna_seq_settings, genome, slurm):
         script.write(f"#SBATCH -c {threads}\n")
         script.write(f"#SBATCH -t {slurm_time}\n")
         script.write(f"#SBATCH --mem={mem}\n")
-        script.write("#SBATCH -J miso_sum\n")
+        script.write("#SBATCH -J miso_compare\n")
         script.write(f"#SBATCH -a 1-{commands}\n")
         script.write(f"#SBATCH --dependency=afterok:{job_id}\n\n")
               
@@ -1183,11 +1184,9 @@ def isoformAnalysis(work_dir, rna_seq_settings, genome, slurm):
         script.close()
         
         #submit script to cluster 
-        job_id_miso = subprocess.check_output(f"sbatch {script_rsem} | cut -d ' ' -f 4", shell = True)
+        job_id_miso = subprocess.check_output(f"sbatch {csv_miso_compare} | cut -d ' ' -f 4", shell = True)
         job_id_miso = job_id_miso.decode("UTF-8").replace("\n","")
         print(f"Submitted SLURM script to cluster (job ID {job_id})")
         
-
-
 
 
