@@ -1114,6 +1114,11 @@ if __name__ == "__main__":
     rna_seq_genomeList = []
     for key, value in rna_seq_settings["FASTA"].items():
         rna_seq_genomeList.append(key)
+    for key, value in rna_seq_settings["RSEM_STAR_index"].items():
+        rna_seq_genomeList.append(key)
+    for key, value in rna_seq_settings["STAR_index"].items():
+        rna_seq_genomeList.append(key)
+    rna_seq_genomeList = set(rna_seq_genomeList)
 
     ###loads ChIP-Seq settings
     try:
