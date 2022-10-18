@@ -967,7 +967,7 @@ def isoformAnalysis(work_dir, rna_seq_settings, genome, slurm):
         csv_miso = os.path.join(work_dir,"slurm", "miso.csv")
         
         script_rsem = os.path.join(work_dir, "slurm", f"rsem_{genome}.sh")
-        script_miso_sum = os.path.join(work_dir, "slurm", f"miso_sum_{genome}.sh")
+        script_miso_compare = os.path.join(work_dir, "slurm", f"miso_compare_{genome}.sh")
         
         try:
             remove_csvs = [csv_merge1, csv_merge2, csv_rsem, csv_sort, 
@@ -1154,7 +1154,7 @@ def isoformAnalysis(work_dir, rna_seq_settings, genome, slurm):
         slurm_log = os.path.join(work_dir, "slurm", 'miso_compare_%a.log')
         commands = subprocess.check_output(f"cat {csv_miso_compare} | wc -l", shell = True).decode("utf-8")
         
-        script = open(script_miso_sum, "w")  
+        script = open(script_miso_compare, "w")  
         script.write("#!/bin/bash\n\n")
         
         script.write(f"#SBATCH -A {account}\n")
@@ -1165,14 +1165,19 @@ def isoformAnalysis(work_dir, rna_seq_settings, genome, slurm):
         script.write(f"#SBATCH -t {slurm_time}\n")
         script.write(f"#SBATCH --mem={mem}\n")
         script.write("#SBATCH -J miso_compare\n")
-        script.write(f"#SBATCH -a 1-{commands}\n")
+        if len(commands) > 1:
+            script.write(f"#SBATCH -a 1-{commands}\n")
+        
         script.write(f"#SBATCH --dependency=afterok:{job_id}\n\n")
               
         script.write("source ~/.bashrc\n")
         script.write("conda deactivate\n")
         script.write("conda activate miso\n\n")
         
-        script.write("sed -n ${SLURM_ARRAY_TASK_ID}p " + f"{csv_miso_compare} | bash\n")
+        if len(commands) > 1:
+            script.write("sed -n ${SLURM_ARRAY_TASK_ID}p " + f"{csv_miso_compare} | bash\n")
+        else:
+            script.write("sed -n 1p " + f"{csv_miso_compare} | bash\n")
            
         script.close()
         
@@ -1181,8 +1186,7 @@ def isoformAnalysis(work_dir, rna_seq_settings, genome, slurm):
         job_id_miso = job_id_miso.decode("UTF-8").replace("\n","")
         print(f"Submitted SLURM script to cluster (job ID {job_id_miso})")
         
-
-
+                
 
 
 
