@@ -139,6 +139,10 @@ def file_exists(file): #check if file exists/is not size zero
         return(False)
 
 
+def SLURM_job_id_log(work_dir, job_id):
+    pass
+
+
 def checkSamtools(script_dir):
     #Check for samtools in $PATH
     path = os.environ["PATH"].lower()
