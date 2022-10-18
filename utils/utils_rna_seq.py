@@ -990,7 +990,7 @@ def isoformAnalysis(work_dir, rna_seq_settings, genome, slurm):
             
             read1_merged = os.path.join(work_dir, "trim", f"{condition}_merged_val_1.fq.gz")
             command = ["cat", " ".join(read1), ">", read1_merged]
-            
+    
             csv_.write(" ".join(command) + "\n")
             csv_.close()
                         
