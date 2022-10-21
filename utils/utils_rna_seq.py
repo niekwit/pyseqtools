@@ -1152,7 +1152,7 @@ def isoformAnalysis(work_dir, rna_seq_settings, genome, slurm):
         #generate slurm script
         print("Generating SLURM script for MISO COMPARE")
         slurm_log = os.path.join(work_dir, "slurm", 'miso_compare_%a.log')
-        with open (f'r"{csv_miso_compare}"', "r") as fp: commands = len(fp.readlines())
+        commands = subprocess.check_output(f"cat {csv_miso_compare} | wc -l", shell = True).decode("utf-8")
         
         script = open(script_miso_compare, "w")  
         script.write("#!/bin/bash\n\n")
