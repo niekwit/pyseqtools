@@ -1058,9 +1058,8 @@ def isoformAnalysis(work_dir, rna_seq_settings, genome, slurm):
             csv_.write(" ".join(command) + "\n")
             csv_.close()
             
-            
             #summarise MISO data
-            #miso_summary_dir = os.path.join(work_dir,"miso", genome, condition, "summary")
+            miso_summary_dir = os.path.join(work_dir,"miso", genome, condition, "summary")
             
         #create SLURM bash script for RSEM/MISO
         print("Generating SLURM script for RSEM and MISO SUMMARY")
@@ -1073,6 +1072,7 @@ def isoformAnalysis(work_dir, rna_seq_settings, genome, slurm):
         
         script.write(f"#SBATCH -A {account}\n")
         script.write("#SBATCH --mail-type=BEGIN,FAIL,END\n")
+        script.write(f"#SBATCH -D {rsem_dir}\n")
         script.write(f"#SBATCH -p {partition}\n")
         script.write(f"#SBATCH -o {slurm_log}\n")
         script.write(f"#SBATCH -c {threads}\n")
@@ -1089,7 +1089,7 @@ def isoformAnalysis(work_dir, rna_seq_settings, genome, slurm):
         script.write("echo 'Running RSEM'\n")
         script.write("sed -n ${SLURM_ARRAY_TASK_ID}p " + f"{csv_rsem} | bash\n")
         script.write("echo 'RSEM done'\n\n")
-        
+                
         script.write("echo 'Running samtools sort'\n")
         script.write("sed -n ${SLURM_ARRAY_TASK_ID}p " + f"{csv_sort} | bash\n")
         script.write("echo 'Sorting done'\n\n")
@@ -1119,7 +1119,7 @@ def isoformAnalysis(work_dir, rna_seq_settings, genome, slurm):
         script.write(" ".join(["miso", "--run", gff_index, "$SORTED_BAM","--output-dir $MISO_DIR", "-p", threads, 
                    "--paired-end", "$INSERT_SIZE", "$SD" ,"--read-len", genome.split("_")[1], "\n\n"]))
         
-        script.write("summarise_miso --summarize-samples $MISO_DIR $MISO_SUMMARY_DIR \n\n")
+        script.write("summarise_miso --summarize-samples $MISO_DIR $MISO_SUMMARY_DIR\n\n")
         
         script.close()
         
@@ -1152,7 +1152,7 @@ def isoformAnalysis(work_dir, rna_seq_settings, genome, slurm):
         #generate slurm script
         print("Generating SLURM script for MISO COMPARE")
         slurm_log = os.path.join(work_dir, "slurm", 'miso_compare_%a.log')
-        commands = subprocess.check_output(f"cat {csv_miso_compare} | wc -l", shell = True).decode("utf-8")
+        with open (f'r"{csv_miso_compare}"', "r") as fp: commands = len(fp.readlines())
         
         script = open(script_miso_compare, "w")  
         script.write("#!/bin/bash\n\n")
