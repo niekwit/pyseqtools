@@ -1100,7 +1100,7 @@ def isoformAnalysis(work_dir, rna_seq_settings, genome, slurm):
         
         script.write("echo 'Running RSEM'\n")
         script.write("sed -n ${SLURM_ARRAY_TASK_ID}p " + f"{csv_rsem} | bash\n")
-        
+        script.write("sed -n ${SLURM_ARRAY_TASK_ID}p " + f"{csv_move} | bash\n")
         script.write("echo 'RSEM done'\n\n")
                 
         script.write("echo 'Running samtools sort'\n")
