@@ -1132,7 +1132,7 @@ def isoformAnalysis(work_dir, rna_seq_settings, genome, slurm):
         script.write(" ".join(["miso", "--run", gff_index, "$SORTED_BAM","--output-dir $MISO_DIR", "-p", threads, 
                    "--paired-end", "$INSERT_SIZE", "$SD" ,"--read-len", genome.split("_")[1], "\n\n"]))
         
-        script.write("summarise_miso --summarize-samples $MISO_DIR $MISO_SUMMARY_DIR\n\n")
+        script.write("summarize_miso --summarize-samples $MISO_DIR $MISO_SUMMARY_DIR\n\n")
         
         script.close()
         
