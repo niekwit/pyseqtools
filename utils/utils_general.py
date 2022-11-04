@@ -139,8 +139,9 @@ def file_exists(file): #check if file exists/is not size zero
         return(False)
 
 
-def SLURM_job_id_log(work_dir, job_id):
-    pass
+def SLURM_job_id_log(work_dir, job, job_id):
+    print(f"{job}: {job_id}",
+          file = open(os.path.join(work_dir, "slurm","slurm_job_id.log"), "a"))
 
 
 def checkSamtools(script_dir):
