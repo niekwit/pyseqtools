@@ -960,6 +960,7 @@ def isoformAnalysis(work_dir, rna_seq_settings, genome, slurm):
         csv_merge1 = os.path.join(work_dir, "slurm", "RSEM", "merge1.csv")
         csv_merge2 = os.path.join(work_dir, "slurm", "RSEM", "merge2.csv")
         csv_rsem = os.path.join(work_dir,"slurm", "RSEM", f"RSEM_{genome}.csv")
+        csv_move = os.path.join(work_dir,"slurm", "RSEM", "move.csv")
         csv_sort = os.path.join(work_dir,"slurm", "RSEM", "sort.csv")
         csv_index = os.path.join(work_dir,"slurm", "RSEM", "index.csv")
         csv_picard = os.path.join(work_dir,"slurm", "picard.csv")
@@ -970,7 +971,7 @@ def isoformAnalysis(work_dir, rna_seq_settings, genome, slurm):
         script_miso_compare = os.path.join(work_dir, "slurm", f"miso_compare_{genome}.sh")
         
         try:
-            remove_csvs = [csv_merge1, csv_merge2, csv_rsem, csv_sort, 
+            remove_csvs = [csv_merge1, csv_merge2, csv_rsem, csv_move, csv_sort, 
                            csv_index, csv_miso, csv_picard, csv_miso_compare, csv_miso]
             for csv in remove_csvs:
                 os.remove(csv)
@@ -1009,7 +1010,18 @@ def isoformAnalysis(work_dir, rna_seq_settings, genome, slurm):
                     "--strandedness", strand, "--star-output-genome-bam",
                     "--estimate-rspd", "--star-gzipped-read-file",
                     "--time", read1_merged, read2_merged, star_index, condition]
-            csv_.write(" ".join(command) +"\n")
+            csv_.write(" ".join(command) + "\n")
+            csv_.close()
+            
+            #move rsem files to correct directory
+            csv_ = open(csv_move, "a")  
+            command = ["mv", os.path.join(work_dir, "*.stat",),
+                       os.path.join(work_dir, "*.results",),
+                       os.path.join(work_dir, "*.bam",),
+                       os.path.join(work_dir, "*.time",),
+                       os.path.join(work_dir, f"{condition}*.log",),
+                       rsem_dir]
+            csv_.write(" ".join(command) + "\n")
             csv_.close()
             
             #sort BAM file
@@ -1088,6 +1100,7 @@ def isoformAnalysis(work_dir, rna_seq_settings, genome, slurm):
         
         script.write("echo 'Running RSEM'\n")
         script.write("sed -n ${SLURM_ARRAY_TASK_ID}p " + f"{csv_rsem} | bash\n")
+        
         script.write("echo 'RSEM done'\n\n")
                 
         script.write("echo 'Running samtools sort'\n")
