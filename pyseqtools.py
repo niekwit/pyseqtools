@@ -122,8 +122,9 @@ def main():
                              help = "Generate index for STAR alignment via RSEM (--rsemIndex genome read-length out-dir")
     parser_rnaseq.add_argument("--isoformAnalysis",
                              required = False,
-                             action = 'store_true',
-                             help = "Alternative isoform analysis with RSEM/MISO")
+                             default = None,
+                             choices = [None,"miso","rmats"],
+                             help = "Alternative isoform analysis with RSEM/MISO or rMATS")
     parser_rnaseq.add_argument("--indexBAM",
                              required = False,
                              action = 'store_true',
@@ -724,8 +725,8 @@ def main():
              if align == "star":
                  rnaseq_utils.STAR(work_dir, threads, script_dir, rna_seq_settings, genome, slurm)
                  
-             if isoformAnalysis == True:
-                 rnaseq_utils.isoformAnalysis(work_dir, rna_seq_settings, genome, slurm)
+             if isoformAnalysis != None:
+                 rnaseq_utils.isoformAnalysis(work_dir, rna_seq_settings, genome, slurm, isoformAnalysis)
                 
              if deseq2 == True:
                  gtf = rna_seq_settings["gtf"][genome.split("_")[0]]

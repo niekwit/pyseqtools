@@ -4,7 +4,6 @@
 import glob
 import os
 import subprocess
-import yaml
 import sys
 import pkg_resources
 import pandas as pd
@@ -18,6 +17,7 @@ from pathlib import Path
 import tempfile
 import warnings
 
+import yaml
 from clint.textui import colored, puts
 import pysam
 import gseapy as gp
@@ -922,283 +922,402 @@ def rsemIndex(work_dir, script_dir, rna_seq_settings, slurm, rsemIndex):
         pass
       
     
-def isoformAnalysis(work_dir, rna_seq_settings, genome, slurm):
+def isoformAnalysis(work_dir, rna_seq_settings, genome, slurm, isoformAnalysis):
     '''
     Alternative isoform analysis using RSEM/MISO, based on CRICK scripts
 
     '''
     
-    puts(colored.green("Alternative isoform analysis using RSEM and MISO"))
+    puts(colored.green("Isoform analysisusing MISO or rMATS"))
     
     #load sample info
     sample_info = pd.read_csv(os.path.join(work_dir,"samples.csv"))
     
-    if slurm == True:
-        #load SLURM settings
-        with open(os.path.join(os.path.dirname(script_dir),"yaml","slurm.yaml")) as file:
-            slurm_settings = yaml.full_load(file)
-        threads = str(slurm_settings["RNA-Seq"]["rsem_CPU"])
-        mem = str(slurm_settings["RNA-Seq"]["rsem_mem"])
-        slurm_time = str(slurm_settings["RNA-Seq"]["rsem_time"])
-        account = slurm_settings["groupname"]
-        partition = slurm_settings["partition"]
-        strand = slurm_settings["RNA-Seq"]["rsem_strand"]
-        
-        #load STAR index (IMPORTANT: created via RSEM!)
-        star_index = rna_seq_settings["RSEM_STAR_index"][genome]
-        
-        #create directory for SLURM commands
-        os.makedirs(os.path.join(work_dir,"slurm","RSEM"), exist_ok=True)
-        
-        #create directory for all output
-        rsem_dir = os.path.join(work_dir,"rsem", genome)
+    if isoformAnalysis == "miso":
+        if slurm == True:
+            print("RSEM/MISO selected")
+            #load SLURM settings
+            with open(os.path.join(os.path.dirname(script_dir),"yaml","slurm.yaml")) as file:
+                slurm_settings = yaml.full_load(file)
+            threads = str(slurm_settings["RNA-Seq"]["rsem_CPU"])
+            mem = str(slurm_settings["RNA-Seq"]["rsem_mem"])
+            slurm_time = str(slurm_settings["RNA-Seq"]["rsem_time"])
+            account = slurm_settings["groupname"]
+            partition = slurm_settings["partition"]
+            strand = slurm_settings["RNA-Seq"]["rsem_strand"]
+            
+            #load STAR index (IMPORTANT: created via RSEM!)
+            star_index = rna_seq_settings["RSEM_STAR_index"][genome]
+            
+            #create directory for SLURM commands
+            os.makedirs(os.path.join(work_dir,"slurm","RSEM"), exist_ok=True)
+            
+            #create directory for all output
+            rsem_dir = os.path.join(work_dir,"rsem", genome)
+                    
+            #get unique conditions
+            conditions = list(set(sample_info["genotype"]))
+            
+            #remove pre-existing command files
+            csv_merge1 = os.path.join(work_dir, "slurm", "RSEM", "merge1.csv")
+            csv_merge2 = os.path.join(work_dir, "slurm", "RSEM", "merge2.csv")
+            csv_rsem = os.path.join(work_dir,"slurm", "RSEM", f"RSEM_{genome}.csv")
+            csv_move = os.path.join(work_dir,"slurm", "RSEM", "move.csv")
+            csv_sort = os.path.join(work_dir,"slurm", "RSEM", "sort.csv")
+            csv_index = os.path.join(work_dir,"slurm", "RSEM", "index.csv")
+            csv_picard = os.path.join(work_dir,"slurm", "picard.csv")
+            csv_miso_compare = os.path.join(work_dir,"slurm", "miso_compare.csv")
+            csv_miso = os.path.join(work_dir,"slurm", "miso.csv")
+            
+            script_rsem = os.path.join(work_dir, "slurm", f"rsem_{genome}.sh")
+            script_miso_compare = os.path.join(work_dir, "slurm", f"miso_compare_{genome}.sh")
+            
+            try:
+                remove_csvs = [csv_merge1, csv_merge2, csv_rsem, csv_move, csv_sort, 
+                               csv_index, csv_miso, csv_picard, csv_miso_compare, csv_miso]
+                for csv in remove_csvs:
+                    os.remove(csv)
+            except FileNotFoundError:
+                pass
+            
+            #run RSEM/MISO
+            for condition in conditions:
+                ###create csv files with all commands (for SLURM array script)###
+                #merge replicate fastq files by genotype
+                read1 = glob.glob(os.path.join(work_dir, "trim", f"{condition}*_val_1.fq.gz"))
+                read1.sort()
+                read2 = glob.glob(os.path.join(work_dir, "trim", f"{condition}*_val_2.fq.gz"))
+                read2.sort()
+                            
+                csv_ = open(csv_merge1, "a")
                 
-        #get unique conditions
-        conditions = list(set(sample_info["genotype"]))
+                read1_merged = os.path.join(work_dir, "trim", f"{condition}_merged_val_1.fq.gz")
+                command = ["cat", " ".join(read1), ">", read1_merged]
         
-        #remove pre-existing command files
-        csv_merge1 = os.path.join(work_dir, "slurm", "RSEM", "merge1.csv")
-        csv_merge2 = os.path.join(work_dir, "slurm", "RSEM", "merge2.csv")
-        csv_rsem = os.path.join(work_dir,"slurm", "RSEM", f"RSEM_{genome}.csv")
-        csv_move = os.path.join(work_dir,"slurm", "RSEM", "move.csv")
-        csv_sort = os.path.join(work_dir,"slurm", "RSEM", "sort.csv")
-        csv_index = os.path.join(work_dir,"slurm", "RSEM", "index.csv")
-        csv_picard = os.path.join(work_dir,"slurm", "picard.csv")
-        csv_miso_compare = os.path.join(work_dir,"slurm", "miso_compare.csv")
-        csv_miso = os.path.join(work_dir,"slurm", "miso.csv")
-        
-        script_rsem = os.path.join(work_dir, "slurm", f"rsem_{genome}.sh")
-        script_miso_compare = os.path.join(work_dir, "slurm", f"miso_compare_{genome}.sh")
-        
-        try:
-            remove_csvs = [csv_merge1, csv_merge2, csv_rsem, csv_move, csv_sort, 
-                           csv_index, csv_miso, csv_picard, csv_miso_compare, csv_miso]
-            for csv in remove_csvs:
-                os.remove(csv)
-        except FileNotFoundError:
-            pass
-        
-        #run RSEM/MISO
-        for condition in conditions:
-            ###create csv files with all commands (for SLURM array script)###
-            #merge replicate fastq files by genotype
-            read1 = glob.glob(os.path.join(work_dir, "trim", f"{condition}*_val_1.fq.gz"))
-            read1.sort()
-            read2 = glob.glob(os.path.join(work_dir, "trim", f"{condition}*_val_2.fq.gz"))
-            read2.sort()
-                        
-            csv_ = open(csv_merge1, "a")
-            
-            read1_merged = os.path.join(work_dir, "trim", f"{condition}_merged_val_1.fq.gz")
-            command = ["cat", " ".join(read1), ">", read1_merged]
-    
-            csv_.write(" ".join(command) + "\n")
-            csv_.close()
-                        
-            csv_ = open(csv_merge2, "a")
-            
-            read2_merged = os.path.join(work_dir, "trim", f"{condition}_merged_val_2.fq.gz")
-            command = ["cat", " ".join(read2), ">", read2_merged]
-            
-            csv_.write(" ".join(command) + "\n")
-            csv_.close()
-            
-            #run RSEM
-            csv_ = open(csv_rsem, "a")  
-                        
-            command = ["rsem-calculate-expression", "--paired-end","--star", "-p", threads,
-                    "--strandedness", strand, "--star-output-genome-bam",
-                    "--estimate-rspd", "--star-gzipped-read-file",
-                    "--time", read1_merged, read2_merged, star_index, condition]
-            csv_.write(" ".join(command) + "\n")
-            csv_.close()
-            
-            #move rsem files to correct directory
-            csv_ = open(csv_move, "a")  
-            command = ["mv", os.path.join(work_dir, "*.stat",),
-                       os.path.join(work_dir, "*.results",),
-                       os.path.join(work_dir, "*.bam",),
-                       os.path.join(work_dir, "*.time",),
-                       os.path.join(work_dir, f"{condition}*.log",),
-                       rsem_dir]
-            csv_.write(" ".join(command) + "\n")
-            csv_.close()
-            
-            #sort BAM file
-            rsem_bam = os.path.join(rsem_dir, f"{condition}.STAR.genome.bam")
-            sorted_bam = rsem_bam.replace(".STAR.genome.bam","_sorted.bam")
-            
-            csv_ = open(csv_sort, "a")  
-            
-            command = ["samtools", "sort", "--threads", threads, "-o", sorted_bam, rsem_bam]
-            
-            csv_.write(" ".join(command) + "\n")
-            csv_.close()
-            
-            #index sorted BAM file
-            csv_ = open(csv_index, "a")  
-            
-            command = ["samtools", "index", "-@", threads, sorted_bam]
-            
-            csv_.write(" ".join(command) + "\n")
-            csv_.close()
-            
-            #determine insert length distribution and SD
-            picard_dir = os.path.join(work_dir, "picard")
-            os.makedirs(picard_dir, exist_ok=True)
-            insert_sizes = os.path.join(picard_dir, f"{condition}.insert_sizes.txt")
-            insert_sizes_pdf = os.path.join(picard_dir, f"{condition}.insert_sizes.pdf")
-            
-            csv_ = open(csv_picard, "a")  
-            
-            command = ["picard", "CollectInsertSizeMetrics", f"I={sorted_bam}",
-                       f"O={insert_sizes}", f"H={insert_sizes_pdf}", "M=0.5",
-                       "MAX_RECORDS_IN_RAM=2000000", "VALIDATION_STRINGENCY=LENIENT"]
-            
-            csv_.write(" ".join(command) + "\n")
-            csv_.close()
-            
-                       
-            #create csv with sample info to run MISO 
-            miso_dir = os.path.join(work_dir,"miso", genome, condition)
-            
-            gff_index = rna_seq_settings["MISO_index"][genome.split("_")[0]] #(make sure GFF3 file is indexed first)
-            csv_ = open(csv_miso, "a")  
-            
-            command = [sorted_bam, insert_sizes, miso_dir]
-            
-            csv_.write(" ".join(command) + "\n")
-            csv_.close()
-            
-            #summarise MISO data
-            miso_summary_dir = os.path.join(work_dir,"miso", genome, condition, "summary")
-            
-        #create SLURM bash script for RSEM/MISO
-        print("Generating SLURM script for RSEM and MISO SUMMARY")
-        
-        commands = subprocess.check_output(f"cat {csv_rsem} | wc -l", shell = True).decode("utf-8")
-        os.makedirs(rsem_dir, exist_ok=True)
-        slurm_log = os.path.join(work_dir, "slurm", 'alt_spl_%a.log')
-        script = open(script_rsem, "w")  
-        script.write("#!/bin/bash\n\n")
-        
-        script.write(f"#SBATCH -A {account}\n")
-        script.write("#SBATCH --mail-type=BEGIN,FAIL,END\n")
-        script.write(f"#SBATCH -D {rsem_dir}\n")
-        script.write(f"#SBATCH -p {partition}\n")
-        script.write(f"#SBATCH -o {slurm_log}\n")
-        script.write(f"#SBATCH -c {threads}\n")
-        script.write(f"#SBATCH -t {slurm_time}\n")
-        script.write(f"#SBATCH --mem={mem}\n")
-        script.write("#SBATCH -J alt_spl\n")
-        script.write(f"#SBATCH -a 1-{commands}\n")
-        
-        script.write("echo 'Merging replicate genotype fq.gz files'\n")
-        script.write("sed -n ${SLURM_ARRAY_TASK_ID}p " + f"{csv_merge1} | bash\n")
-        script.write("sed -n ${SLURM_ARRAY_TASK_ID}p " + f"{csv_merge2} | bash\n")
-        script.write("echo 'Merging replicate genotype fq.gz files completed'\n\n")
-        
-        script.write("echo 'Running RSEM'\n")
-        script.write("sed -n ${SLURM_ARRAY_TASK_ID}p " + f"{csv_rsem} | bash\n")
-        script.write("sed -n ${SLURM_ARRAY_TASK_ID}p " + f"{csv_move} | bash\n")
-        script.write("echo 'RSEM done'\n\n")
+                csv_.write(" ".join(command) + "\n")
+                csv_.close()
+                            
+                csv_ = open(csv_merge2, "a")
                 
-        script.write("echo 'Running samtools sort'\n")
-        script.write("sed -n ${SLURM_ARRAY_TASK_ID}p " + f"{csv_sort} | bash\n")
-        script.write("echo 'Sorting done'\n\n")
-        
-        script.write("echo 'Running samtools index'\n")
-        script.write("sed -n ${SLURM_ARRAY_TASK_ID}p " + f"{csv_index} | bash\n")
-        script.write("echo 'Indexing done'\n\n")
-        
-        script.write("echo 'Running PICARD CollectInsertSizeMetrics'\n")
-        script.write("sed -n ${SLURM_ARRAY_TASK_ID}p " + f"{csv_picard} | bash\n")
-        script.write("echo 'PICARD CollectInsertSizeMetrics done'\n\n")
-        
-        script.write("echo 'Running MISO'\n")
-        script.write("source ~/.bashrc\n")
-        script.write("conda deactivate\n")
-        script.write("conda activate miso\n\n")
-        
-        script.write("SORTED_BAM=$(sed -n ${SLURM_ARRAY_TASK_ID}p " + f"{csv_miso} | awk" + " '{print $1}')\n")
-        script.write("INSERT_SIZE_FILE=$(sed -n ${SLURM_ARRAY_TASK_ID}p " + f"{csv_miso} | awk" + " '{print $2}')\n")
-        script.write("INSERT_SIZE=$(sed -n 8p $INSERT_SIZE_FILE | " + "awk '{print $1}')\n")
-        script.write("INSERT_SIZE=${INSERT_SIZE%.*}\n") #convert to integer
-        script.write("SD=$(sed -n 8p $INSERT_SIZE_FILE | awk '{print $7}')\n")
-        script.write("SD=${SD%.*}\n\n") #convert to integer
-        script.write("MISO_DIR=$(sed -n ${SLURM_ARRAY_TASK_ID}p " + f"{csv_miso} | awk" + " '{print $3}')\n")
-        script.write('MISO_SUMMARY_DIR="${MISO_DIR}/summary"\n\n')
-        
-        script.write(" ".join(["miso", "--run", gff_index, "$SORTED_BAM","--output-dir $MISO_DIR", "-p", threads, 
-                   "--paired-end", "$INSERT_SIZE", "$SD" ,"--read-len", genome.split("_")[1], "\n\n"]))
-        
-        script.write("summarize_miso --summarize-samples $MISO_DIR $MISO_SUMMARY_DIR\n\n")
-        
-        script.close()
-        
-        #submit RSEM/MISO job to cluster 
-        job_id = subprocess.check_output(f"sbatch {script_rsem} | cut -d ' ' -f 4", shell = True)
-        job_id = job_id.decode("UTF-8").replace("\n","")
-        print(f"Submitted SLURM script to cluster (job ID {job_id})")
-        
-        #run compare_miso (compare to reference sample)
-        ref_condition = sample_info[(sample_info["ref"] == "ref" )]
-        ref_condition = list(set(ref_condition["genotype"]))[0]
-        
-        test_conditions = sample_info[(sample_info["ref"] != "ref" )]
-        test_conditions = list(set(test_conditions["genotype"]))
-              
-        #generate csv with commands
-        for i in test_conditions:
-            samples = [ref_condition, i]
-            miso_dirs = " ".join([os.path.join(work_dir,"miso", genome, x) for x in samples])
-            miso_out_dir = os.path.join(work_dir, "miso", genome, "_vs_".join(samples))
-            names = " ".join(samples)
+                read2_merged = os.path.join(work_dir, "trim", f"{condition}_merged_val_2.fq.gz")
+                command = ["cat", " ".join(read2), ">", read2_merged]
+                
+                csv_.write(" ".join(command) + "\n")
+                csv_.close()
+                
+                #run RSEM
+                csv_ = open(csv_rsem, "a")  
+                            
+                command = ["rsem-calculate-expression", "--paired-end","--star", "-p", threads,
+                        "--strandedness", strand, "--star-output-genome-bam",
+                        "--estimate-rspd", "--star-gzipped-read-file",
+                        "--time", read1_merged, read2_merged, star_index, condition]
+                csv_.write(" ".join(command) + "\n")
+                csv_.close()
+                
+                #move rsem files to correct directory
+                csv_ = open(csv_move, "a")  
+                command = ["mv", os.path.join(work_dir, "*.stat",),
+                           os.path.join(work_dir, "*.results",),
+                           os.path.join(work_dir, "*.bam",),
+                           os.path.join(work_dir, "*.time",),
+                           os.path.join(work_dir, f"{condition}*.log",),
+                           rsem_dir]
+                csv_.write(" ".join(command) + "\n")
+                csv_.close()
+                
+                #sort BAM file
+                rsem_bam = os.path.join(rsem_dir, f"{condition}.STAR.genome.bam")
+                sorted_bam = rsem_bam.replace(".STAR.genome.bam","_sorted.bam")
+                
+                csv_ = open(csv_sort, "a")  
+                
+                command = ["samtools", "sort", "--threads", threads, "-o", sorted_bam, rsem_bam]
+                
+                csv_.write(" ".join(command) + "\n")
+                csv_.close()
+                
+                #index sorted BAM file
+                csv_ = open(csv_index, "a")  
+                
+                command = ["samtools", "index", "-@", threads, sorted_bam]
+                
+                csv_.write(" ".join(command) + "\n")
+                csv_.close()
+                
+                #determine insert length distribution and SD
+                picard_dir = os.path.join(work_dir, "picard")
+                os.makedirs(picard_dir, exist_ok=True)
+                insert_sizes = os.path.join(picard_dir, f"{condition}.insert_sizes.txt")
+                insert_sizes_pdf = os.path.join(picard_dir, f"{condition}.insert_sizes.pdf")
+                
+                csv_ = open(csv_picard, "a")  
+                
+                command = ["picard", "CollectInsertSizeMetrics", f"I={sorted_bam}",
+                           f"O={insert_sizes}", f"H={insert_sizes_pdf}", "M=0.5",
+                           "MAX_RECORDS_IN_RAM=2000000", "VALIDATION_STRINGENCY=LENIENT"]
+                
+                csv_.write(" ".join(command) + "\n")
+                csv_.close()
+                
+                           
+                #create csv with sample info to run MISO 
+                miso_dir = os.path.join(work_dir,"miso", genome, condition)
+                
+                gff_index = rna_seq_settings["MISO_index"][genome.split("_")[0]] #(make sure GFF3 file is indexed first)
+                csv_ = open(csv_miso, "a")  
+                
+                command = [sorted_bam, insert_sizes, miso_dir]
+                
+                csv_.write(" ".join(command) + "\n")
+                csv_.close()
+                
+                #summarise MISO data
+                #miso_summary_dir = os.path.join(work_dir,"miso", genome, condition, "summary")
+                
+            #create SLURM bash script for RSEM/MISO
+            print("Generating SLURM script for RSEM and MISO SUMMARY")
             
-            csv_ = open(csv_miso_compare, "a")
-            command = ["compare_miso", "--compare-samples", miso_dirs, miso_out_dir, 
-                       "--comparison-labels", names]
+            commands = subprocess.check_output(f"cat {csv_rsem} | wc -l", shell = True).decode("utf-8")
+            os.makedirs(rsem_dir, exist_ok=True)
+            slurm_log = os.path.join(work_dir, "slurm", 'alt_spl_%a.log')
+            script = open(script_rsem, "w")  
+            script.write("#!/bin/bash\n\n")
             
-            csv_.write(" ".join(command) + "\n")
-            csv_.close()
-        
-        #generate slurm script
-        print("Generating SLURM script for MISO COMPARE")
-        slurm_log = os.path.join(work_dir, "slurm", 'miso_compare_%a.log')
-        commands = subprocess.check_output(f"cat {csv_miso_compare} | wc -l", shell = True).decode("utf-8")
-        
-        script = open(script_miso_compare, "w")  
-        script.write("#!/bin/bash\n\n")
-        
-        script.write(f"#SBATCH -A {account}\n")
-        script.write("#SBATCH --mail-type=BEGIN,FAIL,END\n")
-        script.write(f"#SBATCH -p {partition}\n")
-        script.write(f"#SBATCH -o {slurm_log}\n")
-        script.write(f"#SBATCH -c {threads}\n")
-        script.write(f"#SBATCH -t {slurm_time}\n")
-        script.write(f"#SBATCH --mem={mem}\n")
-        script.write("#SBATCH -J miso_compare\n")
-        if len(commands) > 1:
+            script.write(f"#SBATCH -A {account}\n")
+            script.write("#SBATCH --mail-type=BEGIN,FAIL,END\n")
+            script.write(f"#SBATCH -D {rsem_dir}\n")
+            script.write(f"#SBATCH -p {partition}\n")
+            script.write(f"#SBATCH -o {slurm_log}\n")
+            script.write(f"#SBATCH -c {threads}\n")
+            script.write(f"#SBATCH -t {slurm_time}\n")
+            script.write(f"#SBATCH --mem={mem}\n")
+            script.write("#SBATCH -J alt_spl\n")
             script.write(f"#SBATCH -a 1-{commands}\n")
-        
-        script.write(f"#SBATCH --dependency=afterok:{job_id}\n\n")
-              
-        script.write("source ~/.bashrc\n")
-        script.write("conda deactivate\n")
-        script.write("conda activate miso\n\n")
-        
-        if len(commands) > 1:
-            script.write("sed -n ${SLURM_ARRAY_TASK_ID}p " + f"{csv_miso_compare} | bash\n")
-        else:
-            script.write("sed -n 1p " + f"{csv_miso_compare} | bash\n")
-           
-        script.close()
-        
-        #submit script to cluster 
-        job_id_miso = subprocess.check_output(f"sbatch {script_miso_compare} | cut -d ' ' -f 4", shell = True)
-        job_id_miso = job_id_miso.decode("UTF-8").replace("\n","")
-        print(f"Submitted SLURM script to cluster (job ID {job_id_miso})")
-        
+            
+            script.write("echo 'Merging replicate genotype fq.gz files'\n")
+            script.write("sed -n ${SLURM_ARRAY_TASK_ID}p " + f"{csv_merge1} | bash\n")
+            script.write("sed -n ${SLURM_ARRAY_TASK_ID}p " + f"{csv_merge2} | bash\n")
+            script.write("echo 'Merging replicate genotype fq.gz files completed'\n\n")
+            
+            script.write("echo 'Running RSEM'\n")
+            script.write("sed -n ${SLURM_ARRAY_TASK_ID}p " + f"{csv_rsem} | bash\n")
+            script.write("sed -n ${SLURM_ARRAY_TASK_ID}p " + f"{csv_move} | bash\n")
+            script.write("echo 'RSEM done'\n\n")
+                    
+            script.write("echo 'Running samtools sort'\n")
+            script.write("sed -n ${SLURM_ARRAY_TASK_ID}p " + f"{csv_sort} | bash\n")
+            script.write("echo 'Sorting done'\n\n")
+            
+            script.write("echo 'Running samtools index'\n")
+            script.write("sed -n ${SLURM_ARRAY_TASK_ID}p " + f"{csv_index} | bash\n")
+            script.write("echo 'Indexing done'\n\n")
+            
+            script.write("echo 'Running PICARD CollectInsertSizeMetrics'\n")
+            script.write("sed -n ${SLURM_ARRAY_TASK_ID}p " + f"{csv_picard} | bash\n")
+            script.write("echo 'PICARD CollectInsertSizeMetrics done'\n\n")
+            
+            script.write("echo 'Running MISO'\n")
+            script.write("source ~/.bashrc\n")
+            script.write("conda deactivate\n")
+            script.write("conda activate miso\n\n")
+            
+            script.write("SORTED_BAM=$(sed -n ${SLURM_ARRAY_TASK_ID}p " + f"{csv_miso} | awk" + " '{print $1}')\n")
+            script.write("INSERT_SIZE_FILE=$(sed -n ${SLURM_ARRAY_TASK_ID}p " + f"{csv_miso} | awk" + " '{print $2}')\n")
+            script.write("INSERT_SIZE=$(sed -n 8p $INSERT_SIZE_FILE | " + "awk '{print $1}')\n")
+            script.write("INSERT_SIZE=${INSERT_SIZE%.*}\n") #convert to integer
+            script.write("SD=$(sed -n 8p $INSERT_SIZE_FILE | awk '{print $7}')\n")
+            script.write("SD=${SD%.*}\n\n") #convert to integer
+            script.write("MISO_DIR=$(sed -n ${SLURM_ARRAY_TASK_ID}p " + f"{csv_miso} | awk" + " '{print $3}')\n")
+            script.write('MISO_SUMMARY_DIR="${MISO_DIR}/summary"\n\n')
+            
+            script.write(" ".join(["miso", "--run", gff_index, "$SORTED_BAM","--output-dir $MISO_DIR", "-p", threads, 
+                       "--paired-end", "$INSERT_SIZE", "$SD" ,"--read-len", genome.split("_")[1], "\n\n"]))
+            
+            script.write("summarize_miso --summarize-samples $MISO_DIR $MISO_SUMMARY_DIR\n\n")
+            
+            script.close()
+            
+            #submit RSEM/MISO job to cluster 
+            job_id = subprocess.check_output(f"sbatch {script_rsem} | cut -d ' ' -f 4", shell = True)
+            job_id = job_id.decode("UTF-8").replace("\n","")
+            print(f"Submitted SLURM script to cluster (job ID {job_id})")
+            
+            #run compare_miso (compare to reference sample)
+            ref_condition = sample_info[(sample_info["ref"] == "ref" )]
+            ref_condition = list(set(ref_condition["genotype"]))[0]
+            
+            test_conditions = sample_info[(sample_info["ref"] != "ref" )]
+            test_conditions = list(set(test_conditions["genotype"]))
+                  
+            #generate csv with commands
+            for i in test_conditions:
+                samples = [ref_condition, i]
+                miso_dirs = " ".join([os.path.join(work_dir,"miso", genome, x) for x in samples])
+                miso_out_dir = os.path.join(work_dir, "miso", genome, "_vs_".join(samples))
+                names = " ".join(samples)
+                
+                csv_ = open(csv_miso_compare, "a")
+                command = ["compare_miso", "--compare-samples", miso_dirs, miso_out_dir, 
+                           "--comparison-labels", names]
+                
+                csv_.write(" ".join(command) + "\n")
+                csv_.close()
+            
+            #generate slurm script
+            print("Generating SLURM script for MISO COMPARE")
+            slurm_log = os.path.join(work_dir, "slurm", 'miso_compare_%a.log')
+            commands = subprocess.check_output(f"cat {csv_miso_compare} | wc -l", shell = True).decode("utf-8")
+            
+            script = open(script_miso_compare, "w")  
+            script.write("#!/bin/bash\n\n")
+            
+            script.write(f"#SBATCH -A {account}\n")
+            script.write("#SBATCH --mail-type=BEGIN,FAIL,END\n")
+            script.write(f"#SBATCH -p {partition}\n")
+            script.write(f"#SBATCH -o {slurm_log}\n")
+            script.write(f"#SBATCH -c {threads}\n")
+            script.write(f"#SBATCH -t {slurm_time}\n")
+            script.write(f"#SBATCH --mem={mem}\n")
+            script.write("#SBATCH -J miso_compare\n")
+            if len(commands) > 1:
+                script.write(f"#SBATCH -a 1-{commands}\n")
+            
+            script.write(f"#SBATCH --dependency=afterok:{job_id}\n\n")
+                  
+            script.write("source ~/.bashrc\n")
+            script.write("conda deactivate\n")
+            script.write("conda activate miso\n\n")
+            
+            if len(commands) > 1:
+                script.write("sed -n ${SLURM_ARRAY_TASK_ID}p " + f"{csv_miso_compare} | bash\n")
+            else:
+                script.write("sed -n 1p " + f"{csv_miso_compare} | bash\n")
+               
+            script.close()
+            
+            #submit script to cluster 
+            job_id_miso = subprocess.check_output(f"sbatch {script_miso_compare} | cut -d ' ' -f 4", shell = True)
+            job_id_miso = job_id_miso.decode("UTF-8").replace("\n","")
+            print(f"Submitted SLURM script to cluster (job ID {job_id_miso})")
+    elif isoformAnalysis == "rmats":
+        print("rMATS selected")
+        if slurm == True:
+            rmats_dir = os.path.join(work_dir, "rmats", genome)
+            os.makedirs(rmats_dir, exist_ok=True)
+            
+            samples = set(sample_info["genotype"])
+            conditions = set(sample_info["condition"])
+            reference_sample = list(set(sample_info[sample_info["ref"]=="ref"]["genotype"]))[0]
+            
+            reference_fastq = glob.glob(os.path.join(work_dir, "raw-data", f"{reference_sample}*"))
+            reference_fastq.sort()
+            reference_replicates = int(len(reference_fastq) / 2) #assume paired-end data
+            
+            #prepare text file for --s1 rmats flag
+            fastq_text =[]
+            j = [-2,0] #indeces for slicing
+            i = 1 #counter
+            while i < reference_replicates + 1:
+                j = [x + 2 for x in j]
+                n = ":".join(reference_fastq[j[0]:j[1]])
+                fastq_text.append(n)
+                i += 1
+            fastq_text = ",".join(fastq_text)
+            s1 = os.path.join(rmats_dir, "s1.txt")
+            with open(s1, "w") as f:
+                print(fastq_text, file=f)
+            
+            #prepare text files for --s2 rmats flag
+            test_samples = list(set(sample_info[sample_info["ref"]!="ref"]["genotype"]))
+            s2_list = []
+            
+            for sample in test_samples:
+                test_fastq = glob.glob(os.path.join(work_dir, "trim", f"{sample}*.fq.gz"))
+                test_fastq.sort()
+                test_replicates = int(len(test_fastq) / 2) #assumes paired-end data
+                
+                fastq_text =[]
+                j = [-2,0] #indeces for slicing
+                i = 1 #counter
+                while i < test_replicates + 1:
+                    j = [x + 2 for x in j]
+                    n = ":".join(test_fastq[j[0]:j[1]])
+                    fastq_text.append(n)
+                    i += 1
+                fastq_text = ",".join(fastq_text)
+                s2 = os.path.join(rmats_dir, f"s2_{sample}.txt")
+                with open(s2, "w") as f:
+                    print(fastq_text, file=f)
+                s2_list.append(s2)
+            
+            #prepare rmats commands
+            star_index = rna_seq_settings["STAR_index"][genome]
+            gtf = rna_seq_settings["gtf"][genome]
+            out_dir = os.path.join(rmats_dir, f"{reference_sample}_vs_{sample}")
+            read_length = genome.split("_")[1]
+            
+            with open(os.path.join(os.path.dirname(script_dir),"yaml","slurm.yaml")) as file:
+                slurm_settings = yaml.full_load(file)
+            threads = str(slurm_settings["RNA-Seq"]["rMATS"]["CPU"])
+            mem = str(slurm_settings["RNA-Seq"]["rMATS"]["mem"])
+            slurm_time = str(slurm_settings["RNA-Seq"]["rMATS"]["time"])
+            account = slurm_settings["groupname"]
+            partition = slurm_settings["partition"]
+            strand = slurm_settings["RNA-Seq"]["rMATS"]["strand"]
+            
+            extension = ["--gtf", gtf, "--bi", star_index, "-od", out_dir,
+                         "-t", "paired", "-readLength", read_length,
+                         "--nthread", threads, "-libType", strand,
+                         "--tstat", threads]
+            
+            csv_rmats = os.path.join(work_dir, "slurm", "rmats_f{genome}")
+            os.makedirs(os.path.join(work_dir, "slurm"), exist_ok=True)
+            
+            try:
+                os.remove(csv_rmats)
+            except FileNotFoundError:
+                pass
+            
+            for i in s2_list:
+                csv_ = open(csv_rmats, "a")
+                
+                rmats = ["rmats.py", "--s1", s1, "--s2", s2]
+                rmats.extend(extension)
+                
+                csv_.write(" ".join(command) + "\n")
+                csv_.close()
+            
+            #generate slurm script
+            print("Generating SLURM script for rMATS")
+            slurm_log = os.path.join(work_dir, "slurm", 'rmats_%a.log')
+            commands = subprocess.check_output(f"cat {csv_rmats} | wc -l", shell = True).decode("utf-8")
+            
+            script = open(script_miso_compare, "w")  
+            script.write("#!/bin/bash\n\n")
+            
+            script.write(f"#SBATCH -A {account}\n")
+            script.write("#SBATCH --mail-type=BEGIN,FAIL,END\n")
+            script.write(f"#SBATCH -p {partition}\n")
+            script.write(f"#SBATCH -o {slurm_log}\n")
+            script.write(f"#SBATCH -c {threads}\n")
+            script.write(f"#SBATCH -t {slurm_time}\n")
+            script.write(f"#SBATCH --mem={mem}\n")
+            script.write("#SBATCH -J rMATS\n")
+            script.write(f"#SBATCH -a 1-{commands}\n")
+                  
+            script.write("source ~/.bashrc\n")
+            script.write("conda deactivate\n")
+            script.write("conda activate miso\n\n")
+            
+            script.write("sed -n ${SLURM_ARRAY_TASK_ID}p " + f"{csv_rmats} | bash\n")
+               
+            script.close()
+            
+            #submit script to cluster 
+            job_id_rmats = subprocess.check_output(f"sbatch {script_miso_compare} | cut -d ' ' -f 4", shell = True)
+            job_id_rmats = job_id_rmats.decode("UTF-8").replace("\n","")
+            print(f"Submitted SLURM script to cluster (job ID {job_id_rmats})")
                 
 
 
