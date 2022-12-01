@@ -1299,19 +1299,32 @@ def isoformAnalysis(work_dir, rna_seq_settings, genome, slurm, isoformAnalysis):
             
             script.write(f"#SBATCH -A {account}\n")
             script.write("#SBATCH --mail-type=BEGIN,FAIL,END\n")
+            script.write(f"#SBATCH -D {rmats_dir}\n")
             script.write(f"#SBATCH -p {partition}\n")
-            script.write(f"#SBATCH -o {slurm_log}\n")
             script.write(f"#SBATCH -c {threads}\n")
             script.write(f"#SBATCH -t {slurm_time}\n")
             script.write(f"#SBATCH --mem={mem}\n")
             script.write("#SBATCH -J rMATS\n")
-            script.write(f"#SBATCH -a 1-{commands}\n")
-                  
-            script.write("source ~/.bashrc\n")
-            script.write("conda deactivate\n")
-            script.write("conda activate miso\n\n")
             
-            script.write("sed -n ${SLURM_ARRAY_TASK_ID}p " + f"{csv_rmats} | bash\n")
+            if commands > 1:
+                script.write(f"#SBATCH -a 1-{commands}\n")
+                script.write(f"#SBATCH -o {os.path.join(work_dir,'slurm','rmats_', genome, '_%a.log')}\n\n")
+                
+                script.write("source ~/.bashrc\n")
+                script.write("conda deactivate\n")
+                script.write("conda activate miso\n\n")
+                
+                script.write("sed -n ${SLURM_ARRAY_TASK_ID}p " + f"{csv_rmats} | bash\n")
+            else:
+                script.write(f"#SBATCH -o {os.path.join(work_dir,'slurm','rmats_', genome,'.log')}\n\n")
+                
+                script.write("source ~/.bashrc\n")
+                script.write("conda deactivate\n")
+                script.write("conda activate miso\n\n")
+                  
+            
+            
+            
                
             script.close()
             
