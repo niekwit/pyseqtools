@@ -1316,7 +1316,7 @@ def isoformAnalysis(work_dir, rna_seq_settings, genome, slurm, isoformAnalysis):
             script.close()
             
             #submit script to cluster 
-            job_id_rmats = subprocess.check_output(f"sbatch {script_miso_compare} | cut -d ' ' -f 4", shell = True)
+            job_id_rmats = subprocess.check_output(f"sbatch {script_rmats} | cut -d ' ' -f 4", shell = True)
             job_id_rmats = job_id_rmats.decode("UTF-8").replace("\n","")
             print(f"Submitted SLURM script to cluster (job ID {job_id_rmats})")
                 
