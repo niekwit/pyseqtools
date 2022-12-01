@@ -1285,7 +1285,7 @@ def isoformAnalysis(work_dir, rna_seq_settings, genome, slurm, isoformAnalysis):
                 rmats = ["rmats.py", "--s1", s1, "--s2", s2]
                 rmats.extend(extension)
                 
-                csv_.write(" ".join(command) + "\n")
+                csv_.write(" ".join(rmats) + "\n")
                 csv_.close()
             
             #generate slurm script
