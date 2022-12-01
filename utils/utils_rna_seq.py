@@ -1253,7 +1253,7 @@ def isoformAnalysis(work_dir, rna_seq_settings, genome, slurm, isoformAnalysis):
             
             #prepare rmats commands
             star_index = rna_seq_settings["STAR_index"][genome]
-            gtf = rna_seq_settings["gtf"][genome]
+            gtf = rna_seq_settings["gtf"][genome.split("_")[0]]
             out_dir = os.path.join(rmats_dir, f"{reference_sample}_vs_{sample}")
             read_length = genome.split("_")[1]
             
