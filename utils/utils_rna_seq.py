@@ -1323,7 +1323,7 @@ def isoformAnalysis(work_dir, rna_seq_settings, genome, slurm, isoformAnalysis):
                 script.write("conda deactivate\n")
                 script.write("conda activate miso\n\n")
                   
-                script.close()
+            script.close()
             
             #submit script to cluster 
             job_id_rmats = subprocess.check_output(f"sbatch {script_rmats} | cut -d ' ' -f 4", shell = True)
