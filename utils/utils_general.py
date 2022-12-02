@@ -18,6 +18,7 @@ import gzip
 import shutil
 import re
 from pathlib import Path
+import datetime 
 
 from clint.textui import colored, puts
 import matplotlib.pyplot as plt
@@ -139,8 +140,13 @@ def file_exists(file): #check if file exists/is not size zero
         return(False)
 
 
-def SLURM_job_id_log(work_dir, job, job_id):
-    print(f"{job}: {job_id}",
+def SLURM_job_id_log(work_dir, name, job_id):
+    '''
+    Logs slurm job id
+
+    '''
+    date = str(datetime.datetime.now()).split(".",1)[0]
+    print(f"{date} {name}: {job_id}",
           file = open(os.path.join(work_dir, "slurm","slurm_job_id.log"), "a"))
 
 

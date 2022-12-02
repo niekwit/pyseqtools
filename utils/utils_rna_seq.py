@@ -16,7 +16,7 @@ import shutil
 from pathlib import Path
 import tempfile
 import warnings
-import datetime 
+
 
 import yaml
 from clint.textui import colored, puts
@@ -1331,8 +1331,8 @@ def isoformAnalysis(work_dir, rna_seq_settings, genome, slurm, isoformAnalysis):
             print(f"Submitted SLURM script to cluster (job ID {job_id_rmats})")
             
             #log slurm job id
-            date = str(datetime.datetime.now()).split(".",1)[0]
-            utils.SLURM_job_id_log(work_dir, f"{date} rMATS: ", job_id_rmats)
+            
+            utils.SLURM_job_id_log(work_dir, "rMATS", job_id_rmats)
             
             
                 
