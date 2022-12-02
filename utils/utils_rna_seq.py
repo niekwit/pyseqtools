@@ -1268,8 +1268,8 @@ def isoformAnalysis(work_dir, rna_seq_settings, genome, slurm, isoformAnalysis):
             strand = slurm_settings["RNA-Seq"]["rMATS"]["strand"]
             
             extension = ["--gtf", gtf, "--bi", star_index, "--od", out_dir,
-                         "-t", "paired", "-readLength", read_length,
-                         "--nthread", threads, "-libType", strand,
+                         "-t", "paired", "--readLength", read_length,
+                         "--nthread", threads, "--libType", strand,
                          "--tstat", threads]
             
             csv_rmats = os.path.join(work_dir, "slurm", f"rmats_{genome}.csv")
