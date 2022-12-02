@@ -1267,7 +1267,7 @@ def isoformAnalysis(work_dir, rna_seq_settings, genome, slurm, isoformAnalysis):
             partition = slurm_settings["partition"]
             strand = slurm_settings["RNA-Seq"]["rMATS"]["strand"]
             
-            extension = ["--gtf", gtf, "--bi", star_index, "-od", out_dir,
+            extension = ["--gtf", gtf, "--bi", star_index, "--od", out_dir,
                          "-t", "paired", "-readLength", read_length,
                          "--nthread", threads, "-libType", strand,
                          "--tstat", threads]
