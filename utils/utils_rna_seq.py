@@ -1226,8 +1226,7 @@ def isoformAnalysis(work_dir, rna_seq_settings, genome, slurm, isoformAnalysis):
                 i += 1
             fastq_text = ",".join(fastq_text)
             s1 = os.path.join(rmats_dir, "s1.txt")
-            with open(s1, "w") as f:
-                print(fastq_text, file=f)
+            print(fastq_text, file = open(s1, "w"))
             
             #prepare text files for --s2 rmats flag
             test_samples = list(set(sample_info[sample_info["ref"]!="ref"]["genotype"]))
@@ -1248,14 +1247,16 @@ def isoformAnalysis(work_dir, rna_seq_settings, genome, slurm, isoformAnalysis):
                     i += 1
                 fastq_text = ",".join(fastq_text)
                 s2 = os.path.join(rmats_dir, f"s2_{sample}.txt")
-                with open(s2, "w") as f:
-                    print(fastq_text, file=f)
+                print(fastq_text, file = open(s2, "w"))
                 s2_list.append(s2)
             
             #prepare rmats commands
             star_index = rna_seq_settings["STAR_index"][genome]
             gtf = rna_seq_settings["gtf"][genome.split("_")[0]]
             out_dir = os.path.join(rmats_dir, f"{reference_sample}_vs_{sample}")
+            os.makedirs(out_dir, exist_ok=True)
+            tmp_dir = os.path.join(work_dir, "temp")
+            os.makedirs(tmp_dir, exist_ok=True)
             read_length = genome.split("_")[1]
             
             with open(os.path.join(os.path.dirname(script_dir),"yaml","slurm.yaml")) as file:
@@ -1270,7 +1271,7 @@ def isoformAnalysis(work_dir, rna_seq_settings, genome, slurm, isoformAnalysis):
             extension = ["--gtf", gtf, "--bi", star_index, "--od", out_dir,
                          "-t", "paired", "--readLength", read_length,
                          "--nthread", threads, "--libType", strand,
-                         "--tstat", threads]
+                         "--tstat", threads, "--tmp", tmp_dir]
             
             csv_rmats = os.path.join(work_dir, "slurm", f"rmats_{genome}.csv")
             os.makedirs(os.path.join(work_dir, "slurm"), exist_ok=True)
