@@ -1272,7 +1272,7 @@ def isoformAnalysis(work_dir, rna_seq_settings, genome, slurm, isoformAnalysis):
                          "--nthread", threads, "-libType", strand,
                          "--tstat", threads]
             
-            csv_rmats = os.path.join(work_dir, "slurm", "rmats_f{genome}.csv")
+            csv_rmats = os.path.join(work_dir, "slurm", f"rmats_{genome}.csv")
             os.makedirs(os.path.join(work_dir, "slurm"), exist_ok=True)
             
             try:
@@ -1293,7 +1293,7 @@ def isoformAnalysis(work_dir, rna_seq_settings, genome, slurm, isoformAnalysis):
             print("Generating SLURM script for rMATS")
             slurm_log = os.path.join(work_dir, "slurm", 'rmats_%a.log')
             commands = int(subprocess.check_output(f"cat {csv_rmats} | wc -l", shell = True).decode("utf-8"))
-            script_rmats = os.path.join(work_dir, "slurm", "rmats_f{genome}.sh")
+            script_rmats = os.path.join(work_dir, "slurm", f"rmats_{genome}.sh")
             
             script = open(script_rmats, "w")  
             script.write("#!/bin/bash\n\n")
@@ -1322,6 +1322,10 @@ def isoformAnalysis(work_dir, rna_seq_settings, genome, slurm, isoformAnalysis):
                 script.write("source ~/.bashrc\n")
                 script.write("conda deactivate\n")
                 script.write("conda activate miso\n\n")
+                
+                script.write("sed -n 1p " + f"{csv_rmats} | bash\n\n")
+                
+                
                   
             script.close()
             
