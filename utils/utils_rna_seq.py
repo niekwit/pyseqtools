@@ -16,6 +16,7 @@ import shutil
 from pathlib import Path
 import tempfile
 import warnings
+import datetime 
 
 import yaml
 from clint.textui import colored, puts
@@ -928,7 +929,7 @@ def isoformAnalysis(work_dir, rna_seq_settings, genome, slurm, isoformAnalysis):
 
     '''
     
-    puts(colored.green("Isoform analysisusing MISO or rMATS"))
+    puts(colored.green("Isoform analysis using MISO or rMATS"))
     
     #load sample info
     sample_info = pd.read_csv(os.path.join(work_dir,"samples.csv"))
@@ -1322,16 +1323,18 @@ def isoformAnalysis(work_dir, rna_seq_settings, genome, slurm, isoformAnalysis):
                 script.write("conda deactivate\n")
                 script.write("conda activate miso\n\n")
                   
-            
-            
-            
-               
-            script.close()
+                script.close()
             
             #submit script to cluster 
             job_id_rmats = subprocess.check_output(f"sbatch {script_rmats} | cut -d ' ' -f 4", shell = True)
             job_id_rmats = job_id_rmats.decode("UTF-8").replace("\n","")
             print(f"Submitted SLURM script to cluster (job ID {job_id_rmats})")
+            
+            #log slurm job id
+            date = str(datetime.datetime.now()).split(".",1)[0]
+            utils.SLURM_job_id_log(work_dir, f"{date} rMATS: ", job_id_rmats)
+            
+            
                 
 
 
