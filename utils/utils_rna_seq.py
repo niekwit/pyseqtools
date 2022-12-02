@@ -1310,7 +1310,7 @@ def isoformAnalysis(work_dir, rna_seq_settings, genome, slurm, isoformAnalysis):
             
             if commands > 1:
                 script.write(f"#SBATCH -a 1-{commands}\n")
-                script.write("#SBATCH -o" + os.path.join(work_dir,'slurm',f'rmats_{genome}_%a.log') + "\n\n")
+                script.write("#SBATCH -o " + os.path.join(work_dir,'slurm',f'rmats_{genome}_%a.log') + "\n\n")
                 
                 script.write("source ~/.bashrc\n")
                 script.write("conda deactivate\n")
@@ -1318,7 +1318,7 @@ def isoformAnalysis(work_dir, rna_seq_settings, genome, slurm, isoformAnalysis):
                 
                 script.write("sed -n ${SLURM_ARRAY_TASK_ID}p " + f"{csv_rmats} | bash\n")
             else:
-                script.write("#SBATCH -o" + os.path.join(work_dir,'slurm',f'rmats_{genome}.log') + "\n\n")
+                script.write("#SBATCH -o " + os.path.join(work_dir,'slurm',f'rmats_{genome}.log') + "\n\n")
                 
                 script.write("source ~/.bashrc\n")
                 script.write("conda deactivate\n")
