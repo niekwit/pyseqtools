@@ -1026,6 +1026,11 @@ def trimSLURM(script_dir, work_dir, module, pe_tags):
     job_id = job_id.decode("utf-8").replace("\n","")
     print(f"Quality trimming submitted (job id {job_id})")
     
+    #log slurm job id
+    
+    SLURM_job_id_log(work_dir, "trim_galore", job_id)
+    
+    
 
 def blackList(script_dir, genome):
     with open(os.path.join(script_dir, "yaml", "chip-seq.yaml")) as f:
