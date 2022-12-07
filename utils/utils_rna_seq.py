@@ -1211,7 +1211,7 @@ def isoformAnalysis(work_dir, rna_seq_settings, genome, slurm, isoformAnalysis):
             conditions = set(sample_info["condition"])
             reference_sample = list(set(sample_info[sample_info["ref"]=="ref"]["genotype"]))[0]
             
-            reference_fastq = glob.glob(os.path.join(work_dir, "trim", f"{reference_sample}*"))
+            reference_fastq = glob.glob(os.path.join(work_dir, "trim", f"{reference_sample}*.fq.gz"))
             reference_fastq.sort()
             reference_replicates = int(len(reference_fastq) / 2) #assume paired-end data
             
