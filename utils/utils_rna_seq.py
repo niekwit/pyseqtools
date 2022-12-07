@@ -923,7 +923,7 @@ def rsemIndex(work_dir, script_dir, rna_seq_settings, slurm, rsemIndex):
         pass
       
     
-def isoformAnalysis(work_dir, rna_seq_settings, genome, slurm, isoformAnalysis):
+def isoformAnalysis(work_dir, rna_seq_settings, genome, slurm, isoformAnalysis, singleEnd):
     '''
     Alternative isoform analysis using RSEM/MISO, based on CRICK scripts
 
@@ -1213,18 +1213,24 @@ def isoformAnalysis(work_dir, rna_seq_settings, genome, slurm, isoformAnalysis):
             
             reference_fastq = glob.glob(os.path.join(work_dir, "trim", f"{reference_sample}*.fq.gz"))
             reference_fastq.sort()
-            reference_replicates = int(len(reference_fastq) / 2) #assume paired-end data
             
             #prepare text file for --s1 rmats flag
-            fastq_text =[]
-            j = [-2,0] #indeces for slicing
-            i = 1 #counter
-            while i < reference_replicates + 1:
-                j = [x + 2 for x in j]
-                n = ":".join(reference_fastq[j[0]:j[1]])
-                fastq_text.append(n)
-                i += 1
-            fastq_text = ",".join(fastq_text)
+            if singleEnd == False:
+                #paired-end data
+                reference_replicates = int(len(reference_fastq) / 2)  
+                fastq_text =[]
+                j = [-2,0] #indeces for slicing
+                i = 1 #counter
+                while i < reference_replicates + 1:
+                    j = [x + 2 for x in j]
+                    n = ":".join(reference_fastq[j[0]:j[1]])
+                    fastq_text.append(n)
+                    i += 1
+                fastq_text = ",".join(fastq_text)
+            else:
+                #single-end data
+                fastq_text = ",".join(reference_fastq)
+                
             s1 = os.path.join(rmats_dir, "s1.txt")
             print(fastq_text, file = open(s1, "w"))
             
@@ -1235,21 +1241,25 @@ def isoformAnalysis(work_dir, rna_seq_settings, genome, slurm, isoformAnalysis):
             for sample in test_samples:
                 test_fastq = glob.glob(os.path.join(work_dir, "trim", f"{sample}*.fq.gz"))
                 test_fastq.sort()
-                test_replicates = int(len(test_fastq) / 2) #assumes paired-end data
+                if singleEnd == False:
+                    test_replicates = int(len(test_fastq) / 2) #paired-end data
                 
-                fastq_text =[]
-                j = [-2,0] #indeces for slicing
-                i = 1 #counter
-                while i < test_replicates + 1:
-                    j = [x + 2 for x in j]
-                    n = ":".join(test_fastq[j[0]:j[1]])
-                    fastq_text.append(n)
-                    i += 1
-                fastq_text = ",".join(fastq_text)
+                    fastq_text =[]
+                    j = [-2,0] #indeces for slicing
+                    i = 1 #counter
+                    while i < test_replicates + 1:
+                        j = [x + 2 for x in j]
+                        n = ":".join(test_fastq[j[0]:j[1]])
+                        fastq_text.append(n)
+                        i += 1
+                    fastq_text = ",".join(fastq_text)
+                else:
+                    fastq_text = ",".join(test_fastq)
+                
                 s2 = os.path.join(rmats_dir, f"s2_{sample}.txt")
                 print(fastq_text, file = open(s2, "w"))
                 s2_list.append(s2)
-            
+                    
             #prepare rmats commands
             star_index = rna_seq_settings["STAR_index"][genome]
             gtf = rna_seq_settings["gtf"][genome.split("_")[0]]
@@ -1258,6 +1268,10 @@ def isoformAnalysis(work_dir, rna_seq_settings, genome, slurm, isoformAnalysis):
             tmp_dir = os.path.join(work_dir, "temp")
             os.makedirs(tmp_dir, exist_ok=True)
             read_length = genome.split("_")[1]
+            if singleEnd == True:
+                end = "single"
+            else:
+                end = "paired"
             
             with open(os.path.join(os.path.dirname(script_dir),"yaml","slurm.yaml")) as file:
                 slurm_settings = yaml.full_load(file)
@@ -1269,7 +1283,7 @@ def isoformAnalysis(work_dir, rna_seq_settings, genome, slurm, isoformAnalysis):
             strand = slurm_settings["RNA-Seq"]["rMATS"]["strand"]
             
             extension = ["--gtf", gtf, "--bi", star_index, "--od", out_dir,
-                         "-t", "paired", "--readLength", read_length,
+                         "-t", end, "--readLength", read_length,
                          "--nthread", threads, "--libType", strand,
                          "--tstat", threads, "--tmp", tmp_dir]
             
@@ -1331,13 +1345,24 @@ def isoformAnalysis(work_dir, rna_seq_settings, genome, slurm, isoformAnalysis):
             script.close()
             
             #submit script to cluster 
-            job_id_rmats = subprocess.check_output(f"sbatch {script_rmats} | cut -d ' ' -f 4", shell = True)
+            job_id_rmats = subprocess.check_output(f"sbatch {script_rmats} | cut -d ' ' -f 4", 
+                                                   shell = True,
+                                                   stderr = subprocess.STDOUT)
             job_id_rmats = job_id_rmats.decode("UTF-8").replace("\n","")
-            print(f"Submitted SLURM script to cluster (job ID {job_id_rmats})")
             
-            #log slurm job id
+            try:
+                test = int(job_id_rmats)
+                utils.SLURM_job_id_log(work_dir, "rMATS", job_id_rmats)
+                print(f"Submitted SLURM script to cluster (job ID {job_id_rmats})")
+                
+                #log slurm job id
+                utils.SLURM_job_id_log(work_dir, "rMATS", job_id_rmats)
+            except ValueError:
+                print(job_id_rmats)
             
-            utils.SLURM_job_id_log(work_dir, "rMATS", job_id_rmats)
+            
+            
+            
             
             
                 
