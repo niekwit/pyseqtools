@@ -1202,10 +1202,15 @@ def isoformAnalysis(work_dir, rna_seq_settings, genome, slurm, isoformAnalysis):
             job_id_miso = job_id_miso.decode("UTF-8").replace("\n","")
             print(f"Submitted SLURM script to cluster (job ID {job_id_miso})")
     elif isoformAnalysis == "rmats":
-        print("rMATS selected")
+        #check if data is single-end
+        singleEnd = os.path.exists(os.path.join(work_dir,".single-end"))
+        if singleEnd == True:
+            end = "single"
+        else:
+            end = "paired"
+        
+        print(f"rMATS selected for {end}-end data")
         if slurm == True:
-            #check if data is single-end
-            singleEnd = os.path.exists(os.path.join(work_dir,".single-end"))
             
             rmats_dir = os.path.join(work_dir, "rmats", genome)
             os.makedirs(rmats_dir, exist_ok=True)
@@ -1271,11 +1276,7 @@ def isoformAnalysis(work_dir, rna_seq_settings, genome, slurm, isoformAnalysis):
             tmp_dir = os.path.join(work_dir, "temp")
             os.makedirs(tmp_dir, exist_ok=True)
             read_length = genome.split("_")[1]
-            if singleEnd == True:
-                end = "single"
-            else:
-                end = "paired"
-            
+                        
             with open(os.path.join(os.path.dirname(script_dir),"yaml","slurm.yaml")) as file:
                 slurm_settings = yaml.full_load(file)
             threads = str(slurm_settings["RNA-Seq"]["rMATS"]["CPU"])
