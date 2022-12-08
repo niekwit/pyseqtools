@@ -943,17 +943,22 @@ def trim(script_dir, threads, work_dir, pe_tags):
 
 def trimSLURM(script_dir, work_dir, module, pe_tags):
     """
-    Creates SLURM bash script for PE-end quality trimming using Trim_galore
+    Creates SLURM bash script for SE/PE-end quality trimming using Trim_galore
 
     """
-    puts(colored.green("Trimming paired-end fastq files"))
-       
-    if pe_tags != None:
+           
+    if pe_tags != None: #paired-end data
+        puts(colored.green("Trimming paired-end fastq files with Trim_galore"))    
         fwd_tag = pe_tags.split(",")[0]
         rev_tag = pe_tags.split(",")[1]
+        
+        read1_list = glob.glob(os.path.join(work_dir,"raw-data","*" + fwd_tag))
+    else: #single-end data
+        puts(colored.green("Trimming single-end fastq files with Trim_galore"))    
+        read1_list = glob.glob(os.path.join(work_dir,"raw-data","*.gz"))
+        
     
     #create output directories
-    read1_list = glob.glob(os.path.join(work_dir,"raw-data","*" + fwd_tag))
     os.makedirs(os.path.join(work_dir, "trim"), exist_ok=True)
     os.makedirs(os.path.join(work_dir, "slurm"), exist_ok=True)
     
@@ -975,21 +980,31 @@ def trimSLURM(script_dir, work_dir, module, pe_tags):
     if os.path.exists(csv):
         os.remove(csv)
     
-    for read1 in read1_list:
-        read2 = read1.replace(fwd_tag, rev_tag)
-        out_file1 = read1.replace(fwd_tag,"_val_1.fq.gz")
-        out_file1 = out_file1.replace("raw-data", "trim")
-        
-        if not file_exists(out_file1):
-            base_name = os.path.basename(read1.replace(fwd_tag,""))
-            trim_galore = ["trim_galore","-j", str(threads), "-o",
-                           os.path.join(work_dir,"trim"), "--paired", read1, read2,
-                           "--basename", base_name, "\n"]
+    if pe_tags != None: #paired-end data
+        for read1 in read1_list:
+            read2 = read1.replace(fwd_tag, rev_tag)
+            out_file1 = read1.replace(fwd_tag,"_val_1.fq.gz")
+            out_file1 = out_file1.replace("raw-data", "trim")
+            
+            if not file_exists(out_file1):
+                base_name = os.path.basename(read1.replace(fwd_tag,""))
+                trim_galore = ["trim_galore","-j", str(threads), "-o",
+                               os.path.join(work_dir,"trim"), "--paired", read1, read2,
+                               "--basename", base_name, "\n"]
+                trim_galore = " ".join(trim_galore)
+                csv = os.path.join(work_dir,"slurm","slurm_trim.csv")
+                csv = open(csv, "a")  
+                csv.write(trim_galore)
+                csv.close()
+    else: #single-end data
+        for read1 in read1_list:
+            trim_galore = ["trim_galore","-j", str(threads), "-o", os.path.join(work_dir,"trim"), read1, "\n"]
             trim_galore = " ".join(trim_galore)
             csv = os.path.join(work_dir,"slurm","slurm_trim.csv")
             csv = open(csv, "a")  
             csv.write(trim_galore)
             csv.close()
+            
             
     #if trimming has already been done return none
     csv = os.path.join(work_dir,"slurm","slurm_trim.csv")
@@ -1018,18 +1033,14 @@ def trimSLURM(script_dir, work_dir, module, pe_tags):
     
     #run slurm bash script
     script = os.path.join(work_dir,"slurm","slurm_trim.sh")
-    #slurm = ["sbatch", script]
-    #subprocess.call(slurm)
-    
+        
     print("Submitting slurm_trim.sh to cluster")
     job_id = subprocess.check_output(f"sbatch {script} | cut -d ' ' -f 4", shell = True)
     job_id = job_id.decode("utf-8").replace("\n","")
     print(f"Quality trimming submitted (job id {job_id})")
     
     #log slurm job id
-    
     SLURM_job_id_log(work_dir, "trim_galore", job_id)
-    
     
 
 def blackList(script_dir, genome):
