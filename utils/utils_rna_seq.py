@@ -923,7 +923,7 @@ def rsemIndex(work_dir, script_dir, rna_seq_settings, slurm, rsemIndex):
         pass
       
     
-def isoformAnalysis(work_dir, rna_seq_settings, genome, slurm, isoformAnalysis, singleEnd):
+def isoformAnalysis(work_dir, rna_seq_settings, genome, slurm, isoformAnalysis):
     '''
     Alternative isoform analysis using RSEM/MISO, based on CRICK scripts
 
@@ -1204,6 +1204,9 @@ def isoformAnalysis(work_dir, rna_seq_settings, genome, slurm, isoformAnalysis, 
     elif isoformAnalysis == "rmats":
         print("rMATS selected")
         if slurm == True:
+            #check if data is single-end
+            singleEnd = os.path.exists(os.path.join(work_dir,".single-end"))
+            
             rmats_dir = os.path.join(work_dir, "rmats", genome)
             os.makedirs(rmats_dir, exist_ok=True)
             

@@ -125,11 +125,6 @@ def main():
                              default = None,
                              choices = [None,"miso","rmats"],
                              help = "Alternative isoform analysis with RSEM/MISO or rMATS")
-    parser_rnaseq.add_argument("--singleEnd",
-                             required = False,
-                             action = 'store_true',
-                             default = False,
-                             help = "Data to be analysed is single end sequenced")
     parser_rnaseq.add_argument("--indexBAM",
                              required = False,
                              action = 'store_true',
@@ -628,8 +623,6 @@ def main():
         pe_tags = args["peTags"]
         slurm = args["slurm"] 
         rsemIndex = args["rsemIndex"]
-        singleEnd = args["singleEnd"]
-             
         
         if slurm == False:
             ####set thread count for processing
@@ -732,7 +725,7 @@ def main():
                  rnaseq_utils.STAR(work_dir, threads, script_dir, rna_seq_settings, genome, slurm)
                  
              if isoformAnalysis != None:
-                 rnaseq_utils.isoformAnalysis(work_dir, rna_seq_settings, genome, slurm, isoformAnalysis, singleEnd)
+                 rnaseq_utils.isoformAnalysis(work_dir, rna_seq_settings, genome, slurm, isoformAnalysis)
                 
              if deseq2 == True:
                  gtf = rna_seq_settings["gtf"][genome.split("_")[0]]

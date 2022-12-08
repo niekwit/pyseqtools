@@ -956,6 +956,8 @@ def trimSLURM(script_dir, work_dir, module, pe_tags):
     else: #single-end data
         puts(colored.green("Trimming single-end fastq files with Trim_galore"))    
         read1_list = glob.glob(os.path.join(work_dir,"raw-data","*.gz"))
+        #create hidden file to mark that data is single-end
+        Path(os.path.join(work_dir,".single-end")).touch()
         
     
     #create output directories
