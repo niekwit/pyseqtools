@@ -202,6 +202,10 @@ def main():
                              action = 'store_true',
                              required = False,
                              help = "Quality trimming of data using Trim_galore!")
+    parser_chip.add_argument("--peTags",
+                               required = False,
+                               default = None,
+                               help = "Comma-separated paired-end file tags (e.g. _R1_001.fq.gz,_R2_001.fq.gz). Only required when --trim argument is called.")
     parser_chip.add_argument("--align",
                              choices = ["hisat2",
                                         "bwa-mem",
@@ -743,6 +747,7 @@ def main():
 
     def chip_seq(args, script_dir, module):
         slurm = args["slurm"]
+        pe_tags = args["peTags"]
         
         #set thread count for processing
         max_threads = str(multiprocessing.cpu_count())
@@ -761,7 +766,7 @@ def main():
         trim = args["trim"]
         if trim == True:
             if slurm == True:
-                utils.trimSLURM(script_dir, work_dir, module)
+                utils.trimSLURM(script_dir, work_dir, module, pe_tags)
         
         if slurm == False:
             if align is not None:
