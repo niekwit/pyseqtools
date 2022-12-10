@@ -523,6 +523,9 @@ def deduplicationSLURM(script_dir, work_dir, genome):
     job_id_picard = job_id_picard.decode("UTF-8").replace("\n","")
     print(f"SLURM job submitted successfully (job ID {job_id_picard})")   
     
+    #log slurm job id
+    SLURM_job_id_log(work_dir, "PICARD deduplication", job_id_picard)
+    
  
 def indexBam(work_dir, threads, genome="hg38", slurm=False, script_dir=None):
     '''
