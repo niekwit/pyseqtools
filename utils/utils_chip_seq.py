@@ -349,7 +349,7 @@ def hisat2SLURM(script_dir, work_dir, threads, chip_seq_settings, genome):
     puts(colored.green(f"Aligning quality trimmed files to {genome} using HISAT2"))
 
     #it is assumed that all data is paired-end, and hisat2/samtools/bedtools are in $PATH
-    read1_list = glob.glob(os.path.join(work_dir, "trim","*R1_001_val_1.fq.gz"))
+    read1_list = glob.glob(os.path.join(work_dir, "trim","*_val_1.fq.gz"))
     if len(read1_list) == 0:
         puts(colored.red("ERROR: no fastq files found in trim/"))
     
