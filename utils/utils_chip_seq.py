@@ -352,6 +352,7 @@ def hisat2SLURM(script_dir, work_dir, threads, chip_seq_settings, genome):
     read1_list = glob.glob(os.path.join(work_dir, "trim","*_val_1.fq.gz"))
     if len(read1_list) == 0:
         puts(colored.red("ERROR: no fastq files found in trim/"))
+        return
     
     #create BAM directory
     os.makedirs(os.path.join(work_dir,"bam", genome), exist_ok = True)
