@@ -33,3 +33,33 @@ for (i in 1:length(fileList)){
   df[i,3] <- one
   df[i,4] <- more.one
 }
+
+#create df for plotting
+df.melt <- melt(df, value.name = sample)
+
+
+
+
+p <- ggplot(df.melt, aes(sample, Parent_Input)) +   
+  geom_bar(aes(fill = variable), 
+           position = "dodge", 
+           stat = "identity",
+           color = "black") +
+  theme_bw() +
+  theme(text=element_text(size=16),
+        axis.text.x = element_text(angle = 90, 
+                                   vjust = 0.5, 
+                                   hjust=1)) +
+  ylab("Alignment rate (%)") +
+  xlab(NULL) +
+  guides(fill=guide_legend("Aligned:")) +
+  scale_fill_discrete(labels=c("0 times",
+                                "1 time",
+                                ">1 times"))
+
+ggsave(file.path(work.dir, "bam", "alignment-rates.pdf"), p)
+
+
+
+
+
