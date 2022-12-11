@@ -380,6 +380,10 @@ def hisat2SLURM(script_dir, work_dir, threads, chip_seq_settings, genome):
     csv_echo = os.path.join(work_dir,"slurm",f"slurm_hisat2_echo_{genome}.csv")
     if os.path.exists(csv_echo) == True:
         os.remove(csv_echo)
+        
+    csv_index = os.path.join(work_dir,"slurm",f"slurm_hisat2_index_{genome}.csv")
+    if os.path.exists(csv_index) == True:
+        os.remove(csv_index)
     
     for read1 in read1_list:
         read2 = read1.replace("_val_1.fq.gz","_val_2.fq.gz")
@@ -410,6 +414,16 @@ def hisat2SLURM(script_dir, work_dir, threads, chip_seq_settings, genome):
         csv.write(" ".join(command) +"\n")
         csv.close()
         
+        #generate commands for bam indexing with samtools
+        command = ["samtools", "index", "-@", threads, out_put_file]
+        
+        csv_ = csv_index
+        
+        csv = open(csv_, "a")  
+        csv.write(" ".join(command) +"\n")
+        csv.close()
+        
+        
             
     print(f"Generating slurm_hisat2_{genome}.sh")
     csv = os.path.join(work_dir,"slurm",f"slurm_hisat2_{genome}.csv")
@@ -432,9 +446,15 @@ def hisat2SLURM(script_dir, work_dir, threads, chip_seq_settings, genome):
     #echo file name
     script.write("sed -n ${SLURM_ARRAY_TASK_ID}p " + f"{csv_echo} | bash\n")
 
-    
     #alignment with hisat2
-    script.write("sed -n ${SLURM_ARRAY_TASK_ID}p " + f"{csv_hisat2} | bash\n")
+    script.write("sed -n ${SLURM_ARRAY_TASK_ID}p " + f"{csv_hisat2} | bash\n\n")
+    
+    #plot detailed alignment rates with R
+    rscript = os.path.join(script_dir, "R", "chip-seq_plot-alignments-rates-hisat2.R")
+    script.write(f"Rscript {rscript}\n\n")
+    
+    #index bam files
+    script.write("sed -n ${SLURM_ARRAY_TASK_ID}p " + f"{csv_index} | bash\n\n")
     
     script.close()
     
@@ -445,7 +465,7 @@ def hisat2SLURM(script_dir, work_dir, threads, chip_seq_settings, genome):
     #log slurm job id
     utils.SLURM_job_id_log(work_dir, "HISAT2", job_id_hisat2)
     
-    #plot detailed alignment rates with R
+    
     
       
     
