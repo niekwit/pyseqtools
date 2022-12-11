@@ -470,7 +470,19 @@ def deduplicationSLURM(script_dir, work_dir, genome):
     
     bam_list = glob.glob(os.path.join(work_dir, "bam", "*", "*-sort-bl.bam"))
     
-    
+    csv_index = os.path.join(work_dir,"slurm",f"slurm_hisat2_index_{genome}.csv")
+    if os.path.exists(csv_index) == True:
+        os.remove(csv_index)
+        
+    #load SLURM settings
+    with open(os.path.join(script_dir,"yaml","slurm.yaml")) as file:
+        slurm_settings = yaml.full_load(file)        
+
+    threads = slurm_settings["ChIP-Seq"]["picard_CPU"]
+    mem = slurm_settings["ChIP-Seq"]["picard_mem"]
+    time = slurm_settings["ChIP-Seq"]["picard_time"]
+    account = slurm_settings["groupname"]
+    partition = slurm_settings["ChIP-Seq"]["partition"]
     
     #check which BAM files have already been sorted
     for bam in bam_list:
@@ -484,17 +496,15 @@ def deduplicationSLURM(script_dir, work_dir, genome):
             csv = open(csv, "a")  
             csv.write(" ".join(command) +"\n")
             csv.close()  
-    
-    #load SLURM settings
-    with open(os.path.join(script_dir,"yaml","slurm.yaml")) as file:
-        slurm_settings = yaml.full_load(file)        
-
-    threads = slurm_settings["ChIP-Seq"]["picard_CPU"]
-    mem = slurm_settings["ChIP-Seq"]["picard_mem"]
-    time = slurm_settings["ChIP-Seq"]["picard_time"]
-    account = slurm_settings["groupname"]
-    partition = slurm_settings["ChIP-Seq"]["partition"]
-    
+            
+            #generate commands for bam indexing with samtools
+            command = ["samtools", "index", "-@", threads, dedup_bam]
+            
+            csv_ = csv_index
+            
+            csv = open(csv_, "a")  
+            csv.write(" ".join(command) +"\n")
+            csv.close()
     
     
     print(f"Generating slurm_picard_{genome}.sh")
@@ -516,6 +526,7 @@ def deduplicationSLURM(script_dir, work_dir, genome):
     script.write(f"#SBATCH -a  1-{str(commands)}\n")
     script.write("\n")
     script.write("sed -n ${SLURM_ARRAY_TASK_ID}p " + f"{csv} | bash\n")
+    script.write("sed -n ${SLURM_ARRAY_TASK_ID}p " + f"{csv_index} | bash\n")
     script.close()
     
     print("Submitting SLURM script to cluster")
