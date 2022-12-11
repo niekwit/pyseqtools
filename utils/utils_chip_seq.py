@@ -372,23 +372,44 @@ def hisat2SLURM(script_dir, work_dir, threads, chip_seq_settings, genome):
     time = slurm_settings["ChIP-Seq"]["hisat2_time"]
     account = slurm_settings["groupname"]
     partition = slurm_settings["ChIP-Seq"]["partition"]
-
+    
+    csv_hisat2 = os.path.join(work_dir,"slurm",f"slurm_hisat2_{genome}.csv")
+    if os.path.exists(csv_hisat2) == True:
+        os.remove(csv_hisat2)
+        
+    csv_echo = os.path.join(work_dir,"slurm",f"slurm_hisat2_echo_{genome}.csv")
+    if os.path.exists(csv_echo) == True:
+        os.remove(csv_echo)
+    
     for read1 in read1_list:
         read2 = read1.replace("_val_1.fq.gz","_val_2.fq.gz")
         out_put_file = os.path.basename(read1.replace("_val_1.fq.gz","-sort-bl.bam"))
         out_put_file = os.path.join(work_dir, "bam", genome, out_put_file)
+        base = os.path.basename(read1.replace("_val_1.fq.gz", ""))
         
-        if not utils.file_exists(out_put_file):
-            command = ["hisat2","-p", threads, "-x", index, "-1", read1, "-2", read2,
-                       "|", "samtools", "view", "-q", "15", "-F", "260", "-bS", "-@",
-                       threads, "-", "|", "bedtools", "intersect","-v", "-a", "'stdin'",
-                       "-b", blacklist, "-nonamecheck", "|", "samtools", "sort", "-@",
-                       threads, "-", ">", out_put_file]
-            os.makedirs(os.path.join(work_dir,"slurm"), exist_ok = True)
-            csv = os.path.join(work_dir,"slurm",f"slurm_hisat2_{genome}.csv")
-            csv = open(csv, "a")  
-            csv.write(" ".join(command) +"\n")
-            csv.close()  
+        #generate alignment commands in csv
+        command = ["hisat2","-p", threads, "-x", index, "-1", read1, "-2", read2,
+                   "|", "samtools", "view", "-q", "15", "-F", "260", "-bS", "-@",
+                   threads, "-", "|", "bedtools", "intersect","-v", "-a", "'stdin'",
+                   "-b", blacklist, "-nonamecheck", "|", "samtools", "sort", "-@",
+                   threads, "-", ">", out_put_file]
+        os.makedirs(os.path.join(work_dir,"slurm"), exist_ok = True)
+        
+        csv_ = csv_hisat2
+        
+        csv = open(csv_, "a")  
+        csv.write(" ".join(command) +"\n")
+        csv.close()  
+        
+        #generate commands for printing file name to log
+        command = ["echo", base]
+        
+        csv_ = csv_echo
+        
+        csv = open(csv_, "a")  
+        csv.write(" ".join(command) +"\n")
+        csv.close()
+        
             
     print(f"Generating slurm_hisat2_{genome}.sh")
     csv = os.path.join(work_dir,"slurm",f"slurm_hisat2_{genome}.csv")
@@ -406,9 +427,15 @@ def hisat2SLURM(script_dir, work_dir, threads, chip_seq_settings, genome):
     script.write(f"#SBATCH -t {time}\n")
     script.write(f"#SBATCH --mem={mem}\n")
     script.write("#SBATCH -J hisat2\n")
-    script.write(f"#SBATCH -a  1-{str(commands)}\n")
-    script.write("\n")
-    script.write("sed -n ${SLURM_ARRAY_TASK_ID}p " + f"{csv} | bash\n")
+    script.write(f"#SBATCH -a  1-{str(commands)}\n\n")
+    
+    #echo file name
+    script.write("sed -n ${SLURM_ARRAY_TASK_ID}p " + f"{csv_echo} | bash\n")
+
+    
+    #alignment with hisat2
+    script.write("sed -n ${SLURM_ARRAY_TASK_ID}p " + f"{csv_hisat2} | bash\n")
+    
     script.close()
     
     print("Submitting SLURM script to cluster")
@@ -417,6 +444,9 @@ def hisat2SLURM(script_dir, work_dir, threads, chip_seq_settings, genome):
     print(f"SLURM job submitted successfully (job ID {job_id_hisat2})") 
     #log slurm job id
     utils.SLURM_job_id_log(work_dir, "HISAT2", job_id_hisat2)
+    
+    #plot detailed alignment rates with R
+    
       
     
 
