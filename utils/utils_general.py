@@ -527,7 +527,7 @@ def deduplicationSLURM(script_dir, work_dir, genome):
     SLURM_job_id_log(work_dir, "PICARD deduplication", job_id_picard)
     
  
-def indexBam(work_dir, threads, genome="hg38", slurm=False, script_dir=None):
+def indexBam(work_dir, threads, genome, slurm, script_dir):
     '''
     Index BAM files in bam/ directory using samtools
 
@@ -608,6 +608,9 @@ def indexBam(work_dir, threads, genome="hg38", slurm=False, script_dir=None):
         job_id_index = subprocess.check_output(f"sbatch {script} | cut -d ' ' -f 4", shell = True)
         job_id_index = job_id_index.decode("UTF-8").replace("\n","")
         print(f"SLURM job submitted (job ID {job_id_index})")
+        
+        #log slurm job id
+        SLURM_job_id_log(work_dir, "samtools index", job_id_index)
 
 def createBigWig(work_dir, script_dir, threads, chip_seq_settings, genome="hg38", slurm=False):
     #creates BigWig files for all existing BAM files

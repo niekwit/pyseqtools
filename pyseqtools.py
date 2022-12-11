@@ -805,7 +805,7 @@ def main():
                 utils.deduplicationBam(script_dir, work_dir, threads, args)
                 utils.indexBam(work_dir, threads)
             else:
-                utils.deduplicationSLURM(script_dir, work_dir, genome)
+                utils.deduplicationSLURM(script_dir, work_dir, genome, slurm)
 
         downscale = args["downsample"]
         if downscale == True:
