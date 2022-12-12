@@ -444,14 +444,10 @@ def hisat2SLURM(script_dir, work_dir, threads, chip_seq_settings, genome):
     script.write(f"#SBATCH -a  1-{str(commands)}\n\n")
     
     #echo file name
-    script.write("sed -n ${SLURM_ARRAY_TASK_ID}p " + f"{csv_echo} | bash\n")
+    script.write("sed -n ${SLURM_ARRAY_TASK_ID}p " + f"{csv_echo} | bash\n\n")
 
     #alignment with hisat2
     script.write("sed -n ${SLURM_ARRAY_TASK_ID}p " + f"{csv_hisat2} | bash\n\n")
-    
-    #plot detailed alignment rates with R
-    rscript = os.path.join(script_dir, "R", "chip-seq_plot-alignments-rates-hisat2.R")
-    script.write(f"Rscript {rscript}\n\n")
     
     #index bam files
     script.write("sed -n ${SLURM_ARRAY_TASK_ID}p " + f"{csv_index} | bash\n\n")
@@ -465,8 +461,33 @@ def hisat2SLURM(script_dir, work_dir, threads, chip_seq_settings, genome):
     #log slurm job id
     utils.SLURM_job_id_log(work_dir, "HISAT2", job_id_hisat2)
     
+    #plot detailed alignment rates with R
+    rscript = os.path.join(script_dir, "R", "chip-seq_plot-alignments-rates-hisat2.R")
     
+    script_ = os.path.join(work_dir,"slurm",f"slurm_hisat2_{genome}_plot.sh")
+    script = open(script_, "w")  
+    script.write("#!/bin/bash" + "\n\n")
+    script.write(f"#SBATCH -A {account}\n")
+    script.write("#SBATCH --mail-type=BEGIN,FAIL,END" + "\n")
+    script.write(f"#SBATCH -p {partition}\n")
+    script.write(f"#SBATCH -D {work_dir}\n")
+    script.write("#SBATCH -o slurm/slurm_hisat2_plot.log" + "\n")
+    script.write(f"#SBATCH -c {threads}\n")
+    script.write(f"#SBATCH -t {time}\n")
+    script.write(f"#SBATCH --mem={mem}\n")
+    script.write("#SBATCH -J plot\n\n")
+    script.write(f"#SBATCH --dependency=afterok:{job_id_hisat2}\n\n")
     
+    script.write(f"Rscript {rscript}\n\n")
+    
+    script.close()
+    
+    #submit script to cluster
+    job_id_plot = subprocess.check_output(f"sbatch {script_} | cut -d ' ' -f 4", shell = True)
+    job_id_plot = job_id_plot.decode("UTF-8").replace("\n","")
+    
+    #log slurm job id
+    utils.SLURM_job_id_log(work_dir, "HISAT2", job_id_plot)
       
     
 
