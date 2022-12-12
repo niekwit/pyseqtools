@@ -45,7 +45,7 @@ for bam in non_dedup_bam:
     
 #save df to csv for plotting with R
 csv = os.path.join(work_dir, "bam", "read-counts.csv")
-df.to_csv(index = False)
+df.to_csv(csv, index = False)
 
 
 
