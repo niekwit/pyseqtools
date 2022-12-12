@@ -567,7 +567,7 @@ def deduplicationSLURM(script_dir, work_dir, genome):
     
     #log slurm job id
     SLURM_job_id_log(work_dir, "pysamtools", job_id_count)
-    '''
+    
     #plot read count with R
     #get pre and post duplication read counts from bam files
     print(f"Generating slurm_plot-counts_{genome}.sh")
@@ -583,12 +583,12 @@ def deduplicationSLURM(script_dir, work_dir, genome):
     script.write(f"#SBATCH -c {threads}\n")
     script.write(f"#SBATCH -t {time}\n")
     script.write(f"#SBATCH --mem={mem}\n")
-    script.write("#SBATCH -J pysamtools\n")
+    script.write("#SBATCH -J plot-counts\n")
     script.write(f"#SBATCH --dependency=afterok:{job_id_count}\n\n")
     script.write("\n")
     
     plot_reads = os.path.join(script_dir,"R","plot-reads.R")
-    script.write(f"Rscript {plot_reads} {work_dir} {genome}")
+    script.write(f"Rscript {plot_reads} {work_dir}")
     
     script.close()
     
@@ -599,7 +599,7 @@ def deduplicationSLURM(script_dir, work_dir, genome):
     
     #log slurm job id
     SLURM_job_id_log(work_dir, "plot read counts", job_id_plot)
-    '''
+    
     
     
 def indexBam(work_dir, threads, genome, slurm, script_dir):
