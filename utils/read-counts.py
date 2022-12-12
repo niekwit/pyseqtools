@@ -28,7 +28,7 @@ df["sample"] = sample_names
 
 #count reads
 for bam in non_dedup_bam:
-    dedup_bam = [x.replace("-sort-bl.bam","-sort-bl-dedupl.bam") for x in non_dedup_bam]
+    dedup_bam = bam.replace("-sort-bl.bam","-sort-bl-dedupl.bam") 
     sample = os.path.basename(bam).replace("-sort-bl.bam","")
     
     #count reads
