@@ -457,7 +457,7 @@ def hisat2SLURM(script_dir, work_dir, threads, chip_seq_settings, genome):
     print("Submitting SLURM script to cluster")
     job_id_hisat2 = subprocess.check_output(f"sbatch {script_} | cut -d ' ' -f 4", shell = True)
     job_id_hisat2 = job_id_hisat2.decode("UTF-8").replace("\n","")
-    print(f"SLURM job submitted successfully (job ID {job_id_hisat2})") 
+    
     #log slurm job id
     utils.SLURM_job_id_log(work_dir, "HISAT2", job_id_hisat2)
     
@@ -478,18 +478,18 @@ def hisat2SLURM(script_dir, work_dir, threads, chip_seq_settings, genome):
     script.write("#SBATCH -J plot\n\n")
     script.write(f"#SBATCH --dependency=afterok:{job_id_hisat2}\n\n")
     
-    script.write(f"Rscript {rscript}\n\n")
+    script.write(f"Rscript {rscript} {work_dir}\n\n")
     
     script.close()
     
     #submit script to cluster
     job_id_plot = subprocess.check_output(f"sbatch {script_} | cut -d ' ' -f 4", shell = True)
     job_id_plot = job_id_plot.decode("UTF-8").replace("\n","")
+    print(f"SLURM jobs submitted successfully (job IDs: {job_id_hisat2} (HISAT2) and {job_id_plot} (plotting alignment rates))") 
     
     #log slurm job id
     utils.SLURM_job_id_log(work_dir, "HISAT2", job_id_plot)
       
-    
 
 def downsample(script_dir, work_dir, threads, genome="hg38", slurm=False):
     '''

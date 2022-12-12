@@ -532,12 +532,76 @@ def deduplicationSLURM(script_dir, work_dir, genome):
     print("Submitting SLURM script to cluster")
     job_id_picard = subprocess.check_output(f"sbatch {script_} | cut -d ' ' -f 4", shell = True)
     job_id_picard = job_id_picard.decode("UTF-8").replace("\n","")
-    print(f"SLURM job submitted successfully (job ID {job_id_picard})")   
+    print(f"SLURM deduplication job submitted successfully (job ID {job_id_picard})")   
     
     #log slurm job id
     SLURM_job_id_log(work_dir, "PICARD deduplication", job_id_picard)
     
- 
+    #get pre and post duplication read counts from bam files
+    print(f"Generating slurm_pysamtools_{genome}.sh")
+    script_ = os.path.join(work_dir,"slurm",f"slurm_pysamtools_{genome}.sh")
+    script = open(script_, "w")  
+    script.write("#!/bin/bash" + "\n")
+    script.write("\n")
+    script.write(f"#SBATCH -A {account}\n")
+    script.write("#SBATCH --mail-type=BEGIN,FAIL,END" + "\n")
+    script.write(f"#SBATCH -p {partition}\n")
+    script.write(f"#SBATCH -D {work_dir}\n")
+    script.write("#SBATCH -o slurm/slurm_pysamtools.log" + "\n")
+    script.write(f"#SBATCH -c {threads}\n")
+    script.write(f"#SBATCH -t {time}\n")
+    script.write(f"#SBATCH --mem={mem}\n")
+    script.write("#SBATCH -J pysamtools\n")
+    script.write(f"#SBATCH --dependency=afterok:{job_id_picard}\n\n")
+    script.write("\n")
+    
+    read_count = os.path.join(script_dir,"utils","read-counts.py")
+    script.write(f"python3 {read_count} {work_dir} {script_dir} {genome} {threads}")
+    
+    script.close()
+    
+    print("Submitting SLURM script to cluster")
+    job_id_count = subprocess.check_output(f"sbatch {script_} | cut -d ' ' -f 4", shell = True)
+    job_id_count = job_id_count.decode("UTF-8").replace("\n","")
+    print(f"SLURM read counting job submitted successfully (job ID {job_id_count})")  
+    
+    #log slurm job id
+    SLURM_job_id_log(work_dir, "pysamtools", job_id_count)
+    '''
+    #plot read count with R
+    #get pre and post duplication read counts from bam files
+    print(f"Generating slurm_plot-counts_{genome}.sh")
+    script_ = os.path.join(work_dir,"slurm",f"slurm_plot-counts_{genome}.sh")
+    script = open(script_, "w")  
+    script.write("#!/bin/bash" + "\n")
+    script.write("\n")
+    script.write(f"#SBATCH -A {account}\n")
+    script.write("#SBATCH --mail-type=BEGIN,FAIL,END" + "\n")
+    script.write(f"#SBATCH -p {partition}\n")
+    script.write(f"#SBATCH -D {work_dir}\n")
+    script.write("#SBATCH -o slurm/slurm_plot-counts.log" + "\n")
+    script.write(f"#SBATCH -c {threads}\n")
+    script.write(f"#SBATCH -t {time}\n")
+    script.write(f"#SBATCH --mem={mem}\n")
+    script.write("#SBATCH -J pysamtools\n")
+    script.write(f"#SBATCH --dependency=afterok:{job_id_count}\n\n")
+    script.write("\n")
+    
+    plot_reads = os.path.join(script_dir,"R","plot-reads.R")
+    script.write(f"Rscript {plot_reads} {work_dir} {genome}")
+    
+    script.close()
+    
+    print("Submitting SLURM script to cluster")
+    job_id_plot = subprocess.check_output(f"sbatch {script_} | cut -d ' ' -f 4", shell = True)
+    job_id_plot = job_id_plot.decode("UTF-8").replace("\n","")
+    print(f"SLURM plotting job submitted successfully (job ID {job_id_plot})")  
+    
+    #log slurm job id
+    SLURM_job_id_log(work_dir, "plot read counts", job_id_plot)
+    '''
+    
+    
 def indexBam(work_dir, threads, genome, slurm, script_dir):
     '''
     Index BAM files in bam/ directory using samtools
@@ -622,6 +686,7 @@ def indexBam(work_dir, threads, genome, slurm, script_dir):
         
         #log slurm job id
         SLURM_job_id_log(work_dir, "samtools index", job_id_index)
+
 
 def createBigWig(work_dir, script_dir, threads, chip_seq_settings, genome="hg38", slurm=False):
     #creates BigWig files for all existing BAM files
@@ -741,6 +806,9 @@ def createBigWig(work_dir, script_dir, threads, chip_seq_settings, genome="hg38"
         job_id_bigwig = subprocess.check_output(f"sbatch {script_} | cut -d ' ' -f 4", shell = True)
         job_id_bigwig = job_id_bigwig.decode("UTF-8").replace("\n","")
         print(f"Submitted SLURM script to cluster (job ID {job_id_bigwig})")
+        
+        #log slurm job id
+        SLURM_job_id_log(work_dir, "bamCoverage", job_id_bigwig)
         
 
 def bigwigQC(work_dir, threads):
