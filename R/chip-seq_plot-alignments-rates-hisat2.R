@@ -1,10 +1,12 @@
 library(tidyverse)
 library(reshape2)
 
-work.dir <- getwd()
+#get parsed arguments
+args <- commandArgs(trailingOnly = TRUE)
+work.dir <- args[1]
 
 #get HISAT2 log files
-fileList <- Sys.glob(file.path(work.dir, "slurm", "slurm_hisat2*.log"))
+fileList <- Sys.glob(file.path(work.dir, "slurm", "slurm_hisat2*[0-9].log"))
 
 #create df for storing alignment info
 df <- data.frame(matrix(ncol = 4, nrow = length(fileList)))
@@ -34,11 +36,11 @@ for (i in 1:length(fileList)){
   df[i,4] <- more.one
 }
 
+#order df
+df <- df[order(df$sample), ] 
+
 #create df for plotting
 df.melt <- melt(df, value.name = sample)
-
-
-
 
 p <- ggplot(df.melt, aes(sample, Parent_Input)) +   
   geom_bar(aes(fill = variable), 
@@ -57,7 +59,9 @@ p <- ggplot(df.melt, aes(sample, Parent_Input)) +
                                 "1 time",
                                 ">1 times"))
 
-ggsave(file.path(work.dir, "bam", "alignment-rates.pdf"), p)
+ggsave(file.path(work.dir, "bam", "alignment-rates.pdf"), p,
+       width = 7,
+       height = 3.5)
 
 
 
