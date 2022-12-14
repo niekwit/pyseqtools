@@ -946,7 +946,7 @@ def slurmTemplateScript(work_dir,name,file,slurm,commands,array=False,csv=None,d
         
         #write commands to slurm script
         for i in commands:
-            script.write(i)
+            script.write(f"{i}\nn")
     script.close()
     
 
@@ -972,6 +972,7 @@ def fastqcSLURM(work_dir, script_dir):
     Run fastqc/multiqc using SLURM
 
     '''
+    puts(colored.green("Running FastQC/MultiQC on fastq files"))
     
     #load slurm settings
     with open(os.path.join(script_dir,"yaml","slurm.yaml")) as file:
@@ -1003,6 +1004,9 @@ def fastqcSLURM(work_dir, script_dir):
     #create slurm script
     slurm_file = os.path.join(work_dir, "slurm", "fastqc.sh")
     slurmTemplateScript(work_dir,"fastqc",slurm_file,slurm,commands)
+    
+    #run slurm script
+    job_id = runSLURM(work_dir, slurm_file, "FastQC/MultiQC")
 
 
 def getEND(work_dir):
