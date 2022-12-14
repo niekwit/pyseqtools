@@ -934,7 +934,7 @@ def slurmTemplateScript(work_dir,name,file,slurm,commands,array=False,csv=None,d
         
         #set log location
         log = os.path.join(work_dir, "slurm", f"{name}%a.log")
-        script.write(f"#SBATCH -o {log}\n")
+        script.write(f"#SBATCH -o {log}\n\n")
         
         #write array commands for each csv file
         for i in csv:
@@ -942,11 +942,11 @@ def slurmTemplateScript(work_dir,name,file,slurm,commands,array=False,csv=None,d
     else:
         #set log location
         log = os.path.join(work_dir, "slurm", f"{name}.log")
-        script.write(f"#SBATCH -o {log}\n")
+        script.write(f"#SBATCH -o {log}\n\n")
         
         #write commands to slurm script
         for i in commands:
-            script.write(f"{i}\nn")
+            script.write(f"{i}\n\n")
     script.close()
     
 
@@ -993,6 +993,7 @@ def fastqcSLURM(work_dir, script_dir):
     
     #create commands
     fastqc_dir = os.path.join(work_dir,"fastqc")
+    os.makedirs(fastqc_dir, exist_ok=True)
     fastqc = ["fastqc", "--threads", threads, "-o", fastqc_dir, os.path.join(work_dir,"raw-data", "*")]
     fastqc = " ".join(fastqc)
     
