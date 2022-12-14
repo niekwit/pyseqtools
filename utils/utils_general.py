@@ -993,7 +993,7 @@ def fastqcSLURM(work_dir, script_dir):
     
     #create commands
     fastqc_dir = os.path.join(work_dir,"fastqc")
-    fastqc = ["fastqc", "threads", threads, "-o", fastqc_dir, os.path.join(work_dir,"raw-data", "*")]
+    fastqc = ["fastqc", "--threads", threads, "-o", fastqc_dir, os.path.join(work_dir,"raw-data", "*")]
     fastqc = " ".join(fastqc)
     
     multiqc = ["multiqc", "-o", fastqc_dir, fastqc_dir]
