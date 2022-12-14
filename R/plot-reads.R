@@ -10,10 +10,10 @@ df <- read.csv(file.path(work.dir,"bam","read-counts.csv"))
 df <- df[order(df$sample), ] 
 
 #create df for plotting
-df.melt <- melt(df, value.name = sample)
+df.melt <- melt(df, value.name = "counts")
 
 #plot data
-p <- ggplot(df.melt, aes(sample, Parent_Input)) +   
+p <- ggplot(df.melt, aes(sample, counts)) +   
   geom_bar(aes(fill = variable), 
            position = "dodge", 
            stat = "identity",
@@ -27,12 +27,10 @@ p <- ggplot(df.melt, aes(sample, Parent_Input)) +
   xlab(NULL) +
   guides(fill=guide_legend(NULL)) +
   scale_fill_discrete(labels=c("pre-deduplication",
-                               "post-deduplication"))
+                               "post-deduplication")) 
 
 #save plot
-ggsave(file.path(work.dir, "bam", "read-count_deduplication.pdf"), p,
-       width = 7,
-       height = 3.5)
+ggsave(file.path(work.dir, "bam", "read-count_deduplication.pdf"), p)
 
 
 
