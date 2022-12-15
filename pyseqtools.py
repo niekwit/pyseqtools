@@ -797,6 +797,10 @@ def main():
         else:
             if align == "hisat2":
                 chipseq_utils.hisat2SLURM(script_dir, work_dir, threads, chip_seq_settings, genome)
+                
+            fastqc = args["fastqc"]
+            if fastqc == True:
+                utils.fastqcSLURM(work_dir, script_dir)
 
 
         dedup = args["deduplication"]

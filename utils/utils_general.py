@@ -900,8 +900,114 @@ def fastqc(script_dir, work_dir, threads, file_extension):
         print("Skipping FastQC/MultiQC (already performed)")
 
 
-def fastqcSLURM(work_dir):
-    pass
+def slurmTemplateScript(work_dir,name,file,slurm,commands,array=False,csv=None,dep=None):
+    '''
+    Template for SLURM scripts
+
+    '''
+    #load slurm settings
+    threads = slurm["threads"]
+    mem = slurm["mem"]
+    time = slurm["time"]
+    account = slurm["account"]
+    partition = slurm["partition"]
+    
+    #prepare slurm srcipt
+    script = file
+    script = open(script, "w")  
+    script.write("#!/bin/bash\n\n")
+    script.write(f"#SBATCH -A {account}\n")
+    script.write("#SBATCH --mail-type=BEGIN,END,FAIL" + "\n")
+    script.write(f"#SBATCH -p {partition}\n")
+    script.write(f"#SBATCH -D {work_dir}\n")
+    script.write(f"#SBATCH -c {threads}\n")
+    script.write(f"#SBATCH -t {time}\n")
+    script.write(f"#SBATCH --mem={mem}\n")
+    script.write(f"#SBATCH -J {name}\n")
+    if dep == True:
+        script.write(f"#SBATCH --dependency=afterok:{dep}\n")
+    if array == True:
+        #set numer of jobs for array
+        csv_ = csv[0] #pick one csv with commands (all csvs should have same amount of commands)
+        commands = int(subprocess.check_output(f"cat {csv_} | wc -l", shell = True).decode("utf-8"))
+        script.write("#SBATCH -a " + f"1-{commands}\n")
+        
+        #set log location
+        log = os.path.join(work_dir, "slurm", f"{name}%a.log")
+        script.write(f"#SBATCH -o {log}\n\n")
+        
+        #write array commands for each csv file
+        for i in csv:
+            script.write("sed -n ${SLURM_ARRAY_TASK_ID}p" + f"{i} | bash\n")
+    else:
+        #set log location
+        log = os.path.join(work_dir, "slurm", f"{name}.log")
+        script.write(f"#SBATCH -o {log}\n\n")
+        
+        #write commands to slurm script
+        for i in commands:
+            script.write(f"{i}\n\n")
+    script.close()
+    
+
+def runSLURM(work_dir, script, command):
+    '''Submits SLURM script to cluster
+    '''
+    #run slurm bash script
+    script_base = os.path.basename(script)
+        
+    print(f"Submitting {script_base} to cluster")
+    job_id = subprocess.check_output(f"sbatch {script} | cut -d ' ' -f 4", shell = True)
+    job_id = job_id.decode("utf-8").replace("\n","")
+    print(f"Job submitted (job id {job_id})")
+    
+    #log slurm job id
+    SLURM_job_id_log(work_dir, command, job_id)
+    
+    return(job_id)
+    
+
+def fastqcSLURM(work_dir, script_dir):
+    '''
+    Run fastqc/multiqc using SLURM
+
+    '''
+    puts(colored.green("Running FastQC/MultiQC on fastq files"))
+    
+    #load slurm settings
+    with open(os.path.join(script_dir,"yaml","slurm.yaml")) as file:
+        slurm_settings = yaml.full_load(file)        
+
+    threads = slurm_settings["fastqc"]["cpu"]
+    mem = slurm_settings["fastqc"]["mem"]
+    time = slurm_settings["fastqc"]["time"]
+    account = slurm_settings["groupname"]
+    partition = slurm_settings["partition"]
+    
+    slurm = {"threads": threads, 
+             "mem": mem,
+             "time": time,
+             "account": account,
+             "partition": partition
+             }
+    
+    #create commands
+    fastqc_dir = os.path.join(work_dir,"fastqc")
+    os.makedirs(fastqc_dir, exist_ok=True)
+    fastqc = ["fastqc", "--threads", threads, "-o", fastqc_dir, os.path.join(work_dir,"raw-data", "*")]
+    fastqc = " ".join(fastqc)
+    
+    multiqc = ["multiqc", "-o", fastqc_dir, fastqc_dir]
+    multiqc = " ".join(multiqc)
+    
+    commands = [fastqc,multiqc]
+    
+    #create slurm script
+    slurm_file = os.path.join(work_dir, "slurm", "fastqc.sh")
+    slurmTemplateScript(work_dir,"fastqc",slurm_file,slurm,commands)
+    
+    #run slurm script
+    job_id = runSLURM(work_dir, slurm_file, "FastQC/MultiQC")
 
 
 def getEND(work_dir):
