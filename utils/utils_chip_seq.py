@@ -956,7 +956,42 @@ def peak(work_dir, threads, genome, chip_seq_settings):
                                 on = "name", 
                                 how = "left" )
             df_merge.to_csv(out_file, index = False)
-   
+
+
+def peakSLURM(work_dir, genome):
+    ''' Peak calling with MACS3/HOMER on HPC
+    '''
+    
+    sample_info = pd.read_csv(os.path.join(work_dir,"samples.csv"))
+    
+    peak_dir = os.path.join(work_dir, "peak", genome)
+    
+    samples = list(set(sample_info["genotype"]))
+    #reference = list(set(sample_info[sample_info["ref"] == "ref"]["genotype"]))[0]
+    
+    #load MACS3 settings
+    with open(os.path.join(script_dir,"yaml","chip-seq.yaml")) as file:
+            chip_settings = yaml.full_load(file)
+    
+    cut_off = chip_settings["MACS3"]["broad-cutoff"]
+    extsize = chip_settings["MACS3"]["extsize"]
+    if "hg" in genome:
+        macs3_genome = "hs"
+    elif "mm" in genome:
+        macs3_genome = "mm"
+    ip = chip_settings["MACS3"]["ip"]
+    qvalue = chip_settings["MACS3"]["qvalue"]
+    
+    #get bam files
+    bam_list = sorted(glob.glob(os.path.join(work_dir, "bam", genome, "*.bam")))
+    
+    for sample in samples:
+        df = sample_info[sample_info["genotype"] == sample]
+        chip_samples = list(df[df["type"] == "ip"]["sample"])
+        input_samples = list(df[df["type"] == "input"]["sample"])
+        
+        macs3 = ["macs3","callpeak",]
+    
 
 def overlappingPeaks(work_dir):
     #load settings
