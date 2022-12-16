@@ -795,6 +795,8 @@ def main():
                     utils.trim(script_dir, threads, work_dir)
                     utils.bwa(work_dir, script_dir, args, threads, chip_seq_settings, genome)
                     utils.indexBam(work_dir, threads)
+            if peak == True:
+                chipseq_utils.peak(work_dir, threads, genome, chip_seq_settings)
         else:
             if align == "hisat2":
                 chipseq_utils.hisat2SLURM(script_dir, work_dir, threads, chip_seq_settings, genome)
@@ -835,8 +837,7 @@ def main():
             chipseq_utils.plotProfile(work_dir, chip_seq_settings, genome, threads, slurm)
 
         
-        if peak == True:
-            chipseq_utils.peak(work_dir, threads, genome, chip_seq_settings)
+        
 
 
     def cutrun(args, script_dir):
