@@ -1067,8 +1067,8 @@ def peakSLURM(work_dir, genome):
         slurm_settings = yaml.full_load(file)        
 
     threads = slurm_settings["ChIP-Seq"]["macs3"]["cpu"]
-    mem = slurm_settings["fmacs3"]["mem"]
-    time = slurm_settings["macs3"]["time"]
+    mem = slurm_settings["ChIP-Seq"]["macs3"]["mem"]
+    time = slurm_settings["ChIP-Seq"]["macs3"]["time"]
     account = slurm_settings["groupname"]
     partition = slurm_settings["partition"]
     
