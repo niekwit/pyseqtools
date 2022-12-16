@@ -748,6 +748,7 @@ def main():
     def chip_seq(args, script_dir, module):
         slurm = args["slurm"]
         pe_tags = args["peTags"]
+        peak = args["peaks"]
         
         #set thread count for processing
         max_threads = str(multiprocessing.cpu_count())
@@ -801,7 +802,9 @@ def main():
             fastqc = args["fastqc"]
             if fastqc == True:
                 utils.fastqcSLURM(work_dir, script_dir)
-
+                
+            if peak == True:
+                chipseq_utils.peakSLURM(work_dir, genome)
 
         dedup = args["deduplication"]
         if dedup == True:
@@ -831,7 +834,7 @@ def main():
         if metagene == True:
             chipseq_utils.plotProfile(work_dir, chip_seq_settings, genome, threads, slurm)
 
-        peak = args["peaks"]
+        
         if peak == True:
             chipseq_utils.peak(work_dir, threads, genome, chip_seq_settings)
 

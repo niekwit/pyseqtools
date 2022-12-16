@@ -942,7 +942,7 @@ def peak(work_dir, threads, genome, chip_seq_settings):
             subprocess.run(command, shell = True, check = True)
     
     #merge peak annotation with MACS3 output
-    macs3_list = glob.glob(os.path.join(work_dir, "peak", "*_peaks.xls"))
+    macs3_list = glob.glob(os.path.join(work_dir,"peak","*_peaks.xls"))
     homer_list = [x.replace("_peaks.xls", "_annotated-peaks.txt") for x in macs3_list]
     
     for macs3, homer in zip(macs3_list, homer_list):
@@ -962,9 +962,11 @@ def peakSLURM(work_dir, genome):
     ''' Peak calling with MACS3/HOMER on HPC
     '''
     
+    puts(colored.green(f"Peak calling/annotation using MACS3/HOMER"))
+    
     sample_info = pd.read_csv(os.path.join(work_dir,"samples.csv"))
     
-    peak_dir = os.path.join(work_dir, "peak", genome)
+    peak_dir = os.path.join(work_dir, "peaks", genome)
     
     samples = list(set(sample_info["genotype"]))
     #reference = list(set(sample_info[sample_info["ref"] == "ref"]["genotype"]))[0]
@@ -972,43 +974,119 @@ def peakSLURM(work_dir, genome):
     #load MACS3 settings
     with open(os.path.join(script_dir,"yaml","chip-seq.yaml")) as file:
             chip_settings = yaml.full_load(file)
-    
-    cut_off = chip_settings["MACS3"]["broad-cutoff"]
+        
     extsize = chip_settings["MACS3"]["extsize"]
     if "hg" in genome:
         macs3_genome = "hs"
     elif "mm" in genome:
         macs3_genome = "mm"
     ip = chip_settings["MACS3"]["ip"]
+    cut_off = chip_settings["MACS3"]["broad-cutoff"]
+    macs3_format = chip_settings["MACS3"]["format"]
     qvalue = chip_settings["MACS3"]["qvalue"]
     
     #get bam files
     bam_list = sorted(glob.glob(os.path.join(work_dir, "bam", genome, "*.bam")))
+    dedup = any("dedup" in x for x in bam_list)
+    if dedup == True:
+        bam_list = sorted(glob.glob(os.path.join(work_dir, "bam", genome, "*dedupl.bam")))
     
+    csv_macs3 = os.path.join(work_dir,"slurm",f"macs3_{genome}.csv")
+    csv_bed = os.path.join(work_dir,"slurm",f"bed_{genome}.csv")
+    csv_homer = os.path.join(work_dir,"slurm",f"homer_{genome}.csv")
+    csv_merge = os.path.join(work_dir,"slurm","merge_annotation.csv")
+        
+    csv_list = [csv_macs3,csv_bed,csv_homer,csv_merge]
+    
+    for i in csv_list:
+        if os.path.exists(i) == True:
+            os.remove(i)
+    
+    #prepare csv files with commands for each sample
     for sample in samples:
+        #prepare sample info and files
         df = sample_info[sample_info["genotype"] == sample]
         chip_samples = list(df[df["type"] == "ip"]["sample"])
+        chip_bam = list(filter(lambda item: any(x in item for x in chip_samples), bam_list))
+        chip_bam = " ".join(chip_bam)
+
         input_samples = list(df[df["type"] == "input"]["sample"])
+        input_bam = list(filter(lambda item: any(x in item for x in input_samples), bam_list))
+        input_bam = " ".join(input_bam)
         
-        macs3 = ["macs3","callpeak",]
-    
-
-def overlappingPeaks(work_dir):
-    #load settings
-    df_settings = pd.read_csv(os.path.join(work_dir, "peak_settings.txt"))
-    
-    for index, row in df_settings.iterrows():
-        control_bed = row["control"]
-        sample_bed = row["sample"]
-        output_bed = os.path.join(work_dir,"peak", "overlap-" + control_bed.replace(".bed","") + "_vs_" +sample_bed)
+        out_dir = os.path.join(peak_dir,sample)
         
-        if not utils.file_exists(output_bed):
-            a_bed = pybedtools.BedTool(os.path.join(work_dir, "peak", control_bed))
-            b_bed = pybedtools.BedTool(os.path.join(work_dir, "peak", sample_bed))
+        #create macs3 commands
+        macs3 = ["macs3","callpeak","-t",chip_bam,"-c",input_bam,"-g",macs3_genome
+                 ,"-n",sample,"-q",qvalue,"-f",macs3_format,"--outdir",out_dir,
+                 "--extsize",extsize]
+        if ip == "histone":
+            extension = ["--broad","--broad-cutoff",cut_off]
+            macs3.extend(extension)
+        
+        csv = open(csv_macs3, "a")  
+        csv.write(" ".join(macs3) + "\n")
+        csv.close()  
+        
+        #macs3 output file (get file extension based on narrow of broad peaks)
+        if ip == "histone":
+            extension = "_peaks.broadPeak"
+        elif ip == "tf":
+            extension = "_peaks.narrowPeak"
+        macs3_output = os.path.join(out_dir, sample + extension)
+        
+        #create commands for converting macs3 output to bed format
+        bed_file = os.path.join(out_dir, sample + ".bed")
+        bed_script = os.path.join(script_dir, "utils", "macs2bed.py")
+        bed = [bed_script, macs3_output, bed_file]
+        
+        csv = open(csv_bed, "a")  
+        csv.write(" ".join(bed) + "\n")
+        csv.close()  
+        
+        #create command for peak annotation (homer)
+        out_file = bed.replace(".bed", "_annotated-peaks.txt")
+        
+        homer = ["perl", "annotatePeaks.pl", bed_file, genome, ">", out_file]
+        
+        csv = open(csv_homer, "a")  
+        csv.write(" ".join(homer) + "\n")
+        csv.close() 
+        
+        #create command for merging MACS3 output with HOMER annotation
+        merge_script = os.path.join(script_dir, "utils", "merge-annotation.py")
+        merge = [merge_script,macs3_output,out_file]
+        
+        csv = open(csv_merge, "a")  
+        csv.write(" ".join(merge) + "\n")
+        csv.close() 
+        
+   
+    #load slurm settings
+    with open(os.path.join(script_dir,"yaml","slurm.yaml")) as file:
+        slurm_settings = yaml.full_load(file)        
 
-            intersect_bed = a_bed.intersect(b_bed)
-            out = intersect_bed.saveas(output_bed)
+    threads = slurm_settings["macs3"]["cpu"]
+    mem = slurm_settings["fmacs3"]["mem"]
+    time = slurm_settings["macs3"]["time"]
+    account = slurm_settings["groupname"]
+    partition = slurm_settings["partition"]
     
+    slurm = {"threads": threads, 
+             "mem": mem,
+             "time": time,
+             "account": account,
+             "partition": partition
+             }
+    
+    #generate slurm script
+    slurm_file = os.path.join(work_dir, "slurm", f"macs3_{genome}.sh")
+    utils.slurmTemplateScript(work_dir,"peak",slurm_file,slurm,None,True,csv_list)
+    
+    #run slurm script
+    job_id = utils.runSLURM(work_dir, slurm_file, "peak-calling")
+    
+       
 def bam_bwQC(work_dir, threads):
     #import sample info
     sample_df = pd.read_csv(os.path.join(work_dir, "samples.csv"))
