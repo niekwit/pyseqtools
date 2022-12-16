@@ -1050,8 +1050,9 @@ def peakSLURM(work_dir, genome):
         
         #create command for peak annotation (homer)
         out_file = bed_file.replace(".bed", "_annotated-peaks.txt")
+        annotatePeaks = shutil.which("annotatePeaks.pl")
         
-        homer = ["perl", "annotatePeaks.pl", bed_file, genome, ">", out_file]
+        homer = ["perl", annotatePeaks, bed_file, genome, ">", out_file]
         
         csv = open(csv_homer, "a")  
         csv.write(" ".join(homer) + "\n")
