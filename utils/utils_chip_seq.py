@@ -962,14 +962,18 @@ def peakSLURM(work_dir, genome):
     ''' Peak calling with MACS3/HOMER on HPC
     '''
     
-    puts(colored.green(f"Peak calling/annotation using MACS3/HOMER"))
+    puts(colored.green("Peak calling/annotation using MACS3/HOMER"))
     
     sample_info = pd.read_csv(os.path.join(work_dir,"samples.csv"))
     
-    peak_dir = os.path.join(work_dir, "peaks", genome)
-    
     samples = list(set(sample_info["genotype"]))
     #reference = list(set(sample_info[sample_info["ref"] == "ref"]["genotype"]))[0]
+    
+    #create output dirs
+    peak_dir = os.path.join(work_dir, "peaks", genome)
+    os.makedirs(peak_dir, exist_ok=True)
+    for i in samples:
+        os.makedirs(os.path.join(peak_dir, i), exist_ok=True)
     
     #load MACS3 settings
     with open(os.path.join(script_dir,"yaml","chip-seq.yaml")) as file:
@@ -1080,7 +1084,7 @@ def peakSLURM(work_dir, genome):
              }
     
     #generate slurm script
-    slurm_file = os.path.join(work_dir, "slurm", f"macs3_{genome}.sh")
+    slurm_file = os.path.join(work_dir, "slurm", f"peak_{genome}.sh")
     utils.slurmTemplateScript(work_dir,"peak",slurm_file,slurm,None,True,csv_list)
     
     #run slurm script
