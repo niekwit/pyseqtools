@@ -938,7 +938,7 @@ def slurmTemplateScript(work_dir,name,file,slurm,commands,array=False,csv=None,d
         
         #write array commands for each csv file
         for i in csv:
-            script.write("sed -n ${SLURM_ARRAY_TASK_ID}p" + f"{i} | bash\n")
+            script.write("sed -n ${SLURM_ARRAY_TASK_ID}p " + f"{i} | bash\n")
     else:
         #set log location
         log = os.path.join(work_dir, "slurm", f"{name}.log")
