@@ -1051,8 +1051,9 @@ def peakSLURM(work_dir, genome):
         #create command for peak annotation (homer)
         out_file = bed_file.replace(".bed", "_annotated-peaks.txt")
         annotatePeaks = shutil.which("annotatePeaks.pl")
+        annStats = os.path.join(out_dir, "annStats.txt")
         
-        homer = ["perl", annotatePeaks, bed_file, genome, ">", out_file]
+        homer = ["perl",annotatePeaks,"-annStats",annStats,bed_file,genome, ">",out_file]
         
         csv = open(csv_homer, "a")  
         csv.write(" ".join(homer) + "\n")
@@ -1060,7 +1061,8 @@ def peakSLURM(work_dir, genome):
         
         #create command for merging MACS3 output with HOMER annotation
         merge_script = os.path.join(script_dir, "utils", "merge-annotation.py")
-        merge = [merge_script,macs3_output,out_file]
+        macs3_xls = os.path.join(out_dir, sample + "_peaks.xls")
+        merge = [merge_script,macs3_xls,out_file]
         
         csv = open(csv_merge, "a")  
         csv.write(" ".join(merge) + "\n")
@@ -1090,6 +1092,9 @@ def peakSLURM(work_dir, genome):
     
     #run slurm script
     job_id = utils.runSLURM(work_dir, slurm_file, "peak-calling")
+    
+    #differential peak analysis
+    
     
        
 def bam_bwQC(work_dir, threads):
