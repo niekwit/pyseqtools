@@ -962,7 +962,7 @@ def peakSLURM(work_dir, genome):
     ''' Peak calling with MACS3/HOMER on HPC
     '''
     
-    puts(colored.green("Peak calling/annotation using MACS3/HOMER"))
+    puts(colored.green("Peak calling/annotation using MACS3/HOMER/DiffBind"))
     
     sample_info = pd.read_csv(os.path.join(work_dir,"samples.csv"))
     
@@ -1051,9 +1051,8 @@ def peakSLURM(work_dir, genome):
         #create command for peak annotation (homer)
         out_file = bed_file.replace(".bed", "_annotated-peaks.txt")
         annotatePeaks = shutil.which("annotatePeaks.pl")
-        annStats = os.path.join(out_dir, "annStats.txt")
-        
-        homer = ["perl",annotatePeaks,"-annStats",annStats,bed_file,genome, ">",out_file]
+               
+        homer = ["perl",annotatePeaks,bed_file,genome, ">",out_file]
         
         csv = open(csv_homer, "a")  
         csv.write(" ".join(homer) + "\n")
@@ -1091,10 +1090,31 @@ def peakSLURM(work_dir, genome):
     utils.slurmTemplateScript(work_dir,"peak",slurm_file,slurm,None,True,csv_list)
     
     #run slurm script
-    job_id = utils.runSLURM(work_dir, slurm_file, "peak-calling")
+    job_id_peak = utils.runSLURM(work_dir, slurm_file, "peak-calling")
     
     #differential peak analysis
+    diffbind_script = os.path.join(script_dir,"R","chip-seq_slurm-diffbind.R")
+    diffbind = ["Rscript",diffbind_script,work_dir,genome] 
     
+    threads = slurm_settings["ChIP-Seq"]["diffbind"]["cpu"]
+    mem = slurm_settings["ChIP-Seq"]["diffbind"]["mem"]
+    time = slurm_settings["ChIP-Seq"]["diffbind"]["time"]
+    account = slurm_settings["groupname"]
+    partition = slurm_settings["partition"]
+    
+    slurm = {"threads": threads, 
+             "mem": mem,
+             "time": time,
+             "account": account,
+             "partition": partition
+             }
+    
+    #generate slurm script
+    slurm_file = os.path.join(work_dir, "slurm", f"diffbind_{genome}.sh")
+    utils.slurmTemplateScript(work_dir,"diffbind",slurm_file,slurm,diffbind,False,None,job_id_peak)
+    
+    #run slurm script
+    job_id_diffbind = utils.runSLURM(work_dir, slurm_file, "peak-calling")
     
        
 def bam_bwQC(work_dir, threads):
