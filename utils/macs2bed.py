@@ -27,12 +27,15 @@ if column_number == 4:
     
     df_bed["empty"] = ""
     df_bed["strand"] = "+"
-    df_bed.to_csv(bed_file, sep = "\t", index = False, header = False)
+    
 elif column_number > 6:
     print(f"ERROR: too many columns found in {bed_file}")
 
+#convert chromosome names from ENSEMBL annotation to UCSC annotation
+df_bed[0] = "chr" + df_bed[0] 
 
-
+#save bed file
+df_bed.to_csv(bed_file, sep = "\t", index = False, header = False)
 
 
 
