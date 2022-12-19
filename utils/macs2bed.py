@@ -21,7 +21,6 @@ df_bed = pd.read_csv(macs3_file,
 df_bed = df_bed.drop(range(4,9), axis = 1)
 
 #further annotate BED file (required by HOMER for peak annotation)
-df_bed = pd.read_csv(bed_file, sep = "\t", header = None)
 column_number = len(df_bed.columns)
 if column_number == 4:
     
