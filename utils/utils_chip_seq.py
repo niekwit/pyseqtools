@@ -9,6 +9,7 @@ import gzip
 import shutil
 from builtins import any as b_any
 from itertools import compress
+import numpy as np
 
 import yaml
 import pandas as pd
@@ -967,27 +968,123 @@ def peakSLURM(work_dir, genome):
     sample_info = pd.read_csv(os.path.join(work_dir,"samples.csv"))
     
     samples = list(set(sample_info["genotype"]))
-    #reference = list(set(sample_info[sample_info["ref"] == "ref"]["genotype"]))[0]
     
-    #create output dirs
+    #create output dirs for replicate peaks
     peak_dir = os.path.join(work_dir, "peaks", genome)
     os.makedirs(peak_dir, exist_ok=True)
     for i in samples:
         os.makedirs(os.path.join(peak_dir, i), exist_ok=True)
     
-    #load MACS3 settings
-    with open(os.path.join(script_dir,"yaml","chip-seq.yaml")) as file:
-            chip_settings = yaml.full_load(file)
+    #create output dirs for single file peaks
+    chip_samples = list(sample_info[sample_info["type"] == "ip"]["sample"]) #list(sample_info["sample"])
+    for i in chip_samples:
+        os.makedirs(os.path.join(peak_dir, i), exist_ok=True)
+           
+    def peakCall(work_dir,script_dir,genome,name,sample_list,chip_bams,input_bams):
+        '''
+        Peak calling function
+        '''
+        #load MACS3 settings
+        with open(os.path.join(script_dir,"yaml","chip-seq.yaml")) as file:
+                chip_settings = yaml.full_load(file)
+            
+        extsize = chip_settings["MACS3"]["extsize"]
+        if "hg" in genome:
+            macs3_genome = "hs"
+        elif "mm" in genome:
+            macs3_genome = "mm"
+        ip = chip_settings["MACS3"]["ip"]
+        cut_off = chip_settings["MACS3"]["broad-cutoff"]
+        macs3_format = chip_settings["MACS3"]["format"]
+        qvalue = chip_settings["MACS3"]["qvalue"]
         
-    extsize = chip_settings["MACS3"]["extsize"]
-    if "hg" in genome:
-        macs3_genome = "hs"
-    elif "mm" in genome:
-        macs3_genome = "mm"
-    ip = chip_settings["MACS3"]["ip"]
-    cut_off = chip_settings["MACS3"]["broad-cutoff"]
-    macs3_format = chip_settings["MACS3"]["format"]
-    qvalue = chip_settings["MACS3"]["qvalue"]
+        csv_macs3 = os.path.join(work_dir,"slurm",f"macs3_{name}_{genome}.csv")
+        csv_bed = os.path.join(work_dir,"slurm",f"bed_{name}_{genome}.csv")
+        csv_homer = os.path.join(work_dir,"slurm",f"homer_{name}_{genome}.csv")
+        csv_merge = os.path.join(work_dir,"slurm","merge_{name}_annotation.csv")
+            
+        csv_list = [csv_macs3,csv_bed,csv_homer,csv_merge]
+        
+        for i in csv_list:
+            if os.path.exists(i) == True:
+                os.remove(i)
+        
+        #prepare csv files with commands for each sample
+        for sample in sample_list:
+            out_dir = os.path.join(work_dir, "peaks", genome, sample)
+            
+            #create macs3 commands for combining replicates
+            macs3 = ["macs3","callpeak","-t",chip_bam,"-c",input_bam,"-g",macs3_genome
+                     ,"-n",sample,"-q",qvalue,"-f",macs3_format,"--outdir",out_dir,
+                     "--extsize",extsize]
+            if ip == "histone":
+                extension = ["--broad","--broad-cutoff",cut_off]
+                macs3.extend(extension)
+            
+            csv = open(csv_macs3, "a")  
+            csv.write(" ".join(macs3) + "\n")
+            csv.close()  
+            
+            #macs3 output file (get file extension based on narrow of broad peaks)
+            if ip == "histone":
+                extension = "_peaks.broadPeak"
+            elif ip == "tf":
+                extension = "_peaks.narrowPeak"
+            macs3_output = os.path.join(out_dir, sample + extension)
+            
+            #create commands for converting macs3 output to bed format
+            bed_file = os.path.join(out_dir, sample + ".bed")
+            bed_script = os.path.join(script_dir, "utils", "macs2bed.py")
+            bed = [bed_script, macs3_output, bed_file]
+            
+            csv = open(csv_bed, "a")  
+            csv.write(" ".join(bed) + "\n")
+            csv.close()  
+            
+            #create command for peak annotation (homer)
+            out_file = bed_file.replace(".bed", "_annotated-peaks.txt")
+            annotatePeaks = shutil.which("annotatePeaks.pl")
+                   
+            homer = ["perl",annotatePeaks,bed_file,genome, ">",out_file]
+            
+            csv = open(csv_homer, "a")  
+            csv.write(" ".join(homer) + "\n")
+            csv.close() 
+            
+            #create command for merging MACS3 output with HOMER annotation
+            merge_script = os.path.join(script_dir, "utils", "merge-annotation.py")
+            macs3_xls = os.path.join(out_dir, sample + "_peaks.xls")
+            merge = [merge_script,macs3_xls,out_file]
+            
+            csv = open(csv_merge, "a")  
+            csv.write(" ".join(merge) + "\n")
+            csv.close() 
+            
+       
+        #load slurm settings
+        with open(os.path.join(script_dir,"yaml","slurm.yaml")) as file:
+            slurm_settings = yaml.full_load(file)        
+
+        threads = slurm_settings["ChIP-Seq"]["macs3"]["cpu"]
+        mem = slurm_settings["ChIP-Seq"]["macs3"]["mem"]
+        time = slurm_settings["ChIP-Seq"]["macs3"]["time"]
+        account = slurm_settings["groupname"]
+        partition = slurm_settings["partition"]
+        
+        slurm = {"threads": threads, 
+                 "mem": mem,
+                 "time": time,
+                 "account": account,
+                 "partition": partition
+                 }
+        
+        #generate slurm script
+        slurm_file = os.path.join(work_dir, "slurm", f"peak_{genome}.sh")
+        utils.slurmTemplateScript(work_dir,"peak",slurm_file,slurm,None,True,csv_list)
+        
+        #run slurm script
+        job_id_peak = utils.runSLURM(work_dir, slurm_file, "peak-calling")
+        return(job_id_peak)
     
     #get bam files
     bam_list = sorted(glob.glob(os.path.join(work_dir, "bam", genome, "*.bam")))
@@ -995,104 +1092,50 @@ def peakSLURM(work_dir, genome):
     if dedup == True:
         bam_list = sorted(glob.glob(os.path.join(work_dir, "bam", genome, "*dedupl.bam")))
     
-    csv_macs3 = os.path.join(work_dir,"slurm",f"macs3_{genome}.csv")
-    csv_bed = os.path.join(work_dir,"slurm",f"bed_{genome}.csv")
-    csv_homer = os.path.join(work_dir,"slurm",f"homer_{genome}.csv")
-    csv_merge = os.path.join(work_dir,"slurm","merge_annotation.csv")
-        
-    csv_list = [csv_macs3,csv_bed,csv_homer,csv_merge]
     
-    for i in csv_list:
-        if os.path.exists(i) == True:
-            os.remove(i)
+    #run peak calling for replicate chip/input files
+    chip_bams = []
+    input_bams = []
     
-    #prepare csv files with commands for each sample
     for sample in samples:
-        #prepare sample info and files
         df = sample_info[sample_info["genotype"] == sample]
         chip_samples = list(df[df["type"] == "ip"]["sample"])
         chip_bam = list(filter(lambda item: any(x in item for x in chip_samples), bam_list))
         chip_bam = " ".join(chip_bam)
-
+        chip_bams.append(chip_bam)
+    
         input_samples = list(df[df["type"] == "input"]["sample"])
         input_bam = list(filter(lambda item: any(x in item for x in input_samples), bam_list))
         input_bam = " ".join(input_bam)
+        input_bams.append(input_bam)
+    
+    job_id_peak_replicate=peakCall(work_dir,script_dir,genome,"replicate",samples,chip_bams,input_bams)
+    
+    #run peak calling for single chip/input files
+    chip_samples = sorted(list(sample_info[sample_info["type"] == "ip"]["sample"]))
+    input_samples = sorted(list(sample_info[sample_info["type"] == "input"]["sample"]))
+    
+    chip_bams = []
+    input_bams = []
+    
+    bam_list_ = np.array(bam_list)
+    for chip_,input_ in zip(chip_samples,input_samples):
+                
+        chip_subset = [chip_ in s for s in bam_list]
+        chip_bam = list(bam_list_[chip_subset])[0]
+        chip_bams.append(chip_bam)
         
-        out_dir = os.path.join(peak_dir,sample)
-        
-        #create macs3 commands
-        macs3 = ["macs3","callpeak","-t",chip_bam,"-c",input_bam,"-g",macs3_genome
-                 ,"-n",sample,"-q",qvalue,"-f",macs3_format,"--outdir",out_dir,
-                 "--extsize",extsize]
-        if ip == "histone":
-            extension = ["--broad","--broad-cutoff",cut_off]
-            macs3.extend(extension)
-        
-        csv = open(csv_macs3, "a")  
-        csv.write(" ".join(macs3) + "\n")
-        csv.close()  
-        
-        #macs3 output file (get file extension based on narrow of broad peaks)
-        if ip == "histone":
-            extension = "_peaks.broadPeak"
-        elif ip == "tf":
-            extension = "_peaks.narrowPeak"
-        macs3_output = os.path.join(out_dir, sample + extension)
-        
-        #create commands for converting macs3 output to bed format
-        bed_file = os.path.join(out_dir, sample + ".bed")
-        bed_script = os.path.join(script_dir, "utils", "macs2bed.py")
-        bed = [bed_script, macs3_output, bed_file]
-        
-        csv = open(csv_bed, "a")  
-        csv.write(" ".join(bed) + "\n")
-        csv.close()  
-        
-        #create command for peak annotation (homer)
-        out_file = bed_file.replace(".bed", "_annotated-peaks.txt")
-        annotatePeaks = shutil.which("annotatePeaks.pl")
-               
-        homer = ["perl",annotatePeaks,bed_file,genome, ">",out_file]
-        
-        csv = open(csv_homer, "a")  
-        csv.write(" ".join(homer) + "\n")
-        csv.close() 
-        
-        #create command for merging MACS3 output with HOMER annotation
-        merge_script = os.path.join(script_dir, "utils", "merge-annotation.py")
-        macs3_xls = os.path.join(out_dir, sample + "_peaks.xls")
-        merge = [merge_script,macs3_xls,out_file]
-        
-        csv = open(csv_merge, "a")  
-        csv.write(" ".join(merge) + "\n")
-        csv.close() 
-        
-   
+        input_subset = [input_ in s for s in bam_list]
+        input_bam = list(bam_list_[input_subset])[0]
+        input_bams.append(input_bam)
+    
+    job_id_peak_single=peakCall(work_dir,script_dir,genome,"single-sample",samples,chip_bams,input_bams)
+    
     #load slurm settings
     with open(os.path.join(script_dir,"yaml","slurm.yaml")) as file:
-        slurm_settings = yaml.full_load(file)        
-
-    threads = slurm_settings["ChIP-Seq"]["macs3"]["cpu"]
-    mem = slurm_settings["ChIP-Seq"]["macs3"]["mem"]
-    time = slurm_settings["ChIP-Seq"]["macs3"]["time"]
-    account = slurm_settings["groupname"]
-    partition = slurm_settings["partition"]
+        slurm_settings = yaml.full_load(file)   
     
-    slurm = {"threads": threads, 
-             "mem": mem,
-             "time": time,
-             "account": account,
-             "partition": partition
-             }
-    
-    #generate slurm script
-    slurm_file = os.path.join(work_dir, "slurm", f"peak_{genome}.sh")
-    utils.slurmTemplateScript(work_dir,"peak",slurm_file,slurm,None,True,csv_list)
-    
-    #run slurm script
-    job_id_peak = utils.runSLURM(work_dir, slurm_file, "peak-calling")
-    
-    #differential peak analysis
+    #differential peak analysis 
     diffbind_script = os.path.join(script_dir,"R","chip-seq_slurm-diffbind.R")
     diffbind = ["Rscript",diffbind_script,work_dir,genome] 
     
@@ -1111,7 +1154,7 @@ def peakSLURM(work_dir, genome):
     
     #generate slurm script
     slurm_file = os.path.join(work_dir, "slurm", f"diffbind_{genome}.sh")
-    utils.slurmTemplateScript(work_dir,"diffbind",slurm_file,slurm,diffbind,False,None,job_id_peak)
+    utils.slurmTemplateScript(work_dir,"diffbind",slurm_file,slurm,diffbind,False,None,job_id_peak_single)
     
     #run slurm script
     job_id_diffbind = utils.runSLURM(work_dir, slurm_file, "peak-calling")

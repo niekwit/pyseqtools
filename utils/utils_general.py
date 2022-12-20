@@ -488,7 +488,7 @@ def deduplicationSLURM(script_dir, work_dir, genome):
     for bam in bam_list:
         dedup_bam = bam.replace("-sort-bl.bam","-sort-bl-dedupl.bam")
         if not file_exists(dedup_bam):
-            log_file = os.path.join(work_dir,"bam",bam.replace("-sort-bl.bam",""))
+            log_file = os.path.join(work_dir,"bam",bam.replace("-sort-bl.bam","_dedup.log"))
             command = ["picard", "MarkDuplicates", f"INPUT={bam}", f"OUTPUT={dedup_bam}", 
                        "REMOVE_DUPLICATES=TRUE", f"METRICS_FILE={log_file}"]
             os.makedirs(os.path.join(work_dir,"slurm"), exist_ok = True)
