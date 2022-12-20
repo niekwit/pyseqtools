@@ -40,9 +40,9 @@ for (i in 1:length(fileList)){
 df <- df[order(df$sample), ] 
 
 #create df for plotting
-df.melt <- melt(df, value.name = sample)
+df.melt <- melt(df, value.name = "rate")
 
-p <- ggplot(df.melt, aes(sample, Parent_Input)) +   
+p <- ggplot(df.melt, aes(sample, rate)) +   
   geom_bar(aes(fill = variable), 
            position = "dodge", 
            stat = "identity",
