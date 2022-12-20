@@ -1001,7 +1001,7 @@ def peakSLURM(work_dir, genome):
         csv_macs3 = os.path.join(work_dir,"slurm",f"macs3_{name}_{genome}.csv")
         csv_bed = os.path.join(work_dir,"slurm",f"bed_{name}_{genome}.csv")
         csv_homer = os.path.join(work_dir,"slurm",f"homer_{name}_{genome}.csv")
-        csv_merge = os.path.join(work_dir,"slurm","merge_{name}_annotation.csv")
+        csv_merge = os.path.join(work_dir,"slurm",f"merge_{name}_annotation.csv")
             
         csv_list = [csv_macs3,csv_bed,csv_homer,csv_merge]
         
@@ -1064,7 +1064,7 @@ def peakSLURM(work_dir, genome):
         #load slurm settings
         with open(os.path.join(script_dir,"yaml","slurm.yaml")) as file:
             slurm_settings = yaml.full_load(file)        
-
+    
         threads = slurm_settings["ChIP-Seq"]["macs3"]["cpu"]
         mem = slurm_settings["ChIP-Seq"]["macs3"]["mem"]
         time = slurm_settings["ChIP-Seq"]["macs3"]["time"]
