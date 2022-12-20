@@ -1010,7 +1010,7 @@ def peakSLURM(work_dir, genome):
                 os.remove(i)
         
         #prepare csv files with commands for each sample
-        for sample in sample_list:
+        for sample,chip_bam,input_bam in zip(sample_list,chip_bams,input_bams):
             out_dir = os.path.join(work_dir, "peaks", genome, sample)
             
             #create macs3 commands for combining replicates
@@ -1110,7 +1110,7 @@ def peakSLURM(work_dir, genome):
         input_bams.append(input_bam)
     
     job_id_peak_replicate=peakCall(work_dir,script_dir,genome,"replicate",samples,chip_bams,input_bams)
-    
+                                  #work_dir,script_dir,genome,name,sample_list,chip_bams,input_bams
     #run peak calling for single chip/input files
     chip_samples = sorted(list(sample_info[sample_info["type"] == "ip"]["sample"]))
     input_samples = sorted(list(sample_info[sample_info["type"] == "input"]["sample"]))
@@ -1129,7 +1129,7 @@ def peakSLURM(work_dir, genome):
         input_bam = list(bam_list_[input_subset])[0]
         input_bams.append(input_bam)
     
-    job_id_peak_single=peakCall(work_dir,script_dir,genome,"single-sample",samples,chip_bams,input_bams)
+    job_id_peak_single=peakCall(work_dir,script_dir,genome,"single-sample",chip_samples,chip_bams,input_bams)
     
     #load slurm settings
     with open(os.path.join(script_dir,"yaml","slurm.yaml")) as file:
