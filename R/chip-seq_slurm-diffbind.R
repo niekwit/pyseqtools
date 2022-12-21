@@ -13,6 +13,10 @@ args <- commandArgs(trailingOnly = TRUE)
 work.dir <- args[1]
 genome <- args[2]
 
+#create output dir
+out.dir <- file.path(work.dir,"peaks",genome,"diffbind")
+dir.create(out.dir,showWarnings = FALSE)
+
 #load appropriate genome db
 if (genome == "hg38"){library(TxDb.Hsapiens.UCSC.hg38.knownGene)
   } else if (genome == "hg19"){library(TxDb.Hsapiens.UCSC.hg19.knownGene)}
@@ -90,6 +94,140 @@ for (i in ipSamples){
 
 #write diffbind df to file
 write.csv(diffbind.sheet,file=file.path(work.dir,"peak",genome,"diffbind_samples.csv"))
+
+
+
+
+###differential binding analysis###
+diffbind <- dba.analyze(diffbind.sheet)
+
+#plot correlation heatmap
+pdf(file.path(out.dir,"sample_correlation_heatmap.pdf"))
+plot(diffbind)
+dev.off()
+
+#plot PCA
+pdf(file.path(out.dir,"PCA.pdf"))
+dba.plotPCA(diffbind,DBA_CONDITION,label=DBA_ID)
+dev.off()
+
+#generate binding affinity heatmaps
+hmap <- colorRampPalette(c("red", "black", "forestgreen"))(n = 13)
+pdf(file.path(out.dir,paste0("affinity_heatmap.pdf")))
+dba.plotHeatmap(diffbind, correlations=FALSE,scale="row", colScheme = hmap)
+dev.off()
+
+#Plot profiles
+pdf(file.path(out.dir,"plotProfile.pdf"))
+profiles <- dba.plotProfile(diffbind, samples=diffbind$masks$All, doPlot=TRUE)
+dev.off()
+
+#get number of conditions
+conditions <- length(diffbind$contrasts)
+
+#iterate over conditions (contrasts) and generate plots when DBs > 1
+for(i in 1:conditions){
+  dbs <- dba.report(diffbind, contrast=i)
+  if(sum(dbs$Fold>0) > 1 | sum(dbs$Fold<0) > 1){
+    contrast <- diffbind$contrasts[[i]][[5]]
+    condition <- paste0(contrast[2],"_vs_",contrast[3])
+    print(paste0("Generating plots for ", contrast[2]," vs ",contrast[3]))
+    
+    #create dir for output
+    dir.out <- file.path(work.dir,"diffbind", condition)
+    if(dir.exists(dir.out) == FALSE){
+      dir.create(dir.out)
+    }
+    
+    #Generate MA plots
+    print("MA plots")
+    file <- file.path(out.dir,condition,paste0("MA-plot-",condition,".pdf"))
+    pdf(file)
+    dba.plotMA(diffbind, contrast = i)
+    dev.off()
+    
+    #Generate volcano plots
+    print("Volcano plots")
+    file <- file.path(out.dir,condition,paste0("volcano-",condition,".pdf"))
+    pdf(file)
+    dba.plotVolcano(diffbind, contrast = i)
+    dev.off()
+    
+    #Plot venn diagrams
+    print("Venn diagrams")
+    file <- file.path(out.dir,condition,paste0("venn-",condition,".pdf"))
+    pdf(file)
+    dba.plotVenn(diffbind, contrast=i, bDB=TRUE,bGain=TRUE,bLoss=TRUE,bAll=FALSE)
+    dev.off()
+    
+    #export DBs to bed file
+    print(paste0("Exporting differential binding sites to a bed file for ", contrast[2]," vs ",contrast[3]))
+    bed.file <- file.path(out.dir,condition,paste0("DB-",condition,".bed"))
+    export.bed(dbs,con=bed.file)
+    
+    #coverage plot
+    peak <- readPeakFile(bed.file)
+    file <- file.path(out.dir,condition,paste0("coverage-",condition,".pdf"))
+    pdf(file)
+    covplot(peak, weightCol="V4")
+    dev.off()
+    
+    #peak annotation
+    if (genome == "hg38"){
+      txdb <- TxDb.Hsapiens.UCSC.hg38.knownGene
+    } else if (genome == "hg19") {
+      txdb <- TxDb.Hsapiens.UCSC.hg19.knownGene
+    }
+    
+    peakAnno <- annotatePeak(peak, tssRegion=c(-3000, 3000), TxDb=txdb, annoDb="org.Hs.eg.db")
+    
+    file <- file.path(out.dir,condition,paste0("piechart-",condition,".pdf"))
+    pdf(file)
+    plotAnnoPie(peakAnno)
+    dev.off()
+    
+    file <- file.path(out.dir,condition,paste0("upsetplot-",condition,".pdf"))
+    pdf(file)
+    upsetplot(peakAnno, vennpie=TRUE)
+    dev.off()
+    
+    ###Functional enrichment analysis with ReactomePA
+    #all peaks
+    pathways_all <- enrichPathway(as.data.frame(peakAnno)$geneId)
+    file <- file.path(out.dir,condition,paste0("dotplot_all_peaks-",condition,".pdf"))
+    pdf(file)
+    dotplot(pathways_all)
+    dev.off()
+    
+    go.all <- pathways_all@result
+    go.all$geneSymbol <- NA
+    suppressMessages(for(j in 1:nrow(go.all)){
+      entrez.genes <- unlist(strsplit(go.all[j,8], "/"))
+      entrez.genes <- mapIds(org.Hs.eg.db, entrez.genes,'SYMBOL','ENTREZID')
+      entrez.genes <- paste(entrez.genes, collapse = "/")
+      go.all[j,10] <- entrez.genes
+    })
+    write.csv(go.all, file = file.path(out.dir,condition,paste0("GO_all-peaks_",condition,".csv")))
+    
+    #peaks around tss
+    gene <- seq2gene(peak, tssRegion = c(-1000, 1000), flankDistance = 3000, TxDb=txdb)
+    pathways_tss <- enrichPathway(gene)
+    file <- file.path(out.dir,condition,paste0("dotplot_tss-",condition,".pdf"))
+    pdf(file)
+    dotplot(pathways_tss)
+    dev.off()
+    
+    go.peak <- pathways_all@result
+    go.peak$geneSymbol <- NA
+    suppressMessages(for(j in 1:nrow(go.peak)){
+      entrez.genes <- unlist(strsplit(go.peak[j,8], "/"))
+      entrez.genes <- mapIds(org.Hs.eg.db, entrez.genes,'SYMBOL','ENTREZID')
+      entrez.genes <- paste(entrez.genes, collapse = "/")
+      go.peak[j,10] <- entrez.genes
+    })
+    write.csv(go.all, file = file.path(out.dir,condition,paste0("GO_tss-peaks_",condition,".csv")))
+  }
+}
 
 
 
