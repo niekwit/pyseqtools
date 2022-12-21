@@ -7,8 +7,8 @@ library(clusterProfiler)
 library(ggupset)
 library(ReactomePA)
 
-library(BiocParallel)
-register(SerialParam())
+#library(BiocParallel)
+#register(SerialParam())
 
 #get parsed arguments
 args <- commandArgs(trailingOnly = TRUE)
@@ -101,7 +101,7 @@ write.csv(diffbind.sheet,file=file.path(work.dir,"peaks",genome,"diffbind_sample
 
 
 ###differential binding analysis###
-diffbind <- dba.analyze(diffbind.sheet)
+diffbind <- dba.analyze(diffbind.sheet,bGreylist=FALSE)
 
 #plot correlation heatmap
 pdf(file.path(out.dir,"sample_correlation_heatmap.pdf"))
