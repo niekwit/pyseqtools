@@ -7,6 +7,8 @@ library(clusterProfiler)
 library(ggupset)
 library(ReactomePA)
 
+library(BiocParallel)
+register(SerialParam())
 
 #get parsed arguments
 args <- commandArgs(trailingOnly = TRUE)
