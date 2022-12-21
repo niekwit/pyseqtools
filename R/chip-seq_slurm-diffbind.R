@@ -88,12 +88,12 @@ for (i in inputSamples) {
 
 #add input sample bam files to diffbind.sheet
 for (i in ipSamples){
-  peak <- file.path(work.dir,"peak",genome,i,paste0(i,"_peaks.xls"))
+  peak <- file.path(work.dir,"peaks",genome,i,paste0(i,"_peaks.xls"))
   diffbind.sheet[diffbind.sheet$SampleID == i,10] <- peak
 }
 
 #write diffbind df to file
-write.csv(diffbind.sheet,file=file.path(work.dir,"peak",genome,"diffbind_samples.csv"))
+write.csv(diffbind.sheet,file=file.path(work.dir,"peaks",genome,"diffbind_samples.csv"))
 
 
 
