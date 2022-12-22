@@ -1158,7 +1158,7 @@ def peakSLURM(work_dir, genome):
     utils.slurmTemplateScript(work_dir,"diffbind",slurm_file,slurm,diffbind,False,None,job_id_peak_single)
     
     #run slurm script
-    job_id_diffbind = utils.runSLURM(work_dir, slurm_file, "peak-calling")
+    job_id_diffbind = utils.runSLURM(work_dir, slurm_file, "diffbind")
     
        
 def bam_bwQC(work_dir, threads):
@@ -1307,6 +1307,74 @@ def bam_bwQC(work_dir, threads):
             + " --skipZeros -p " + threads + " --plotFile " + out_file
         subprocess.run(command, shell = True)
 
+
+def bamQCslurm(work_dir,script_dir,genome):
+    '''
+    Quality control analysis of BAM files using SLURM
+    '''
+    #get BAM files
+    bam_files = utils.getBamFiles(work_dir,genome)
+    bam_list = " ".join(bam_files)
+    
+    #create output dir/files
+    out_dir = os.path.join(work_dir,"bam_qc",genome)
+    bam_summary = os.path.join(out_dir,f"bamSummary_{genome}.npz")
+    correlation_plot = os.path.join(out_dir,f"plotCorrelation_{genome}.pdf")
+    pca_plot = os.path.join(out_dir,f"pca-plot_{genome}.pdf")
+    pca_data = os.path.join(out_dir,f"pca-data_{genome}.tab")
+    fingerprint_plot = os.path.join(out_dir,f"fingerprint_{genome}.pdf")
+    fragmentsize_hist = os.path.join(out_dir,f"fragment-sizes_{genome}.png")
+    
+    #create sample labels
+    bam_labels = [x.lsplit("-",1) for x in bam_files] #sample names cannot contain '-'
+    bam_labels = " ".join(bam_labels)
+    
+    #load slurm settings
+    with open(os.path.join(script_dir,"yaml","slurm.yaml")) as file:
+        slurm_settings = yaml.full_load(file)  
+    
+    threads = slurm_settings["ChIP-Seq"]["deeptools"]["cpu"]
+    mem = slurm_settings["ChIP-Seq"]["deeptools"]["mem"]
+    time = slurm_settings["ChIP-Seq"]["deeptools"]["time"]
+    account = slurm_settings["groupname"]
+    partition = slurm_settings["partition"]
+    
+    slurm = {"threads": threads, 
+             "mem": mem,
+             "time": time,
+             "account": account,
+             "partition": partition
+             }
+    
+    #create commands
+    multiBamSummary = ["multiBamSummary","bins",bam_list,"-o",bam_summary,
+                       "--numberOfProcessors",threads,"--labels",bam_labels ]
+    multiBamSummary = " ".join(multiBamSummary)
+    
+    plotCorrelation = ["plotCorrelation","--corData",bam_summary,"--plotFile",correlation_plot]
+    plotCorrelation = " ".join(plotCorrelation)
+    
+    plotPCA = ["plotPCA","--corData",bam_summary,"--outFileNameData",pca_data,
+               "--plotFile",pca_plot]
+    plotPCA = " ".join(plotPCA)
+    
+    plotFingerprint = ["plotFingerprint","-b",bam_list,"--numberOfProcessors",
+                       threads,"--labels",bam_labels, "--plotFile",fingerprint_plot]
+    plotFingerprint = " ".join(plotFingerprint)
+    
+    bamPEFragmentSize = ["bamPEFragmentSize","-b",bam_list,"--histogram",fragmentsize_hist,
+                         "--numberOfProcessors",threads, "--samplesLabel",bam_labels]
+    bamPEFragmentSize= " ".join(bamPEFragmentSize)
+    
+    commands = [multiBamSummary,plotCorrelation,plotPCA,plotFingerprint,bamPEFragmentSize]
+    
+    #generate slurm script
+    slurm_file = os.path.join(work_dir, "slurm", f"bam-qc_{genome}.sh")
+    utils.slurmTemplateScript(work_dir,"bamqc",slurm_file,slurm,commands,False,None,None)
+    #work_dir,name,file,slurm,commands,array=False,csv=None,dep=None
+    
+    #run slurm script
+    job_id_bamqc = utils.runSLURM(work_dir, slurm_file, "bam-qc")
         
 def plotProfile(work_dir, chip_seq_settings, genome, threads, slurm=False):
     
