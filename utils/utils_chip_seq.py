@@ -1317,7 +1317,7 @@ def bamQCslurm(work_dir,script_dir,genome):
     fragmentsize_hist = os.path.join(out_dir,f"fragment-sizes_{genome}.png")
     
     #create sample labels
-    bam_labels = [x.lsplit("-",1) for x in bam_files] #sample names cannot contain '-'
+    bam_labels = [x.split("-",1)[0] for x in bam_files] #sample names cannot contain '-'
     bam_labels = " ".join(bam_labels)
     
     #load slurm settings
