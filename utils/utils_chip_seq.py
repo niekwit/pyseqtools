@@ -1153,6 +1153,7 @@ def peakSLURM(work_dir, genome):
     
        
 def bam_bwQC(work_dir, threads):
+    
     #import sample info
     sample_df = pd.read_csv(os.path.join(work_dir, "samples.csv"))
     conditions = set(sample_df["condition"])
@@ -1300,15 +1301,17 @@ def bam_bwQC(work_dir, threads):
 
 
 def bamQCslurm(work_dir,script_dir,genome):
+    '''BAM file quality control for SLURM
     '''
-    Quality control analysis of BAM files using SLURM
-    '''
+    puts(colored.green("BAM quality control with DeepTools"))
+    
     #get BAM files
     bam_files = utils.getBamFiles(work_dir,genome)
     bam_list = " ".join(bam_files)
     
     #create output dir/files
     out_dir = os.path.join(work_dir,"bam_qc",genome)
+    os.makedirs(out_dir, exist_ok=True)
     bam_summary = os.path.join(out_dir,f"bamSummary_{genome}.npz")
     correlation_plot = os.path.join(out_dir,f"plotCorrelation_{genome}.pdf")
     pca_plot = os.path.join(out_dir,f"pca-plot_{genome}.pdf")
