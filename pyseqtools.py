@@ -324,6 +324,10 @@ def main():
                                action = 'store_true',
                                default = False,
                                help = "Skip FastQC/MultiQC")
+    parser_damid.add_argument("--slurm",
+                             required = False,
+                             action = 'store_true',
+                             help = "Submit jobs to Cambridge HPC using SLURM")
     
     #create subparser for TT-Seq analysis commands
     parser_ttseq = subparsers.add_parser('tt-seq',
@@ -830,7 +834,10 @@ def main():
     
         qc = args["qc"]
         if qc == True:
-            chipseq_utils.bam_bwQC(work_dir, threads)
+            if slurm == False:
+                chipseq_utils.bam_bwQC(work_dir, threads)
+            else:
+                chipseq_utils.bamQCslurm(work_dir,script_dir,genome)
 
         metagene = args["metagene"]
         if metagene == True:
@@ -927,23 +934,26 @@ def main():
     
     
     def damID(args, script_dir):
+        rename = args["rename"]
+        threads = args["threads"]
+        genome = args["genome"]
+        slurm = genome = args["slurm"]
+        
         #Check md5sums
         utils.checkMd5(work_dir)
         
         ##rename files
-        rename = args["rename"]
         if rename == True:
             utils.rename(work_dir)
         
         #set thread count for processing
         max_threads = str(multiprocessing.cpu_count())
-        threads = args["threads"]
         if threads == "max":
             threads = max_threads
         
-        genome = args["genome"]
         
-        utils.trim(script_dir, threads, work_dir)
+        
+        #utils.trim(script_dir, threads, work_dir)
         damid_utils.damID(script_dir, work_dir, threads, genome, damid_settings)
         damid_utils.bedgraph2BigWig(script_dir, work_dir, damid_settings, genome)
     
