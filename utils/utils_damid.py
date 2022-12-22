@@ -12,10 +12,8 @@ import numpy as np
 
 
 import yaml
-try:
-    import git #module name is GitPython
-except ModuleNotFoundError:
-    subprocess.check_call([sys.executable, "-m", "pip", "install", "GitPython"])
+import git #module name is GitPython
+
     
 script_dir = os.path.abspath(os.path.dirname(__file__))
 script_dir = os.path.dirname(script_dir)
@@ -61,7 +59,7 @@ def damID(script_dir, work_dir, threads, genome, damid_settings):
     file_list = glob.glob(os.path.join(work_dir, "trim","*.gz"))
     
     #check whether there is a dam-only control
-    dam_control = b_any(["dam" in x for x in file_list])
+    dam_control = b_any(["dam" in x.lower() for x in file_list])
     
     if not dam_control:
         sys.exit("ERROR: no dam only control defined (dam.fastq.gz) in raw-data directory")

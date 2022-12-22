@@ -1457,6 +1457,12 @@ def bamToFastq(work_dir):
     pass
         
         
-        
-        
-        
+def getBamFiles(work_dir,genome):
+    '''Get BAM files from experiment
+    '''
+    #get bam files
+    bam_list = sorted(glob.glob(os.path.join(work_dir, "bam", genome, "*.bam")))
+    dedup = any("dedup" in x for x in bam_list)
+    if dedup == True:
+        bam_list = sorted(glob.glob(os.path.join(work_dir, "bam", genome, "*dedupl.bam")))
+        return(bam_list)
