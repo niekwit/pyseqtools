@@ -10,7 +10,6 @@ import yaml
 from pathlib import Path
 import tempfile
 
-
 from clint.textui import colored, puts
 import pysam
 
@@ -328,7 +327,7 @@ def hisat2(work_dir, threads, tt_seq_settings, genome, slurm=False, job_id_trim=
     align(work_dir,threads, tt_seq_settings,genome, slurm, job_id_trim)
 
 
-def splitBam(threads, work_dir, genome):
+def splitBam(threads, work_dir, genome, slurm):
     
     '''
     based on https://www.biostars.org/p/92935/
@@ -338,187 +337,142 @@ def splitBam(threads, work_dir, genome):
 
     file_list = glob.glob(os.path.join(work_dir, "bam", genome, "*", "*_sorted.bam"))
     
-        
-    for bam in file_list:
-        print(os.path.basename(bam))
-        ###forward strand
-        fwd1 = bam.replace("_sorted.bam","_fwd1.bam")
-        fwd2 = bam.replace("_sorted.bam","_fwd2.bam")
-        
-        print("\tGenerating forward strand-specific BAM file")
-        #alignments of the second in pair if they map to the forward strand
-        if not utils.file_exists(fwd1):
-            pysam.view("-@",threads,"-b","-f","128","-F","16",bam,"-o",fwd1, catch_stdout=False)
-            pysam.index(fwd1)
-        
-        #alignments of the first in pair if they map to the reverse  strand
-        if not utils.file_exists(fwd2):
-            pysam.view("-@",threads,"-b","-f","80",bam,"-o",fwd2, catch_stdout=False)
-            pysam.index(fwd2)
-        
-        #merge all forward reads
-        fwd = bam.replace("_sorted.bam","_fwd.bam")
-        if not utils.file_exists(fwd):
-            pysam.merge("-@",threads,fwd,fwd1,fwd2, catch_stdout=False)
-            pysam.index(fwd)
-        
-        ###reverse strand
-        rev1 = bam.replace("_sorted.bam","_rev1.bam")
-        rev2 = bam.replace("_sorted.bam","_rev2.bam")
-        
-        print("\tGenerating reverse strand-specific BAM file")
-        #alignments of the second in pair if they map to the reverse strand
-        if not utils.file_exists(rev1):
-            pysam.view("-b","-f","144",bam,"-o", rev1, catch_stdout=False)
-            pysam.index(rev1)
-        
-        #alignments of the first in pair if they map to the forward strand
-        if not utils.file_exists(rev2):
-            pysam.view("-@",threads,"-b","-f","64","-F","16",bam,"-o",rev2, catch_stdout=False)
-            pysam.index(rev2)
-        
-        #merge all reverse reads
-        rev = bam.replace("_sorted.bam","_rev.bam")
-        if not utils.file_exists(rev):
-            pysam.merge("-@",threads,rev,rev1,rev2, catch_stdout=False)
-            pysam.index(rev)
-        
-        #remove all non-merged bam files
-        remove = [fwd1,fwd2,rev1,rev2]
-        for file in remove:
-            os.remove(file)
-            os.remove(file.replace(".bam",".bam.bai"))
-            
-'''
-
-    puts(colored.green("Generating strand-specific BAM files with samtools"))
-    
-    #get sorted bam files
-    file_list = glob.glob(os.path.join(work_dir, "bam", genome, "*", "*_sorted.bam"))
-    
-    if len(file_list) == 0:
-        return(puts(colored.red("ERROR: No BAM files found to split")))
-    
-    #load slurm settings  
-    with open(os.path.join(script_dir,
-                               "yaml",
-                               "slurm.yaml")) as file:
-            slurm_settings = yaml.full_load(file)
-    
-    threads = str(slurm_settings["TT-Seq"]["splitBAM_CPU"])
-    mem = str(slurm_settings["TT-Seq"]["splitBAM_mem"])
-    time = str(slurm_settings["TT-Seq"]["splitBAM_time"])
-    account = slurm_settings["groupname"]
-    partition = slurm_settings["TT-Seq"]["partition"]
-    #email = slurm_settings["email"]
-    
-    #create csv file with samtools view commands for slurm bash script
-    for bam in file_list:
-        ##forward strand
-        fwd1 = bam.replace("*_sorted.bam","_fwd1.bam")
-        fwd2 = bam.replace("*_sorted.bam","_fwd2.bam")
-        
-        #alignments of the second in pair if they map to the forward strand
-        samtools_fwd1 = ["samtools", "view", "-@", threads, "-b", "-f", "128", "-F", "16", bam, "-o", fwd1]
-        samtools_fwd1 = " ".join(samtools_fwd1)
-        #alignments of the first in pair if they map to the reverse  strand
-        samtools_fwd2 = ["samtools", "view", "-@", threads, "-b", "-f", "80", bam, "-o", fwd2]
-        samtools_fwd2 = " ".join(samtools_fwd2)
-        
-        ##reverse strand
-        rev1 = bam.replace("*_sorted.bam","_rev1.bam")
-        rev2 = bam.replace("*_sorted.bam","_rev2.bam")
-        
-        #alignments of the second in pair if they map to the reverse strand
-        samtools_rev1 = ["samtools", "view", "-b", "-f", "144", bam, "-o", rev1]
-        samtools_rev1 = " ".join(samtools_rev1)
-        #alignments of the first in pair if they map to the forward strand
-        samtools_rev2 = ["samtools", "view", "-@", threads, "-b", "-f", "64", "-F", "16", bam, "-o", rev2]
-        samtools_rev2 = " ".join(samtools_rev2)
-        
-        csv = open(os.path.join(work_dir,"slurm","slurm_splitBAM.csv"), "a")  
-        csv.write(samtools_fwd1)
-        csv.write(samtools_fwd2)
-        csv.write(samtools_rev1)
-        csv.write(samtools_rev2)
-        csv.close()
-    
-    #create slurm bash script for splitting bam files
-    print("Generating slurm_splitBAM.sh")
-    script = os.path.join(work_dir,"slurm","slurm_splitBAM.sh")
-    script = open(script, "w")  
-    script.write("#!/bin/bash" + "\n")
-    script.write("\n")
-    script.write("#SBATCH -A " + account + "\n")
-    script.write("#SBATCH --mail-type=FAIL" + "\n")
-    script.write("#SBATCH --mail-type=END" + "\n")
-    script.write("#SBATCH -p " + partition + "\n")
-    script.write("#SBATCH -D " + work_dir + "\n")
-    script.write("#SBATCH -o slurm/slurm_split_BAM_%a.log" + "\n")
-    script.write("#SBATCH -c " + threads + "\n")
-    script.write("#SBATCH -t " + time + "\n")
-    script.write("#SBATCH --mem=" + mem + "\n")
-    script.write("#SBATCH -J " + "split_bam" + "\n")
-    script.write("#SBATCH -a " + "1-" + str(len(file_list) * 4) + "\n")
-    script.write("\n")
-    script.write("sed -n ${SLURM_ARRAY_TASK_ID}p slurm/slurm_splitBAM.csv | bash")
-    script.close()
-    
-    #run slurm script and get job id
-    print("Submitting slurm_splitBAM.sh to cluster")
-    job_id = subprocess.check_output("sbatch slurm/slurm_splitBAM.sh | cut -d " " -f 4", shell = True)
-    job_id = job_id.decode("utf-8")
-    
-    #load slurm settings for samtools index
-    threads = str(slurm_settings["TT-Seq"]["samtools-index_CPU"])
-    mem = str(slurm_settings["TT-Seq"]["samtools-index_mem"])
-    time = str(slurm_settings["TT-Seq"]["samtools-index_time"])
-    
-    #create csv file with bam files to be indexed
-    extensions = ["*_fwd1.bam", "*_fwd2.bam", "*_rev1.bam", "*_rev2.bam"]
-    csv = os.path.join(work_dir,"slurm","slurm_indexBAM.csv")
-    os.remove(csv) #delete a preexisting file                   
-    
-    for extension in extensions:
-        file_list = glob.glob(os.path.join(work_dir, "bam", genome, "*", extension))
+    if slurm == False:    
         for bam in file_list:
-            csv = open(csv, "a")
-            index = ["samtools","index", "-@", threads]
-            csv.write(index)
+            print(os.path.basename(bam))
+            ###forward strand
+            fwd1 = bam.replace("_sorted.bam","_fwd1.bam")
+            fwd2 = bam.replace("_sorted.bam","_fwd2.bam")
+            
+            print("\tGenerating forward strand-specific BAM file")
+            #alignments of the second in pair if they map to the forward strand
+            if not utils.file_exists(fwd1):
+                pysam.view("-@",threads,"-b","-f","128","-F","16",bam,"-o",fwd1, catch_stdout=False)
+                pysam.index(fwd1)
+            
+            #alignments of the first in pair if they map to the reverse  strand
+            if not utils.file_exists(fwd2):
+                pysam.view("-@",threads,"-b","-f","80",bam,"-o",fwd2, catch_stdout=False)
+                pysam.index(fwd2)
+            
+            #merge all forward reads
+            fwd = bam.replace("_sorted.bam","_fwd.bam")
+            if not utils.file_exists(fwd):
+                pysam.merge("-@",threads,fwd,fwd1,fwd2, catch_stdout=False)
+                pysam.index(fwd)
+            
+            ###reverse strand
+            rev1 = bam.replace("_sorted.bam","_rev1.bam")
+            rev2 = bam.replace("_sorted.bam","_rev2.bam")
+            
+            print("\tGenerating reverse strand-specific BAM file")
+            #alignments of the second in pair if they map to the reverse strand
+            if not utils.file_exists(rev1):
+                pysam.view("-b","-f","144",bam,"-o", rev1, catch_stdout=False)
+                pysam.index(rev1)
+            
+            #alignments of the first in pair if they map to the forward strand
+            if not utils.file_exists(rev2):
+                pysam.view("-@",threads,"-b","-f","64","-F","16",bam,"-o",rev2, catch_stdout=False)
+                pysam.index(rev2)
+            
+            #merge all reverse reads
+            rev = bam.replace("_sorted.bam","_rev.bam")
+            if not utils.file_exists(rev):
+                pysam.merge("-@",threads,rev,rev1,rev2, catch_stdout=False)
+                pysam.index(rev)
+            
+            #remove all non-merged bam files
+            remove = [fwd1,fwd2,rev1,rev2]
+            for file in remove:
+                os.remove(file)
+                os.remove(file.replace(".bam",".bam.bai"))
+    else:
+        #read sample info
+        #df = pd.read_csv(os.path.join(work_dir,"samples.csv"))
+        #df.drop("ref", axis=1, inplace = True)
+        
+        #csv files
+        
+        
+        
+        #load SLURM settings
+        with open(os.path.join(script_dir,"yaml","slurm.yaml")) as file:
+            slurm_settings = yaml.full_load(file)        
+
+        threads = slurm_settings["TT-Seq"]["samtools"]["cpu"]
+        mem = slurm_settings["TT-Seq"]["samtools"]["mem"]
+        time = slurm_settings["TT-Seq"]["samtools"]["time"]
+        account = slurm_settings["groupname"]
+        partition = slurm_settings["TT-Seq"]["partition"]
+        
+        slurm = {"threads": threads, 
+                 "mem": mem,
+                 "time": time,
+                 "account": account,
+                 "partition": partition
+                 }
+        #csv files for commands
+        csv_view_fwd1 = os.path.join(work_dir,"slurm","view_fwd1.csv")
+        csv_index_fwd1 = os.path.join(work_dir,"slurm","index_fwd1.csv")
+        
+        csv_view_fwd2 = os.path.join(work_dir,"slurm","view_fwd2.csv")
+        csv_index_fwd2 = os.path.join(work_dir,"slurm","index_fwd2.csv")
+        
+        csv_merge_fwd = os.path.join(work_dir,"slurm","merge_fwd.csv")
+        csv_index_fwd = os.path.join(work_dir,"slurm","index_fwd.csv")
+        
+        #csv_list = [csv_merge,csv_picard,csv_index]
+        
+        for i in csv_list:
+            if os.path.exists(i) == True:
+                os.remove(i)
+        
+        for bam in file_list:
+            ###forward strand
+            fwd1 = bam.replace("_sorted.bam","_fwd1.bam")
+            fwd2 = bam.replace("_sorted.bam","_fwd2.bam")
+            
+            #create commands for alignments of the second in pair if they map to the forward strand
+            samtools_view_fwd1 = ["samtools","view","-@",threads,"-b","-f","128","-F","16",bam,"-o",fwd1]
+            csv = open(csv_view_fwd1, "a")  
+            csv.write(" ".join(samtools_view_fwd1) + "\n")
+            csv.close()  
+                        
+            index_fwd1 = ["samtools","index","-@",threads,fwd1]
+            csv = open(csv_index_fwd1, "a")  
+            csv.write(" ".join(index_fwd1) + "\n")
+            csv.close()  
+            
+            #create commands for alignments of the first in pair if they map to the reverse  strand
+            samtools_view_fwd2 = ["samtools","view","-@",threads,"-b","-f","80",bam,"-o",fwd2]
+            csv = open(csv_view_fwd2, "a")  
+            csv.write(" ".join(samtools_view_fwd2) + "\n")
+            csv.close()  
+            
+            index_fwd2 = ["samtools","index","-@",threads,fwd2]
+            csv = open(csv_index_fwd2, "a")  
+            csv.write(" ".join(index_fwd2) + "\n")
+            csv.close()  
+            
+            #merge all forward reads
+            fwd = bam.replace("_sorted.bam","_fwd.bam")
+            merge_fwd = ["samtools","merge","-@",threads,fwd,fwd1,fwd2]
+            csv = open(csv_merge_fwd, "a")  
+            csv.write(" ".join(merge_fwd) + "\n")
             csv.close()
-    
-    #create bash script indexing splitted bam files
-    script = os.path.join(work_dir,"slurm","slurm_indexBAM.sh")
-    script = open(script, "w")  
-    script.write("#!/bin/bash" + "\n")
-    script.write("\n")
-    script.write("#SBATCH -A " + account + "\n")
-    #script.write("#SBATCH ---mail-user=" + email + "\n")
-    script.write("#SBATCH --mail-type=FAIL" + "\n")
-    script.write("#SBATCH --mail-type=END" + "\n")
-    script.write("#SBATCH -p " + partition + "\n")
-    script.write("#SBATCH -D " + work_dir + "\n")
-    script.write("#SBATCH -o slurm/slurm_index_BAM_%a.log" + "\n")
-    script.write("#SBATCH -c " + threads + "\n")
-    script.write("#SBATCH -t " + time + "\n")
-    script.write("#SBATCH --mem=" + mem + "\n")
-    script.write("#SBATCH -J " + "samtools_index" + "\n")
-    script.write("#SBATCH -a " + "1-" + str(len(file_list) * 4) + "\n")
-    script.write("#SBATCH --dependency=afterok:" + job_id)
-    script.write("\n")
-    script.write("conda activate ttseq")
-    script.write("module load samtools/1.10\n")
-    script.write("\n")
-    script.write("sed -n %ap slurm/slurm_indexBAM.csv | bash")
-    script.close()
-    
-    #run slurm script and get job id
-    job_id = subprocess.check_output("sbatch slurm/slurm_indexBAM.sh | cut -d " " -f 4", shell = True)
-    job_id = job_id.decode("utf-8")
-    
-    #merge all forward and reverse reads
-   ''' 
-   
+            
+            index_fwd = ["samtools","index","-@",threads,fwd]
+            csv = open(csv_index_fwd, "a")  
+            csv.write(" ".join(index_fwd) + "\n")
+            csv.close()  
+                
+            
+
+
+
+
+
 
 def sizeFactors(script_dir, work_dir, slurm=False):
     """
@@ -789,62 +743,144 @@ def metaProfiles(work_dir, threads, tt_seq_settings, genome):
     plotProfile(work_dir, threads, "rev")
 
 
-def mergeBAM(work_dir, genome, threads, slurm=False):
+def mergeBAM(work_dir, script_dir,genome, threads, slurm):
     '''
     Merge replicate BAM files using samtools
     '''
     puts(colored.green("Merging replicate BAM files using samtools"))
     
-    #load samples.csv
-    df = pd.read_csv(os.path.join(work_dir,"samples.csv"))
-    df.drop("ref", axis=1, inplace = True)
-
-    #merge genotype and condition
-    df["merge"] = df["genotype"] + "_" + df["condition"]
-    df.drop(["genotype","condition"], axis=1,inplace = True)
+    if slurm == False:
+        #load samples.csv
+        df = pd.read_csv(os.path.join(work_dir,"samples.csv"))
+        df.drop("ref", axis=1, inplace = True)
     
-    #generate sample names for merged BAM files
-    sample_names = list(set(df["merge"]))
-    
-    #merge BAM files
-    
-    for sample_name in sample_names:
-        #get BAM files to be merged
-        samples = df[df["merge"] == sample_name]
-        samples = samples["sample"]
-        out_bam = os.path.join(work_dir, "bam", genome, f"{sample_name}_merged.bam")
-        bam_files = [os.path.join(work_dir, "bam", genome, x, f"{x}_sorted.bam") for x in samples]
-        print_ = " ".join([os.path.basename(x) for x in bam_files])
-        print(f"Merging {print_}")
+        #merge genotype and condition
+        df["merge"] = df["genotype"] + "_" + df["condition"]
+        df.drop(["genotype","condition"], axis=1,inplace = True)
         
-        if not utils.file_exists(out_bam):
-            command = ["samtools", "merge", "-@", threads, "-"]
-            for i in bam_files:
-                command.append(i)
-            command.extend(["|", "samtools", "sort", "-@", threads, "-" ,">", out_bam])
+        #generate sample names for merged BAM files
+        sample_names = list(set(df["merge"]))
+        
+        #merge BAM files
+        
+        for sample_name in sample_names:
+            #get BAM files to be merged
+            samples = df[df["merge"] == sample_name]
+            samples = samples["sample"]
+            out_bam = os.path.join(work_dir, "bam", genome, f"{sample_name}_merged.bam")
+            bam_files = [os.path.join(work_dir, "bam", genome, x, f"{x}_sorted.bam") for x in samples]
+            print_ = " ".join([os.path.basename(x) for x in bam_files])
+            print(f"Merging {print_}")
             
+            if not utils.file_exists(out_bam):
+                command = ["samtools", "merge", "-@", threads, "-"]
+                for i in bam_files:
+                    command.append(i)
+                command.extend(["|", "samtools", "sort", "-@", threads, "-" ,">", out_bam])
+                
+                if slurm == False:
+                    utils.write2log(work_dir, " ".join(command))
+                    subprocess.call(command)
+                else:
+                    pass
+        
+        #deduplicate merged BAM files
+        file_list = glob.glob(os.path.join(work_dir,"bam", genome,"*_merged.bam"))
+        
+        print("Removing duplicates from merged BAM files using PICARD")
+        for bam in file_list:
             if slurm == False:
+                print(os.path.basename(bam))
+                picard = utils.checkPicard(script_dir)
+                dedup_bam = bam.replace(".bam","_dedup.bam")
+                log = bam.replace(".bam","_deduplication.log")
+                command = ["java", "-jar", picard, "MarkDuplicates", f"INPUT={bam}" , 
+                           f"OUTPUT={dedup_bam}", "REMOVE_DUPLICATES=TRUE", f"METRICS_FILE={log}"]
                 utils.write2log(work_dir, " ".join(command))
-                subprocess.call(command)
-            else:
-                pass
-    
-    #deduplicate merged BAM files
-    file_list = glob.glob(os.path.join(work_dir,"bam", genome,"*_merged.bam"))
-    
-    print("Removing duplicates from merged BAM files using PICARD")
-    for bam in file_list:
-        if slurm == False:
-            print(os.path.basename(bam))
-            picard = utils.checkPicard(script_dir)
-            dedup_bam = bam.replace(".bam","_dedup.bam")
-            log = bam.replace(".bam","_deduplication.log")
-            command = ["java", "-jar", picard, "MarkDuplicates", f"INPUT={bam}" , 
-                       f"OUTPUT={dedup_bam}", "REMOVE_DUPLICATES=TRUE", f"METRICS_FILE={log}"]
-            utils.write2log(work_dir, " ".join(command))
-            if utils.file_exists(dedup_bam):
-                subprocess.call(command)
-           
+                if utils.file_exists(dedup_bam):
+                    subprocess.call(command)
+    else:
+        puts(colored.green("Merging strand-specific replicate BAM files using samtools"))
+        
+        #load samples.csv
+        df = pd.read_csv(os.path.join(work_dir,"samples.csv"))
+        df.drop("ref", axis=1, inplace = True)
+        
+        #get sample names
+        sample_names = list(set([x.rsplit("_",1)[0] for x in df["sample"]]))
+        
+        #strands
+        strands = ["fwd","rev"]
+        
+        #load SLURM settings
+        with open(os.path.join(script_dir,"yaml","slurm.yaml")) as file:
+            slurm_settings = yaml.full_load(file)        
+
+        threads = slurm_settings["TT-Seq"]["samtools"]["cpu"]
+        mem = slurm_settings["TT-Seq"]["samtools"]["mem"]
+        time = slurm_settings["TT-Seq"]["samtools"]["time"]
+        account = slurm_settings["groupname"]
+        partition = slurm_settings["TT-Seq"]["partition"]
+        
+        slurm = {"threads": threads, 
+                 "mem": mem,
+                 "time": time,
+                 "account": account,
+                 "partition": partition
+                 }
+        
+        #csv files for commands
+        csv_merge = os.path.join(work_dir,"slurm","merge.csv")
+        csv_picard = os.path.join(work_dir,"slurm","picard.csv")
+        csv_index = os.path.join(work_dir,"slurm","index2.csv")
+        
+        csv_list = [csv_merge,csv_picard,csv_index]
+        
+        for i in csv_list:
+            if os.path.exists(i) == True:
+                os.remove(i)
+        
+        #create commands 
+        for strand in strands:
+            for sample in sample_names:
+                bams = sorted(glob.glob(os.path.join(work_dir,"bam",genome,f"{sample}*",f"{sample}*{strand}.bam")))
+                               
+                #create commands to merge and sort replicate BAM files
+                out_bam = os.path.join(work_dir,"bam",genome,f"{sample}_merged_{strand}.bam")
+                merge = ["samtools", "merge", "-@", threads, "-"]
+                merge.extend(bams)
+                merge.extend(["|", "samtools", "sort", "-@", threads, "-" ,">", out_bam])
+
+                csv = open(csv_merge, "a")  
+                csv.write(" ".join(merge) + "\n")
+                csv.close()  
+
+                #create commands to deduplicate BAM files
+                out_bam_dedup = os.path.join(work_dir,"bam",genome,f"{sample}_merged_dedupl_{strand}.bam")
+                deduplication = ["picard","MarkDuplicates",f"INPUT={out_bam}",
+                                 f"OUTPUT={out_bam_dedup}","REMOVE_DUPLICATES=TRUE",]
+                
+                csv = open(csv_picard, "a")  
+                csv.write(" ".join(deduplication) + "\n")
+                csv.close() 
+                
+                #create commands to index deduplicated BAM files
+                index_bam = ["samtools", "index", "-@",threads,out_bam_dedup]
+                
+                csv = open(csv_index, "a")  
+                csv.write(" ".join(index_bam) + "\n")
+                csv.close() 
+
+        #generate slurm script
+        slurm_file = os.path.join(work_dir, "slurm", f"merge-bam_{genome}.sh")
+        utils.slurmTemplateScript(work_dir,"merge",slurm_file,slurm,None,True,csv_list)
+        
+        #run slurm script
+        job_id = utils.runSLURM(work_dir, slurm_file, "merge-bam")
+        return(job_id)
+
+
+
 
 def readRatio(work_dir, script_dir, genome, slurm=False, threads = "1"):
     """
@@ -1012,3 +1048,13 @@ def DESeq2(work_dir, script_dir, genome, slurm=False):
 
 def txReadThrough(work_dir, threads):
     pass
+
+
+def ngsPlotSlurm(work_dir,genome):
+    '''
+    Creation of metagene profiles using ngs.plot
+    '''
+    puts(colored.green("Generating metagene profiles using ngs.plot"))
+    
+    ###create first mate only BAM files
+    bam_files = glob.glob(os.path.join(work_dir,"bam",genome,"*_merged_dedup.bam"))

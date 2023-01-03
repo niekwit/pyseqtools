@@ -1432,25 +1432,30 @@ def bwa(work_dir, script_dir, args, threads, chip_seq_settings, genome):
         pass
 
 
-def mergeBam(work_dir, threads):
-    file = open(os.path.join(work_dir,"merge-bam.csv"), "r")
-    lines = file.readlines()
-    lines = lines[1:]
-    count = 0
-    for line in lines: #removes newline characters
-        lines[count] = line.replace("\n","")
-        count+=1
-    
-    
-    for line in lines:
-        out_bam = os.path.join(work_dir, "bam", line.split(",")[0]) + ".bam"
-        in_bams = line.split(",")[1].split(";")
-        in_bams = [os.path.join(work_dir,"bam",x) for x in in_bams]
-        if not file_exists(out_bam):
-            try: 
-                pysam.merge("-@", str(threads) ,out_bam , in_bams[0], in_bams[1], in_bams[2], in_bams[3], in_bams[4])
-            except:
-                pysam.merge("-@", str(threads) ,out_bam , in_bams[0], in_bams[1], in_bams[2], in_bams[3])
+def mergeBam(work_dir, threads, slurm):
+    '''Merge replicate strand-specific BAM files
+    '''
+    if slurm == False:
+        file = open(os.path.join(work_dir,"merge-bam.csv"), "r")
+        lines = file.readlines()
+        lines = lines[1:]
+        count = 0
+        for line in lines: #removes newline characters
+            lines[count] = line.replace("\n","")
+            count+=1
+        
+        
+        for line in lines:
+            out_bam = os.path.join(work_dir, "bam", line.split(",")[0]) + ".bam"
+            in_bams = line.split(",")[1].split(";")
+            in_bams = [os.path.join(work_dir,"bam",x) for x in in_bams]
+            if not file_exists(out_bam):
+                try: 
+                    pysam.merge("-@", str(threads) ,out_bam , in_bams[0], in_bams[1], in_bams[2], in_bams[3], in_bams[4])
+                except:
+                    pysam.merge("-@", str(threads) ,out_bam , in_bams[0], in_bams[1], in_bams[2], in_bams[3])
+    else:
+        sample_info = pd.read_csv(os.path.join(work_dir,"samples.csv"))
                 
         
 def bamToFastq(work_dir):

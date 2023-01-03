@@ -354,10 +354,6 @@ def main():
                              nargs = "?",
                              default = "hg38",
                              help = "Choose reference genome (default is hg38)")
-    parser_ttseq.add_argument("--indexBAM",
-                             required = False,
-                             action = 'store_true',
-                             help = "Generate indeces for all available BAM files (for HPC only)")
     parser_ttseq.add_argument("--splitBAM",
                              required = False,
                              action = 'store_true',
@@ -366,10 +362,6 @@ def main():
                              required = False,
                              action = 'store_true',
                              help = "Calculate size factors from yeast spike-in RNA with DESeq2")
-    parser_ttseq.add_argument("-d", "--deduplication",
-                             required = False,
-                             action = 'store_true',
-                             help = "Perform deduplication of BAM files")
     parser_ttseq.add_argument("-b", "--bigwig",
                              required = False,
                              action = 'store_true',
@@ -381,16 +373,11 @@ def main():
     parser_ttseq.add_argument("--metagene",
                              required = False,
                              action = 'store_true',
-                             help = "Generate metagene plots and heatmaps with plotProfile (deepTools)")
+                             help = "Generate metagene plots and heatmaps with ngs.plot")
     parser_ttseq.add_argument("--readRatio",
                              required = False,
                              action = 'store_true',
                              help = "Calculate ratios of read numbers in areas around TSS vs TES")
-    parser_ttseq.add_argument("--skip-fastqc",
-                               required = False,
-                               action = 'store_true',
-                               default = False,
-                               help = "Skip FastQC/MultiQC")
     parser_ttseq.add_argument("--slurm",
                              required = False,
                              action = 'store_true',
@@ -961,7 +948,12 @@ def main():
     def ttSeq(args, script_dir):
         print("TT-Seq analysis selected")
         
+        #get parsed arguments
+        align=args["align"]
         slurm = args["slurm"]
+        genome = args["genome"]
+        rename = args["rename"]
+        sizeFactors = args["sizeFactors"]
         
         #set thread count for processing
         if slurm == False:
@@ -972,30 +964,16 @@ def main():
             print(f"Using {threads} CPU threads for analysis")
         
         #rename files
-        rename = args["rename"]
+        
         if rename == True:
             utils.rename(work_dir)
         
-        ''' 
-        #determine file extension raw data
-        file_extension = utils.get_extension(work_dir)
-            
-        #run FastQC/MultiQC
-       
-        skip_fastqc = args["skip_fastqc"]
-        if not skip_fastqc:
-            utils.fastqc(script_dir, work_dir,threads,file_extension)
-        else:
-            print("Skipping FastQC/MultiQC analysis")
-        '''
-        #get selected genome
-        genome = args["genome"]
-        
+                
         #check md5sums
         utils.checkMd5(work_dir)
         
         #quality trim fastq files and align
-        align=args["align"]
+        
         if align == True:
             if slurm == True:
                 job_id_trim = utils.trimSLURM(script_dir, work_dir)
@@ -1005,32 +983,14 @@ def main():
                 utils.trim(script_dir, threads, work_dir)
                 tt_seq_utils.STAR(work_dir, threads, script_dir, tt_seq_settings, genome)
                 
-               
-        #index BAM files
-        indexBAM = args["indexBAM"]
-        if indexBAM == True:
-            utils.indexBam(work_dir, threads, genome, slurm, script_dir)
-        
-        #perform deduplication
-        dedup = args["deduplication"]
-        if slurm == False:
-            if dedup == True:
-                utils.deduplicationBam(script_dir, work_dir, threads, args)
-                utils.indexBam(work_dir, threads)
-        else:
-            if dedup == False:
-                pass #to do
-        
         #split bam files into forward and reverse strand files
         splitBAM = args["splitBAM"]
         if splitBAM == True:
-            if slurm == False:
-                tt_seq_utils.splitBam(threads, work_dir, genome)
+                tt_seq_utils.splitBam(threads, work_dir, genome, slurm)
             
         #get scale factors from yeast spike-in
-        sizeFactors = args["sizeFactors"]
         if sizeFactors == True:
-            tt_seq_utils.sizeFactors(work_dir)
+            tt_seq_utils.sizeFactors(script_dir, work_dir, slurm)
             
         #create BigWig files
         bigwig = args["bigwig"]
