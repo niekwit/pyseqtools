@@ -18,7 +18,15 @@ Perform the following command in the directory of your choice:
 ```
 git clone https://github.com/niekwit/pyseqtools.git
 ```
+For your convenience you can add the `pyseqtools` directory to your `$PATH` by adding the following line to your `~/.bashrc` file:
+```
+export PATH=/home/path/to/pyseqtools:$PATH
+```
 
+Optional: enabe auto-completion of the different `pyseqtools` pipelines, genomes, and CRISPR libraries by adding the following line to your `~/.bashrc` file:
+```
+source /home/path/to/pyseqtools/bash/auto-complete.sh
+```
 ## Software requirements
 
 - Python >= 3.7
