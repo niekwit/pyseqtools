@@ -720,7 +720,7 @@ def main():
                  rnaseq_utils.STAR(work_dir, threads, script_dir, rna_seq_settings, genome, slurm)
                  
              if isoformAnalysis != None:
-                 rnaseq_utils.isoformAnalysis(work_dir, rna_seq_settings, genome, slurm, isoformAnalysis)
+                 rnaseq_utils.isoformAnalysis(work_dir, script_dir, rna_seq_settings, genome, slurm, isoformAnalysis)
                 
              if deseq2 == True:
                  gtf = rna_seq_settings["gtf"][genome.split("_")[0]]

@@ -923,9 +923,9 @@ def rsemIndex(work_dir, script_dir, rna_seq_settings, slurm, rsemIndex):
         pass
       
     
-def isoformAnalysis(work_dir, rna_seq_settings, genome, slurm, isoformAnalysis):
+def isoformAnalysis(work_dir, script_dir, rna_seq_settings, genome, slurm, isoformAnalysis):
     '''
-    Alternative isoform analysis using RSEM/MISO, based on CRICK scripts
+    Alternative isoform analysis using RSEM/MISO, based on CRICK scripts, or rMATS
 
     '''
     
@@ -1364,12 +1364,33 @@ def isoformAnalysis(work_dir, rna_seq_settings, genome, slurm, isoformAnalysis):
             except ValueError:
                 print(job_id_rmats)
             
+            #submit rMATS plotting script to HPC
+            plot_script = os.path.join(script_dir,"R","rna-seq_plot-rmats.R")
+            plot = ["Rscript",script,work_dir]
+            plot = " ".join(plot_script)
             
+            #load slurm settings
+            threads = slurm_settings["RNA-Seq"]["rMATS-plot"]["CPU"]
+            mem = slurm_settings["RNA-Seq"]["rMATS-plot"]["mem"]
+            time = slurm_settings["RNA-Seq"]["rMATS-plot"]["time"]
+            account = slurm_settings["groupname"]
+            partition = slurm_settings["RNA-Seq"]["partition"]
             
-            
-            
-            
+            slurm = {"threads": threads, 
+                     "mem": mem,
+                     "time": time,
+                     "account": account,
+                     "partition": partition
+                     }
                 
-
+            #generate slurm script
+            slurm_file = os.path.join(work_dir, "slurm", f"rMATS-plot_{genome}.sh")
+            utils.slurmTemplateScript(work_dir,"rMATS-plot",slurm_file,slurm,plot,False,None,job_id_rmats)
+            
+            #run slurm script
+            job_id_rmatsplot = utils.runSLURM(work_dir, slurm_file, "rMATS-plot")
+            
+            
+            
 
 
