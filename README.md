@@ -106,7 +106,7 @@ optional arguments:
 
 ```
 Before running `pyseqtools` prepare the following:
-1. `stats.config` file.  
+1. `stats.config` file.
 This contains the sample comparisons that will be fed into `MAGeCK` or `BAGEL2`:
 ```
 t;c
@@ -114,11 +114,11 @@ D8SORT;D8LIB
 D21SORT;D21LIB
 D8SORT,D21SORT;D8LIB,D21LIB
 ```
-	The first line is the header line (test;sample). Each following line contains a unique sample comparison: test sample name(s);control sample name(s)
-	The sample names should be the same as the fastq files, but wihout the fastq.gz/fq.gz file extension. Multiple samples can be grouped when seperated with a comma (see example).
-	In the `MAGeCK` output file scores for depletion and enrichment which will correspond to depletion/enrichment of sgRNAs against genes in the test sample compared to the control sample.
+The first line is the header line (test;sample). Each following line contains a unique sample comparison: test sample name(s);control sample name(s)
+The sample names should be the same as the fastq files, but wihout the fastq.gz/fq.gz file extension. Multiple samples can be grouped when seperated with a comma (see example).
+In the `MAGeCK` output file scores for depletion and enrichment which will correspond to depletion/enrichment of sgRNAs against genes in the test sample compared to the control sample.
 
-2. `rename.config` file.  
+2. `rename.config` file.
 This contains information for renaming fastq files before analyis (optional):
 ```
 SLX-20801.DNAA002.H55VLDRX2.s_2.r_1.fq.gz;D8LIB.fq.gz
@@ -126,7 +126,26 @@ SLX-20801.DNAA004.H55VLDRX2.s_2.r_1.fq.gz;D8SORT.fq.gz
 SLX-20801.DNAA007.H55VLDRX2.s_2.r_1.fq.gz;D21LIB.fq.gz
 SLX-20801.DNAA016.H55VLDRX2.s_2.r_1.fq.gz;D21SORT.fq.gz
 ```
-Each line contains: original file name;new file name  
+Each line contains: original file name;new file name.
+
+3. A crispr-library.yaml in the yaml subdirectory of the `pyseqtools` directory:
+
+```
+bassik:
+  clip_seq: GTTTAAGAGCTAAGCTGGAAACAGCATAGCAA
+  fasta: /home/niek/Documents/references/fasta/Human/Bassik-library/bassik_lib.fasta
+  index_path: '/home/niek/Documents/scripts/pyseqtools/index/hisat2/bassik/bassik-index'
+  read_mod: clip
+  sg_length: na
+  species: human
+tko3:
+  clip_seq: ''
+  fasta: /home/niek/Documents/scripts/pyseqtools/index/Moffat_TKO3-guides-sequences/Moffat_TKO3-guides-sequences.fasta
+  index_path: /home/niek/Documents/scripts/pyseqtools/index/hisat2/tko3/tko3-index
+  read_mod: trim
+  sg_length: '20'
+  species: human
+```
 
 IMPORTANT NOTE: if your data is paired-end, only use the fastq files of mate 1 (read1).  
 
