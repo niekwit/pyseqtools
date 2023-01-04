@@ -1356,7 +1356,6 @@ def isoformAnalysis(work_dir, script_dir, rna_seq_settings, genome, slurm, isofo
             
             try:
                 test = int(job_id_rmats)
-                utils.SLURM_job_id_log(work_dir, "rMATS", job_id_rmats)
                 print(f"Submitted SLURM script to cluster (job ID {job_id_rmats})")
                 
                 #log slurm job id
@@ -1367,6 +1366,7 @@ def isoformAnalysis(work_dir, script_dir, rna_seq_settings, genome, slurm, isofo
             #submit rMATS plotting script to HPC
             plot_script = os.path.join(script_dir,"R","rna-seq_plot-rmats.R")
             plot = ["Rscript",plot_script,work_dir]
+            plot = " ".join(plot)
             
             #load slurm settings
             threads = slurm_settings["RNA-Seq"]["rMATS-plot"]["CPU"]

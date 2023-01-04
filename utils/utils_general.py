@@ -899,7 +899,7 @@ def fastqc(script_dir, work_dir, threads, file_extension):
     else:
         print("Skipping FastQC/MultiQC (already performed)")
 
-
+                       #work_dir,"rMATS-plot",slurm_file,slurm,plot,False,None,job_id_rmats
 def slurmTemplateScript(work_dir,name,file,slurm,commands,array=False,csv=None,dep=None):
     '''
     Template for SLURM scripts
@@ -924,7 +924,7 @@ def slurmTemplateScript(work_dir,name,file,slurm,commands,array=False,csv=None,d
     script.write(f"#SBATCH -t {time}\n")
     script.write(f"#SBATCH --mem={mem}\n")
     script.write(f"#SBATCH -J {name}\n")
-    if dep == True:
+    if dep != None:
         script.write(f"#SBATCH --dependency=afterok:{dep}\n")
     if array == True:
         #set numer of jobs for array
@@ -946,7 +946,7 @@ def slurmTemplateScript(work_dir,name,file,slurm,commands,array=False,csv=None,d
         
         #write commands to slurm script
         for i in commands:
-            script.write(f"{i}\n\n")
+            script.write(f"{' '.join(i)}\n\n")
     script.close()
     
 
