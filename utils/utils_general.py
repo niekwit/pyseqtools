@@ -946,7 +946,7 @@ def slurmTemplateScript(work_dir,name,file,slurm,commands,array=False,csv=None,d
         
         #write commands to slurm script
         for i in commands:
-            script.write(f"{i}\n\n")
+            script.write(f"{i}\n")
     script.close()
     
 

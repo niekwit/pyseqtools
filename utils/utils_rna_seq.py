@@ -1366,7 +1366,7 @@ def isoformAnalysis(work_dir, script_dir, rna_seq_settings, genome, slurm, isofo
             #submit rMATS plotting script to HPC
             plot_script = os.path.join(script_dir,"R","rna-seq_plot-rmats.R")
             plot = ["Rscript",plot_script,work_dir]
-            #plot = " ".join(plot)
+            plot = " ".join(plot)
             
             #load slurm settings
             threads = slurm_settings["RNA-Seq"]["rMATS-plot"]["CPU"]
