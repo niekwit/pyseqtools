@@ -19,7 +19,7 @@ def main():
 
     #create subparsers for each module, i.e. functionality
 
-    #create subparser for crispr screen analysis commands
+    ####crispr screen subparser
     parser_crispr = subparsers.add_parser('crispr',
                                           description = "Analysis pipeline for CRISPR-Cas screens",
                                           help = 'CRISPR screen analysis')
@@ -90,11 +90,15 @@ def main():
                                default = False,
                                help = "Skip MAGeCK/BAGEL2")
 
-    # create the parser for RNA-Seq-analysis
+    ####RNA-Seq subparser
     parser_rnaseq = subparsers.add_parser('rna-seq',
                                           description = "Analysis pipeline for RNA-Seq experiments",
                                           help='RNA-Seq analysis')
 
+    parser_rnaseq.add_argument("--md5sum",
+                             action = 'store_true',
+                             required = False,
+                             help = "Check md5sums of fastq files")
     parser_rnaseq.add_argument("-t", "--threads",
                                required = False,
                                default = 1,
@@ -176,11 +180,15 @@ def main():
                              action = 'store_true',
                              help = "Submit jobs to Cambridge HPC using SLURM")
 
-    #create subparser for ChIP-Seq analysis commands
+    ####ChIP-Seq subparser
     parser_chip = subparsers.add_parser('chip-seq',
                                         description = "Analysis pipeline for ChIP-Seq experiments",
                                         help='ChIP-Seq analysis')
 
+    parser_chip.add_argument("--md5sum",
+                                 action = 'store_true',
+                                 required = False,
+                                 help = "Check md5sums of fastq files")
     parser_chip.add_argument("-t", "--threads",
                              required = False,
                              default = "1",
@@ -253,10 +261,14 @@ def main():
                                help = "Run FastQC/MultiQC")
 
 
-    #create subparser for CUT&RUN analysis commands
+    ####cutrun-Seq subparser
     parser_cutrun = subparsers.add_parser('cutrun',
                                           description = "Analysis pipeline for CUT & RUN experiments",
                                           help = 'CUT & RUN analysis')
+    parser_cutrun.add_argument("--md5sum",
+                             action = 'store_true',
+                             required = False,
+                             help = "Check md5sums of fastq files")
     parser_cutrun.add_argument("-t", "--threads",
                              required = False,
                              default = 1,
@@ -301,11 +313,19 @@ def main():
                                action = 'store_true',
                                default = False,
                                help = "Skip FastQC/MultiQC")
+    parser_cutrun.add_argument("--slurm",
+                             required = False,
+                             action = 'store_true',
+                             help = "Submit jobs to Cambridge HPC using SLURM")
 
-    #create subparser for DamID
+    ####DamID-Seq subparser
     parser_damid = subparsers.add_parser('damid',
                                           description = "Analysis pipeline for DamID (wrapper for https://github.com/owenjm/damidseq_pipeline)",
                                           help = 'DamID analysis')
+    parser_damid.add_argument("--md5sum",
+                             action = 'store_true',
+                             required = False,
+                             help = "Check md5sums of fastq files")
     parser_damid.add_argument("-r", "--rename",
                                required = False,
                                action = 'store_true',
@@ -329,11 +349,15 @@ def main():
                              action = 'store_true',
                              help = "Submit jobs to Cambridge HPC using SLURM")
     
-    #create subparser for TT-Seq analysis commands
+    ####TT-Seq subparser
     parser_ttseq = subparsers.add_parser('tt-seq',
                                         description = "Analysis pipeline for TT-Seq experiments",
                                         help='TT-Seq analysis according to https://github.com/crickbabs/DRB_TT-seq')
 
+    parser_ttseq.add_argument("--md5sum",
+                                 action = 'store_true',
+                                 required = False,
+                                 help = "Check md5sums of fastq files")
     parser_ttseq.add_argument("-t", "--threads",
                              required = False,
                              default = "1",
@@ -383,11 +407,14 @@ def main():
                              action = 'store_true',
                              help = "Submit jobs to Cambridge HPC using SLURM")
     
-    # create the parser for 3end-Seq
+    ####3end-Seq subparser
     parser_3endseq = subparsers.add_parser('3end-seq',
                                           description = "Analysis pipeline for 3end-Seq experiments",
                                           help='3end-Seq analysis')
-
+    parser_3endseq.add_argument("--md5sum",
+                             action = 'store_true',
+                             required = False,
+                             help = "Check md5sums of fastq files")
     parser_3endseq.add_argument("-t", "--threads",
                                required = False,
                                default = 1,
@@ -618,16 +645,17 @@ def main():
         pe_tags = args["peTags"]
         slurm = args["slurm"] 
         rsemIndex = args["rsemIndex"]
+        md5sum = args["md5sum"]
         
         if slurm == False:
-            ####set thread count for processing
+            ###set thread count for processing
             max_threads = str(multiprocessing.cpu_count())
             threads = args["threads"]
             if threads == "max":
                 threads = max_threads
 
             ### Check md5sums
-            utils.checkMd5(work_dir)
+            utils.checkMd5(work_dir,script_dir,slurm)
     
             ###Run FastQC/MultiQC
             file_extension = utils.get_extension(work_dir)
@@ -703,6 +731,9 @@ def main():
                  elif "mm" in genome or genome == "gencode.vM1.pc_transcripts":
                      species = "mouse"
              
+             if md5sum == True:
+                 utils.checkMd5(work_dir,script_dir,slurm)   
+             
              if rsemIndex != None:
                  if len(rsemIndex) == 3:
                      rnaseq_utils.rsemIndex(work_dir, script_dir, rna_seq_settings, slurm, rsemIndex)
@@ -740,6 +771,7 @@ def main():
         slurm = args["slurm"]
         pe_tags = args["peTags"]
         peak = args["peaks"]
+        md5sum = args["md5sum"]
         
         #set thread count for processing
         max_threads = str(multiprocessing.cpu_count())
@@ -748,7 +780,8 @@ def main():
             threads = max_threads
 
         #Check md5sums
-        utils.checkMd5(work_dir)
+        if md5sum == True:
+            utils.checkMd5(work_dir,script_dir,slurm)
 
         #create BAM files
         align = args["align"]
@@ -835,6 +868,8 @@ def main():
 
 
     def cutrun(args, script_dir):
+        slurm = args["slurm"]
+        
         #set thread count for processing
         max_threads = str(multiprocessing.cpu_count())
         threads = args["threads"]
@@ -842,7 +877,7 @@ def main():
             threads = max_threads
 
         #Check md5sums
-        utils.checkMd5(work_dir)
+        utils.checkMd5(work_dir,script_dir,slurm)
 
 
         #create BAM files
@@ -927,7 +962,7 @@ def main():
         slurm = genome = args["slurm"]
         
         #Check md5sums
-        utils.checkMd5(work_dir)
+        utils.checkMd5(work_dir,script_dir,slurm)
         
         ##rename files
         if rename == True:
@@ -970,7 +1005,7 @@ def main():
         
                 
         #check md5sums
-        utils.checkMd5(work_dir)
+        utils.checkMd5(work_dir,script_dir,slurm)
         
         #quality trim fastq files and align
         

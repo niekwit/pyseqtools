@@ -45,37 +45,67 @@ def check_whitespace(work_dir):
         sys.exit(1)
     
 
-def checkMd5(work_dir):
-    md5sum_file = os.path.join(work_dir,"raw-data", "md5sums.csv")
-
-    def md5(file):
-        work_dir = os.getcwd()
-        file = os.path.join(work_dir, "raw-data", file)
-        hash_md5 = hashlib.md5()
-        with open(file, "rb") as f:
-            for chunk in iter(lambda: f.read(4096), b""):
-                hash_md5.update(chunk)
-        return(hash_md5.hexdigest())
-
-    if not os.path.exists(os.path.join(work_dir, "md5sums_checked.csv")):
-        if os.path.exists(md5sum_file):
-            print("Checking MD5 checksums")
-            df = pd.read_csv(md5sum_file)
-            df["md5sum_new"] = df["file"].apply(md5)
-
-            #compare original checksums with calculated ones
-            df["md5sumCorrect"] = df["md5sum"] == df["md5sum_new"]
-
-            check_list = df[~df["md5sumCorrect"]]
-            if len(check_list) > 0:
-                print("Calculated MD5 checksums do not match originals:")
-                print(check_list["file"])
-                sys.exit(1)
-            else:
-                print("MD5 checksums correct")
-                df.to_csv("md5sums_checked.csv",index=False)
-
-
+def checkMd5(work_dir,script_dir,slurm):
+    '''Check md5sums of fastq files
+    '''
+    if slurm == False:
+        md5sum_file = os.path.join(work_dir,"raw-data", "md5sums.csv")
+    
+        def md5(file):
+            work_dir = os.getcwd()
+            file = os.path.join(work_dir, "raw-data", file)
+            hash_md5 = hashlib.md5()
+            with open(file, "rb") as f:
+                for chunk in iter(lambda: f.read(4096), b""):
+                    hash_md5.update(chunk)
+            return(hash_md5.hexdigest())
+    
+        if not os.path.exists(os.path.join(work_dir, "md5sums_checked.csv")):
+            if os.path.exists(md5sum_file):
+                print("Checking MD5 checksums")
+                df = pd.read_csv(md5sum_file)
+                df["md5sum_new"] = df["file"].apply(md5)
+    
+                #compare original checksums with calculated ones
+                df["md5sumCorrect"] = df["md5sum"] == df["md5sum_new"]
+    
+                check_list = df[~df["md5sumCorrect"]]
+                if len(check_list) > 0:
+                    print("Calculated MD5 checksums do not match originals:")
+                    print(check_list["file"])
+                    sys.exit(1)
+                else:
+                    print("MD5 checksums correct")
+                    df.to_csv("md5sums_checked.csv",index=False)
+    else:
+        command = ["python",os.path.join(script_dir,"utils","md5sum.py")]
+        
+        #load slurm settings
+        with open(os.path.join(script_dir,"yaml","slurm.yaml")) as file:
+            slurm_settings = yaml.full_load(file)  
+        
+        threads = slurm_settings["md5sum"]["cpu"]
+        mem = slurm_settings["md5sum"]["mem"]
+        time = slurm_settings["md5sum"]["time"]
+        account = slurm_settings["groupname"]
+        partition = slurm_settings["partition"]
+        
+        slurm = {"threads": threads, 
+                 "mem": mem,
+                 "time": time,
+                 "account": account,
+                 "partition": partition
+                 }
+        
+        #generate slurm script
+        slurm_file = os.path.join(work_dir, "slurm", f"md5sum.sh")
+        slurmTemplateScript(work_dir,"md5sum",slurm_file,slurm,command,False,None,None)
+        
+        #run slurm script
+        job_id = runSLURM(work_dir, slurm_file, "md5sum")
+        
+        
+        
 def logCommandLineArgs(work_dir):
     args = sys.argv
     args = " ".join(args)
@@ -945,8 +975,13 @@ def slurmTemplateScript(work_dir,name,file,slurm,commands,array=False,csv=None,d
         script.write(f"#SBATCH -o {log}\n\n")
         
         #write commands to slurm script
-        for i in commands:
-            script.write(f"{i}\n")
+        #check if command is a list of command(s)
+        if type(commands) == list:
+            for i in commands:
+                script.write(f"{i}\n")
+        else: #probably just one command not parsed as a list
+            script.write(f"{commands}\n")
+            
     script.close()
     
 
@@ -1162,9 +1197,9 @@ def trimSLURM(script_dir, work_dir, module, pe_tags):
             slurm_settings = yaml.full_load(file)
     
     #load slurm parameters
-    threads = str(slurm_settings["Trim_galore_CPU"])
-    trim_mem = str(slurm_settings["Trim_galore_mem"])
-    trim_time = str(slurm_settings["Trim_galore_time"])
+    threads = slurm_settings["Trim_galore"]["cpu"]
+    trim_mem = slurm_settings["Trim_galore"]["mem"]
+    trim_time = slurm_settings["Trim_galore"]["time"]
     account = slurm_settings["groupname"]
     partition = slurm_settings["partition"]
         
