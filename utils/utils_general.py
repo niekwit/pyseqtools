@@ -48,6 +48,7 @@ def check_whitespace(work_dir):
 def checkMd5(work_dir,script_dir,slurm):
     '''Check md5sums of fastq files
     '''
+    puts(colored.green("Checking md5sums fastq files"))
     if slurm == False:
         md5sum_file = os.path.join(work_dir,"raw-data", "md5sums.csv")
     
