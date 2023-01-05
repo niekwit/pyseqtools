@@ -933,10 +933,10 @@ def fastqc(script_dir, work_dir, threads, file_extension):
     else:
         print("Skipping FastQC/MultiQC (already performed)")
 
-                       #work_dir,"rMATS-plot",slurm_file,slurm,plot,False,None,job_id_rmats
+
 def slurmTemplateScript(work_dir,name,file,slurm,commands,array=False,csv=None,dep=None):
     '''
-    Template for SLURM scripts
+    Generates SLURM scripts
 
     '''
     #load slurm settings
@@ -963,16 +963,24 @@ def slurmTemplateScript(work_dir,name,file,slurm,commands,array=False,csv=None,d
     if array == True:
         #set numer of jobs for array
         csv_ = csv[0] #pick one csv with commands (all csvs should have same amount of commands)
-        commands = int(subprocess.check_output(f"cat {csv_} | wc -l", shell = True).decode("utf-8"))
-        script.write("#SBATCH -a " + f"1-{commands}\n")
+        commands_number = int(subprocess.check_output(f"cat {csv_} | wc -l", shell = True).decode("utf-8"))
+        script.write("#SBATCH -a " + f"1-{commands_number}\n")
         
         #set log location
-        log = os.path.join(work_dir, "slurm", f"{name}%a.log")
+        log = os.path.join(work_dir, "slurm", f"{name}_%a.log")
         script.write(f"#SBATCH -o {log}\n\n")
         
         #write array commands for each csv file
         for i in csv:
             script.write("sed -n ${SLURM_ARRAY_TASK_ID}p " + f"{i} | bash\n")
+            
+        #write non-csv commands to slurm script
+        if commands != None:
+            if type(commands) == list:#check if command is a list of command(s)
+                for i in commands:
+                    script.write(f"{i}\n")
+            else: #probably just one command not parsed as a list
+                script.write(f"{commands}\n")
     else:
         #set log location
         log = os.path.join(work_dir, "slurm", f"{name}.log")
