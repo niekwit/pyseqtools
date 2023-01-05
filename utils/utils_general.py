@@ -81,7 +81,8 @@ def checkMd5(work_dir,script_dir,slurm):
     else:
         os.makedirs(os.path.join(work_dir,"slurm"),exist_ok=True)
         
-        command = ["python",os.path.join(script_dir,"utils","md5sum.py")]
+        command = ["python",os.path.join(script_dir,"utils","md5sum.py"),work_dir]
+        command = [" ".join(command)]
         
         #load slurm settings
         with open(os.path.join(script_dir,"yaml","slurm.yaml")) as file:
