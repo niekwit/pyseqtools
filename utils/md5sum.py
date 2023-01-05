@@ -12,7 +12,7 @@ import pandas as pd
 args = sys.argv
 
 #get parsed arguments
-work_dir = args[0]
+work_dir = args[1]
 
 #get md5sum files
 md5sum_files = glob.glob(os.path.join(work_dir,"raw-data","*.md5sums.txt"))
