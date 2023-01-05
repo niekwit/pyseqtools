@@ -79,6 +79,8 @@ def checkMd5(work_dir,script_dir,slurm):
                     print("MD5 checksums correct")
                     df.to_csv("md5sums_checked.csv",index=False)
     else:
+        os.makedirs(os.path.join(work_dir,"slurm"),exist_ok=True)
+        
         command = ["python",os.path.join(script_dir,"utils","md5sum.py")]
         
         #load slurm settings
