@@ -989,6 +989,7 @@ def main():
         genome = args["genome"]
         rename = args["rename"]
         sizeFactors = args["sizeFactors"]
+        md5sum = args["md5sum"]
         
         #set thread count for processing
         if slurm == False:
@@ -1005,7 +1006,8 @@ def main():
         
                 
         #check md5sums
-        utils.checkMd5(work_dir,script_dir,slurm)
+        if md5sum == True:
+            utils.checkMd5(work_dir,script_dir,slurm)
         
         #quality trim fastq files and align
         
@@ -1021,7 +1023,10 @@ def main():
         #split bam files into forward and reverse strand files
         splitBAM = args["splitBAM"]
         if splitBAM == True:
-                tt_seq_utils.splitBam(threads, work_dir, genome, slurm)
+            if slurm == True:  
+                tt_seq_utils.splitBam(work_dir, genome, slurm)
+            else:
+                tt_seq_utils.splitBam(work_dir, genome, slurm, threads)
             
         #get scale factors from yeast spike-in
         if sizeFactors == True:
