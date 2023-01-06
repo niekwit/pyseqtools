@@ -327,7 +327,7 @@ def hisat2(work_dir, threads, tt_seq_settings, genome, slurm=False, job_id_trim=
     align(work_dir,threads, tt_seq_settings,genome, slurm, job_id_trim)
 
 
-def splitBam(threads, work_dir, genome, slurm):
+def splitBam(work_dir, genome, slurm,threads='1'):
     
     '''
     based on https://www.biostars.org/p/92935/
@@ -1115,12 +1115,32 @@ def txReadThrough(work_dir, threads):
     pass
 
 
-def ngsPlotSlurm(work_dir,genome):
+def ngsPlotSlurm(work_dir,genome,slurm):
     '''
     Creation of metagene profiles using ngs.plot
     '''
     puts(colored.green("Generating metagene profiles using ngs.plot"))
     
+    def firstMate(threads,bam,mate1):
+        '''Creates samtools command to extract first mate from BAM file
+        '''
+        samtools = f"samtools view -@ {threads} -h -b -f 64 {bam} -o {mate1}"
+        return(samtools)
     
-    ###create first mate only BAM files
-    bam_files = glob.glob(os.path.join(work_dir,"bam",genome,"*_merged.bam"))
+    def reHeader(threads,mate1):
+        '''Reheader bam file from Ensembl to UCSC (https://github.com/crickbabs/DRB_TT-seq/blob/master/metaprofiles.md)
+        '''
+        mate1_reheader = ""
+        command = f"samtools view -@ {threads} -H {mate1} | sed -e 's/SN:\([0-9XY]*\)/SN:chr\1/' -e 's/SN:MT/SN:chrM/' | samtools reheader - {mate1} >  {mate1_reheader}"
+        return(command)
+    
+    strands = ["fwd","rev"]    
+        
+    if slurm == True:
+        #load slurm settings
+        
+        
+        #create first mate only BAM files
+        bam_files_fwd = glob.glob(os.path.join(work_dir,"bam",genome,"*fwd_merged.bam"))
+        bam_files_rev = glob.glob(os.path.join(work_dir,"bam",genome,"*rev_merged.bam"))
+        

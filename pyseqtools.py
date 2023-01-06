@@ -981,8 +981,7 @@ def main():
     
     
     def ttSeq(args, script_dir):
-        print("TT-Seq analysis selected")
-        
+              
         #get parsed arguments
         align=args["align"]
         slurm = args["slurm"]
@@ -990,6 +989,9 @@ def main():
         rename = args["rename"]
         sizeFactors = args["sizeFactors"]
         md5sum = args["md5sum"]
+        splitBAM = args["splitBAM"]
+        
+        print(f"TT-Seq analysis selected for {genome}")
         
         #set thread count for processing
         if slurm == False:
@@ -1000,17 +1002,14 @@ def main():
             print(f"Using {threads} CPU threads for analysis")
         
         #rename files
-        
         if rename == True:
             utils.rename(work_dir)
         
-                
         #check md5sums
         if md5sum == True:
             utils.checkMd5(work_dir,script_dir,slurm)
         
         #quality trim fastq files and align
-        
         if align == True:
             if slurm == True:
                 job_id_trim = utils.trimSLURM(script_dir, work_dir)
@@ -1021,7 +1020,6 @@ def main():
                 tt_seq_utils.STAR(work_dir, threads, script_dir, tt_seq_settings, genome)
                 
         #split bam files into forward and reverse strand files
-        splitBAM = args["splitBAM"]
         if splitBAM == True:
             if slurm == True:  
                 tt_seq_utils.splitBam(work_dir, genome, slurm)
