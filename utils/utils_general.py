@@ -496,12 +496,24 @@ def deduplicationBam(script_dir, work_dir, threads, args):
     plt.savefig(save_file)
     
 
-def removeCSVs(csv_list):
-    '''Remove list of CSV files if they exist
+def removeFiles(file):
+    '''Remove file(s) if they exist
     '''
-    for csv in csv_list:
-        if os.path.exists(csv) == True:
-            os.remove(csv)
+    if type(file) == list:
+        for i in file:
+            if os.path.exists(i) == True:
+                os.remove(i)
+    else:
+        if os.path.exists(file) == True:
+            os.remove(file)
+            
+            
+def appendCSV(csv,command_list):
+    '''Appends a line to a (CSV) file
+    '''
+    csv_ = open(csv, "a")  
+    csv_.write(" ".join(command_list) + "\n")
+    csv_.close()
 
 
 def deduplicationSLURM(script_dir,work_dir,genome,bam_list):
@@ -515,9 +527,8 @@ def deduplicationSLURM(script_dir,work_dir,genome,bam_list):
     csv_index = os.path.join(work_dir,"slurm",f"picard_index_{genome}.csv")
     
     csv_list = [csv_picard,csv_index]
-    removeCSVs(csv_list)
-    
-        
+    removeFiles(csv_list)
+            
     #load SLURM settings
     with open(os.path.join(script_dir,"yaml","slurm.yaml")) as file:
         slurm_settings = yaml.full_load(file)        
@@ -908,6 +919,9 @@ def slurmTemplateScript(work_dir,name,file,slurm,commands,array=False,csv=None,d
         script.write(f"#SBATCH --dependency=afterok:{dep}\n")
     if array == True:
         #set numer of jobs for array
+        if type(csv) != list:
+            csv = [csv]
+        
         csv_ = csv[0] #pick one csv with commands (all csvs should have same amount of commands)
         commands_number = int(subprocess.check_output(f"cat {csv_} | wc -l", shell = True).decode("utf-8"))
         script.write("#SBATCH -a " + f"1-{commands_number}\n")
@@ -1456,3 +1470,16 @@ def getBamFiles(work_dir,genome):
     if dedup == True:
         bam_list = sorted(glob.glob(os.path.join(work_dir, "bam", genome, "*dedupl.bam")))
         return(bam_list)
+    
+    
+def getSampleNames(work_dir):
+    '''Get unique sample name from samples.csv
+    '''
+    sample_info = pd.read_csv(os.path.join(work_dir,"samples.csv"))
+    
+    if len(set(sample_info["condition"])) > 1:
+        samples = sorted(list(set(sample_info["genotype"]+ "_" + sample_info["condition"])))
+    else:
+        samples = sorted(list(set(sample_info["genotype"])))
+    
+    return(samples)
