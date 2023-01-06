@@ -496,146 +496,91 @@ def deduplicationBam(script_dir, work_dir, threads, args):
     plt.savefig(save_file)
     
 
-def deduplicationSLURM(script_dir, work_dir, genome):
+def removeCSVs(csv_list):
+    '''Remove list of CSV files if they exist
+    '''
+    for csv in csv_list:
+        if os.path.exists(csv) == True:
+            os.remove(csv)
+
+
+def deduplicationSLURM(script_dir,work_dir,genome,bam_list):
     """
     Deduplication of BAM files using PICARD on Cambridge HPC
     """
     puts(colored.green("Performing deduplication of BAM files using PICARD"))
     
-    bam_list = glob.glob(os.path.join(work_dir, "bam", "*", "*-sort-bl.bam"))
+    #create csv files for arrayed commands
+    csv_picard = os.path.join(work_dir,"slurm",f"picard_{genome}.csv")
+    csv_index = os.path.join(work_dir,"slurm",f"picard_index_{genome}.csv")
     
-    csv_index = os.path.join(work_dir,"slurm",f"slurm_hisat2_index_{genome}.csv")
-    if os.path.exists(csv_index) == True:
-        os.remove(csv_index)
+    csv_list = [csv_picard,csv_index]
+    removeCSVs(csv_list)
+    
         
     #load SLURM settings
     with open(os.path.join(script_dir,"yaml","slurm.yaml")) as file:
         slurm_settings = yaml.full_load(file)        
 
-    threads = slurm_settings["ChIP-Seq"]["picard_CPU"]
-    mem = slurm_settings["ChIP-Seq"]["picard_mem"]
-    time = slurm_settings["ChIP-Seq"]["picard_time"]
+    threads = slurm_settings["picard"]["cpu"]
+    mem = slurm_settings["picard"]["mem"]
+    time = slurm_settings["picard"]["time"]
     account = slurm_settings["groupname"]
-    partition = slurm_settings["ChIP-Seq"]["partition"]
+    partition = slurm_settings["partition"]
     
-    #check which BAM files have already been sorted
+    slurm = {"threads": threads, 
+             "mem": mem,
+             "time": time,
+             "account": account,
+             "partition": partition
+             }
+    
+    #generate picard and index commands
     for bam in bam_list:
-        dedup_bam = bam.replace("-sort-bl.bam","-sort-bl-dedupl.bam")
-        if not file_exists(dedup_bam):
-            log_file = os.path.join(work_dir,"bam",bam.replace("-sort-bl.bam","_dedup.log"))
-            command = ["picard", "MarkDuplicates", f"INPUT={bam}", f"OUTPUT={dedup_bam}", 
-                       "REMOVE_DUPLICATES=TRUE", f"METRICS_FILE={log_file}"]
-            os.makedirs(os.path.join(work_dir,"slurm"), exist_ok = True)
-            csv = os.path.join(work_dir,"slurm",f"slurm_picard_{genome}.csv")
-            csv = open(csv, "a")  
-            csv.write(" ".join(command) +"\n")
-            csv.close()  
-            
-            #generate commands for bam indexing with samtools
-            command = ["samtools", "index", "-@", threads, dedup_bam]
-            
-            csv_ = csv_index
-            
-            csv = open(csv_, "a")  
-            csv.write(" ".join(command) +"\n")
-            csv.close()
+        dedup_bam = bam.replace(".bam","-dedupl.bam")
+        log_file = os.path.join(work_dir,"bam",bam.replace(".bam","_dedup.log"))
+        command = ["picard", "MarkDuplicates", f"INPUT={bam}", f"OUTPUT={dedup_bam}", 
+                   "REMOVE_DUPLICATES=TRUE", f"METRICS_FILE={log_file}"]
+        csv = os.path.join(work_dir,"slurm",f"picard_{genome}.csv")
+        csv = open(csv, "a")  
+        csv.write(" ".join(command) +"\n")
+        csv.close()  
+        
+        #generate commands for bam indexing with samtools
+        command = ["samtools", "index", "-@", threads, dedup_bam]
+        csv_ = csv_index
+        
+        csv = open(csv_, "a")  
+        csv.write(" ".join(command) +"\n")
+        csv.close()
     
+    #generate slurm script
+    slurm_file = os.path.join(work_dir, "slurm", f"deduplication_{genome}.sh")
+    slurmTemplateScript(work_dir,"dedup",slurm_file,slurm,None,True,csv_list)
+                             #work_dir,name,file,slurm,commands,array=False,csv=None,dep=None
     
-    print(f"Generating slurm_picard_{genome}.sh")
-    csv = os.path.join(work_dir,"slurm",f"slurm_picard_{genome}.csv")
-    commands = int(subprocess.check_output(f"cat {csv} | wc -l", shell = True).decode("utf-8"))
-    script_ = os.path.join(work_dir,"slurm",f"slurm_picard_{genome}.sh")
-    script = open(script_, "w")  
-    script.write("#!/bin/bash" + "\n")
-    script.write("\n")
-    script.write(f"#SBATCH -A {account}\n")
-    script.write("#SBATCH --mail-type=BEGIN,FAIL,END" + "\n")
-    script.write(f"#SBATCH -p {partition}\n")
-    script.write(f"#SBATCH -D {work_dir}\n")
-    script.write("#SBATCH -o slurm/slurm_picard_%a.log" + "\n")
-    script.write(f"#SBATCH -c {threads}\n")
-    script.write(f"#SBATCH -t {time}\n")
-    script.write(f"#SBATCH --mem={mem}\n")
-    script.write("#SBATCH -J picard\n")
-    script.write(f"#SBATCH -a  1-{str(commands)}\n")
-    script.write("\n")
-    script.write("sed -n ${SLURM_ARRAY_TASK_ID}p " + f"{csv} | bash\n")
-    script.write("sed -n ${SLURM_ARRAY_TASK_ID}p " + f"{csv_index} | bash\n")
-    script.close()
+    #submit slurm script to HPC
+    job_id_picard = runSLURM(work_dir, slurm_file, "dedup")
     
-    print("Submitting SLURM script to cluster")
-    job_id_picard = subprocess.check_output(f"sbatch {script_} | cut -d ' ' -f 4", shell = True)
-    job_id_picard = job_id_picard.decode("UTF-8").replace("\n","")
-    print(f"SLURM deduplication job submitted successfully (job ID {job_id_picard})")   
-    
-    #log slurm job id
-    SLURM_job_id_log(work_dir, "PICARD deduplication", job_id_picard)
-    
-    #get pre and post duplication read counts from bam files
-    print(f"Generating slurm_pysamtools_{genome}.sh")
-    script_ = os.path.join(work_dir,"slurm",f"slurm_pysamtools_{genome}.sh")
-    script = open(script_, "w")  
-    script.write("#!/bin/bash" + "\n")
-    script.write("\n")
-    script.write(f"#SBATCH -A {account}\n")
-    script.write("#SBATCH --mail-type=BEGIN,FAIL,END" + "\n")
-    script.write(f"#SBATCH -p {partition}\n")
-    script.write(f"#SBATCH -D {work_dir}\n")
-    script.write("#SBATCH -o slurm/slurm_pysamtools.log" + "\n")
-    script.write(f"#SBATCH -c {threads}\n")
-    script.write(f"#SBATCH -t {time}\n")
-    script.write(f"#SBATCH --mem={mem}\n")
-    script.write("#SBATCH -J pysamtools\n")
-    script.write(f"#SBATCH --dependency=afterok:{job_id_picard}\n\n")
-    script.write("\n")
-    
+    #generate command for counting reads pre/post deduplication
     read_count = os.path.join(script_dir,"utils","read-counts.py")
-    script.write(f"python3 {read_count} {work_dir} {script_dir} {genome} {threads}")
+    read_count_command = f"python3 {read_count} {work_dir} {script_dir} {genome} {threads}"
     
-    script.close()
-    
-    print("Submitting SLURM script to cluster")
-    job_id_count = subprocess.check_output(f"sbatch {script_} | cut -d ' ' -f 4", shell = True)
-    job_id_count = job_id_count.decode("UTF-8").replace("\n","")
-    print(f"SLURM read counting job submitted successfully (job ID {job_id_count})")  
-    
-    #log slurm job id
-    SLURM_job_id_log(work_dir, "pysamtools", job_id_count)
-    
-    #plot read count with R
-    #get pre and post duplication read counts from bam files
-    print(f"Generating slurm_plot-counts_{genome}.sh")
-    script_ = os.path.join(work_dir,"slurm",f"slurm_plot-counts_{genome}.sh")
-    script = open(script_, "w")  
-    script.write("#!/bin/bash" + "\n")
-    script.write("\n")
-    script.write(f"#SBATCH -A {account}\n")
-    script.write("#SBATCH --mail-type=BEGIN,FAIL,END" + "\n")
-    script.write(f"#SBATCH -p {partition}\n")
-    script.write(f"#SBATCH -D {work_dir}\n")
-    script.write("#SBATCH -o slurm/slurm_plot-counts.log" + "\n")
-    script.write(f"#SBATCH -c {threads}\n")
-    script.write(f"#SBATCH -t {time}\n")
-    script.write(f"#SBATCH --mem={mem}\n")
-    script.write("#SBATCH -J plot-counts\n")
-    script.write(f"#SBATCH --dependency=afterok:{job_id_count}\n\n")
-    script.write("\n")
-    
+    #generate command for plotting read counts
     plot_reads = os.path.join(script_dir,"R","plot-reads.R")
-    script.write(f"Rscript {plot_reads} {work_dir}")
+    plot_reads_command = f"Rscript {plot_reads} {work_dir}"
     
-    script.close()
+    commands = [read_count_command,plot_reads_command]
     
-    print("Submitting SLURM script to cluster")
-    job_id_plot = subprocess.check_output(f"sbatch {script_} | cut -d ' ' -f 4", shell = True)
-    job_id_plot = job_id_plot.decode("UTF-8").replace("\n","")
-    print(f"SLURM plotting job submitted successfully (job ID {job_id_plot})")  
+    #generate slurm script
+    slurm_file = os.path.join(work_dir, "slurm", f"picard-plot_{genome}.sh")
+    slurmTemplateScript(work_dir,"dedup-plot",slurm_file,slurm,commands,False,None,job_id_picard)
+                             #work_dir,name,file,slurm,commands,array=False,csv=None,dep=None
     
-    #log slurm job id
-    SLURM_job_id_log(work_dir, "plot read counts", job_id_plot)
+    #submit slurm script to HPC
+    job_id_plot = runSLURM(work_dir, slurm_file, "plot")
     
-    
-    
+        
 def indexBam(work_dir, threads, genome, slurm, script_dir):
     '''
     Index BAM files in bam/ directory using samtools
@@ -939,6 +884,7 @@ def slurmTemplateScript(work_dir,name,file,slurm,commands,array=False,csv=None,d
     Generates SLURM scripts
 
     '''
+    
     #load slurm settings
     threads = slurm["threads"]
     mem = slurm["mem"]
@@ -951,7 +897,7 @@ def slurmTemplateScript(work_dir,name,file,slurm,commands,array=False,csv=None,d
     script = open(script, "w")  
     script.write("#!/bin/bash\n\n")
     script.write(f"#SBATCH -A {account}\n")
-    script.write("#SBATCH --mail-type=BEGIN,END,FAIL" + "\n")
+    script.write("#SBATCH --mail-type=BEGIN,END,FAIL\n")
     script.write(f"#SBATCH -p {partition}\n")
     script.write(f"#SBATCH -D {work_dir}\n")
     script.write(f"#SBATCH -c {threads}\n")
@@ -973,14 +919,6 @@ def slurmTemplateScript(work_dir,name,file,slurm,commands,array=False,csv=None,d
         #write array commands for each csv file
         for i in csv:
             script.write("sed -n ${SLURM_ARRAY_TASK_ID}p " + f"{i} | bash\n")
-            
-        #write non-csv commands to slurm script
-        if commands != None:
-            if type(commands) == list:#check if command is a list of command(s)
-                for i in commands:
-                    script.write(f"{i}\n")
-            else: #probably just one command not parsed as a list
-                script.write(f"{commands}\n")
     else:
         #set log location
         log = os.path.join(work_dir, "slurm", f"{name}.log")
