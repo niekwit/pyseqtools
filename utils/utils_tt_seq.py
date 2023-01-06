@@ -429,9 +429,7 @@ def splitBam(threads, work_dir, genome, slurm):
                     csv_merge_fwd,csv_index_fwd,csv_view_rev1,csv_index_rev1,
                     csv_view_rev2,csv_index_rev2,csv_merge_rev,csv_index_rev]
         
-        for i in csv_list:
-            if os.path.exists(i) == True:
-                os.remove(i)
+        utils.removeFiles(csv_list) #make sure they do not exist already
         
         #create list of bam + index files to be removed post analysis
         remove = []
@@ -443,37 +441,25 @@ def splitBam(threads, work_dir, genome, slurm):
             
             #create commands for alignments of the second in pair if they map to the forward strand
             samtools_view_fwd1 = ["samtools","view","-@",threads,"-b","-f","128","-F","16",bam,"-o",fwd1]
-            csv = open(csv_view_fwd1, "a")  
-            csv.write(" ".join(samtools_view_fwd1) + "\n")
-            csv.close()  
-                        
+            utils.appendCSV(csv_view_fwd1,samtools_view_fwd1)
+            
             index_fwd1 = ["samtools","index","-@",threads,fwd1]
-            csv = open(csv_index_fwd1, "a")  
-            csv.write(" ".join(index_fwd1) + "\n")
-            csv.close()  
+            utils.appendCSV(csv_index_fwd1,index_fwd1)
             
             #create commands for alignments of the first in pair if they map to the reverse  strand
             samtools_view_fwd2 = ["samtools","view","-@",threads,"-b","-f","80",bam,"-o",fwd2]
-            csv = open(csv_view_fwd2, "a")  
-            csv.write(" ".join(samtools_view_fwd2) + "\n")
-            csv.close()  
+            utils.appendCSV(csv_view_fwd2,samtools_view_fwd2) 
             
             index_fwd2 = ["samtools","index","-@",threads,fwd2]
-            csv = open(csv_index_fwd2, "a")  
-            csv.write(" ".join(index_fwd2) + "\n")
-            csv.close()  
+            utils.appendCSV(csv_index_fwd2,index_fwd2)
             
             #merge all forward reads
             fwd = bam.replace("_sorted.bam","_fwd.bam")
             merge_fwd = ["samtools","merge","-@",threads,fwd,fwd1,fwd2]
-            csv = open(csv_merge_fwd, "a")  
-            csv.write(" ".join(merge_fwd) + "\n")
-            csv.close()
+            utils.appendCSV(csv_merge_fwd,merge_fwd)
             
             index_fwd = ["samtools","index","-@",threads,fwd]
-            csv = open(csv_index_fwd, "a")  
-            csv.write(" ".join(index_fwd) + "\n")
-            csv.close()  
+            utils.appendCSV(csv_index_fwd,index_fwd)
                 
             ###reverse strand
             rev1 = bam.replace("_sorted.bam","_rev1.bam")
@@ -481,61 +467,73 @@ def splitBam(threads, work_dir, genome, slurm):
             
             #alignments of the second in pair if they map to the reverse strand
             samtools_view_rev1 = ["samtools","view","-@",threads,"-b","-f","144",bam,"-o",rev1]
-            csv = open(csv_view_rev1, "a")  
-            csv.write(" ".join(samtools_view_rev1) + "\n")
-            csv.close()   
+            utils.appendCSV(csv_view_rev1,samtools_view_rev1)
             
             index_rev1 = ["samtools","index","-@",threads,rev1]
-            csv = open(csv_index_rev1, "a")  
-            csv.write(" ".join(index_rev1) + "\n")
-            csv.close()  
+            utils.appendCSV(csv_index_rev1,index_rev1)
             
             #alignments of the first in pair if they map to the forward strand
             samtools_view_rev2 = ["samtools","view","-@",threads,"-b","-f","64","-F","16",bam,"-o",rev2]
-            csv = open(csv_view_rev2, "a")  
-            csv.write(" ".join(samtools_view_rev2) + "\n")
-            csv.close()  
-            
+            utils.appendCSV(csv_view_rev2,samtools_view_rev2)   
+                        
             index_rev2 = ["samtools","index","-@",threads,rev2]
-            csv = open(csv_index_rev2, "a")  
-            csv.write(" ".join(index_rev2) + "\n")
-            csv.close()  
+            utils.appendCSV(csv_index_rev2,index_rev2)
             
             #merge all reverse reads
             rev = bam.replace("_sorted.bam","_rev.bam")
             merge_rev = ["samtools","merge","-@",threads,rev,rev1,rev2]
-            csv = open(csv_merge_rev, "a")  
-            csv.write(" ".join(merge_rev) + "\n")
-            csv.close()
+            utils.appendCSV(csv_merge_rev,merge_rev)
             
             index_rev = ["samtools","index","-@",threads,rev]
-            csv = open(csv_index_rev, "a")  
-            csv.write(" ".join(index_rev) + "\n")
-            csv.close()  
+            utils.appendCSV(csv_index_rev,index_rev) 
             
             bam_remove = [fwd1,fwd2,rev1,rev2]
             remove.extend(bam_remove)
             remove.extend([x+".bai" for x in bam_remove])
             
-            
-        #remove all non-merged bam files
-        remove_script = os.path.join(script_dir,"utils","remove-bams.py")
-        remove_command = ["python",remove_script," ".join(remove)]
-        remove_command = [" ".join(remove_command)]
-    
         #generate slurm script
         slurm_file = os.path.join(work_dir, "slurm", f"splitBAM_{genome}.sh")
-        utils.slurmTemplateScript(work_dir,"splitBAM",slurm_file,slurm,remove_command,True,csv_list,None)
-                                 #work_dir,name,file,slurm,commands,array=False,csv=None,dep=None
+        utils.slurmTemplateScript(work_dir,"splitBAM",slurm_file,slurm,None,True,csv_list,None)
         
         #submit slurm script to cluster
         job_id_split = utils.runSLURM(work_dir, slurm_file, "splitBAM")
         
-        #merge replicate BAM and deduplicate
-
-
-
-
+        #remove all non-merged fw/rev bam files
+        remove_command = ["rm"]
+        remove_command.extend(remove)
+        remove_command = [" ".join(remove_command)]
+        
+        #generate slurm script
+        slurm_file = os.path.join(work_dir, "slurm", f"removeBAM_{genome}.sh")
+        utils.slurmTemplateScript(work_dir,"removeBAM",slurm_file,slurm,remove_command,False,None,job_id_split)
+        
+        #submit slurm script to cluster
+        job_id_remove = utils.runSLURM(work_dir, slurm_file, "removeBAM")
+        
+        #merge replicate fwd/rev strand split BAM files
+        csv_merge_replicates = os.path.join(work_dir,"slurm","merge_replicates.csv")
+        utils.removeFiles(csv_merge_replicates)
+        
+        samples = utils.getSampleNames(work_dir)
+        strand = ["fwd","rev"]
+        
+        for i in samples:
+            for j in strand:
+                bam_files = sorted(glob.glob(os.path.join(work_dir,"bam",genome,f"{i}*",f"*_{j}.bam")))
+                out_bam = os.path.join(work_dir,"bam",genome,f"{i}_{j}_merged.bam")
+                merge = ["samtools","merge","-@",threads,"-o",out_bam]
+                merge.extend(bam_files)
+                
+                #write command to csv
+                utils.appendCSV(csv_merge_replicates,merge)
+        
+        #generate slurm script
+        slurm_file = os.path.join(work_dir, "slurm", f"mergeBAM_{genome}.sh")
+        utils.slurmTemplateScript(work_dir,"merge",slurm_file,slurm,None,True,csv_merge_replicates,job_id_remove)
+                                 
+        #run slurm script
+        job_id_merge = utils.runSLURM(work_dir, slurm_file, "mergeBAM")
+        
 
 def sizeFactors(script_dir, work_dir, slurm=False):
     """
@@ -1125,4 +1123,4 @@ def ngsPlotSlurm(work_dir,genome):
     
     
     ###create first mate only BAM files
-    bam_files = glob.glob(os.path.join(work_dir,"bam",genome,"*_merged_dedup.bam"))
+    bam_files = glob.glob(os.path.join(work_dir,"bam",genome,"*_merged.bam"))
