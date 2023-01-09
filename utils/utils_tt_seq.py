@@ -528,7 +528,7 @@ def splitBam(work_dir, genome, slurm,threads='1'):
                 utils.appendCSV(csv_merge_replicates,merge)
         
         #generate slurm script
-        slurm_file = os.path.join(work_dir, "slurm", f"mergeBAM_{genome}.sh")
+        slurm_file = os.path.join(work_dir, "slurm", f"mergeBAM_same-strands_{genome}.sh")
         utils.slurmTemplateScript(work_dir,"merge",slurm_file,slurm,None,True,csv_merge_replicates,job_id_remove)
                                  
         #run slurm script
@@ -804,7 +804,7 @@ def metaProfiles(work_dir, threads, tt_seq_settings, genome):
     plotProfile(work_dir, threads, "rev")
 
 
-def mergeBAM(work_dir, script_dir,genome,threads='1',slurm=False):
+def mergeBAM(work_dir, script_dir,genome,slurm=False,threads='1',):
     '''
     Merge replicate BAM files using samtools
     '''
@@ -865,27 +865,18 @@ def mergeBAM(work_dir, script_dir,genome,threads='1',slurm=False):
                     subprocess.call(command)
         '''
     else:
-        puts(colored.green("Merging strand-specific replicate BAM files using samtools"))
-        
-        #load samples.csv
-        df = pd.read_csv(os.path.join(work_dir,"samples.csv"))
-        df.drop("ref", axis=1, inplace = True)
-        
         #get sample names
-        sample_names = list(set([x.rsplit("_",1)[0] for x in df["sample"]]))
-        
-        #strands
-        strands = ["fwd","rev"]
+        sample_names = utils.getSampleNames(work_dir)
         
         #load SLURM settings
         with open(os.path.join(script_dir,"yaml","slurm.yaml")) as file:
             slurm_settings = yaml.full_load(file)        
 
-        threads = slurm_settings["TT-Seq"]["samtools"]["cpu"]
-        mem = slurm_settings["TT-Seq"]["samtools"]["mem"]
-        time = slurm_settings["TT-Seq"]["samtools"]["time"]
+        threads = slurm_settings["samtools"]["cpu"]
+        mem = slurm_settings["samtools"]["mem"]
+        time = slurm_settings["samtools"]["time"]
         account = slurm_settings["groupname"]
-        partition = slurm_settings["TT-Seq"]["partition"]
+        partition = slurm_settings["partition"]
         
         slurm = {"threads": threads, 
                  "mem": mem,
@@ -896,45 +887,29 @@ def mergeBAM(work_dir, script_dir,genome,threads='1',slurm=False):
         
         #csv files for commands
         csv_merge = os.path.join(work_dir,"slurm","merge.csv")
-        csv_picard = os.path.join(work_dir,"slurm","picard.csv")
-        csv_index = os.path.join(work_dir,"slurm","index2.csv")
+        csv_index = os.path.join(work_dir,"slurm","index_merge.csv")
         
-        csv_list = [csv_merge,csv_picard,csv_index]
+        csv_list = [csv_merge,csv_index]
         
         for i in csv_list:
             if os.path.exists(i) == True:
                 os.remove(i)
         
-        #create commands 
-        for strand in strands:
-            for sample in sample_names:
-                bams = sorted(glob.glob(os.path.join(work_dir,"bam",genome,f"{sample}*",f"{sample}*{strand}.bam")))
-                               
-                #create commands to merge and sort replicate BAM files
-                out_bam = os.path.join(work_dir,"bam",genome,f"{sample}_merged_{strand}.bam")
-                merge = ["samtools", "merge", "-@", threads, "-"]
-                merge.extend(bams)
-                merge.extend(["|", "samtools", "sort", "-@", threads, "-" ,">", out_bam])
-
-                csv = open(csv_merge, "a")  
-                csv.write(" ".join(merge) + "\n")
-                csv.close()  
-
-                #create commands to deduplicate BAM files
-                out_bam_dedup = os.path.join(work_dir,"bam",genome,f"{sample}_merged_dedupl_{strand}.bam")
-                deduplication = ["picard","MarkDuplicates",f"INPUT={out_bam}",
-                                 f"OUTPUT={out_bam_dedup}","REMOVE_DUPLICATES=TRUE",]
-                
-                csv = open(csv_picard, "a")  
-                csv.write(" ".join(deduplication) + "\n")
-                csv.close() 
-                
-                #create commands to index deduplicated BAM files
-                index_bam = ["samtools", "index", "-@",threads,out_bam_dedup]
-                
-                csv = open(csv_index, "a")  
-                csv.write(" ".join(index_bam) + "\n")
-                csv.close() 
+        #create commands for merging strand specific bam files
+        
+        for sample in sample_names:
+            bams = sorted(glob.glob(os.path.join(work_dir,"bam",genome,f"{sample}*",f"{sample}*_sorted.bam")))
+                           
+            #create commands to merge and sort replicate BAM files
+            out_bam = os.path.join(work_dir,"bam",genome,f"{sample}_merged_{strand}.bam")
+            merge = ["samtools", "merge", "-f","-@", threads, "-"]
+            merge.extend(bams)
+            merge.extend(["|", "samtools", "sort", "-@", threads, "-" ,">", out_bam])
+            utils.appendCSV(csv_merge,merge)
+                         
+            #create commands to index BAM files
+            index_bam = ["samtools", "index", "-@",threads,out_bam]
+            utils.appendCSV(csv_index,index_bam)
 
         #generate slurm script
         slurm_file = os.path.join(work_dir, "slurm", f"merge-bam_{genome}.sh")
@@ -943,8 +918,6 @@ def mergeBAM(work_dir, script_dir,genome,threads='1',slurm=False):
         #run slurm script
         job_id = utils.runSLURM(work_dir, slurm_file, "merge-bam")
         return(job_id)
-
-
 
 
 def readRatio(work_dir, script_dir, genome, slurm=False, threads = "1"):
@@ -1115,32 +1088,146 @@ def txReadThrough(work_dir, threads):
     pass
 
 
-def ngsPlotSlurm(work_dir,genome,slurm):
+def ngsPlotSlurm(work_dir,genome):
     '''
-    Creation of metagene profiles using ngs.plot
+    Creation of metagene profiles using ngs.plot (https://github.com/crickbabs/DRB_TT-seq/blob/master/metaprofiles.md)
     '''
     puts(colored.green("Generating metagene profiles using ngs.plot"))
     
-    def firstMate(threads,bam,mate1):
-        '''Creates samtools command to extract first mate from BAM file
-        '''
-        samtools = f"samtools view -@ {threads} -h -b -f 64 {bam} -o {mate1}"
-        return(samtools)
+    #create ngs.plot output dir
+    os.makedirs(os.path.join(work_dir,"ngsplot"),exist_ok=True)
     
-    def reHeader(threads,mate1):
-        '''Reheader bam file from Ensembl to UCSC (https://github.com/crickbabs/DRB_TT-seq/blob/master/metaprofiles.md)
-        '''
-        mate1_reheader = ""
-        command = f"samtools view -@ {threads} -H {mate1} | sed -e 's/SN:\([0-9XY]*\)/SN:chr\1/' -e 's/SN:MT/SN:chrM/' | samtools reheader - {mate1} >  {mate1_reheader}"
-        return(command)
+    #load slurm settings
+    with open(os.path.join(script_dir,"yaml","slurm.yaml")) as file:
+        slurm_settings = yaml.full_load(file)        
+
+    threads = slurm_settings["samtools"]["cpu"]
+    mem = slurm_settings["samtools"]["mem"]
+    time = slurm_settings["samtools"]["time"]
+    account = slurm_settings["groupname"]
+    partition = slurm_settings["partition"]
     
-    strands = ["fwd","rev"]    
+    slurm = {"threads": threads, 
+             "mem": mem,
+             "time": time,
+             "account": account,
+             "partition": partition
+             }
+    
+    print("Generating mate1 only for merged bam files required for ngs.plot")
+    
+    #create csv file names for commands
+    csv_mate1 = os.path.join(work_dir,"slurm","mate1.csv")
+    csv_reheader = os.path.join(work_dir,"slurm","reheader.csv")
+    csv_reheader_index = os.path.join(work_dir,"slurm","index_reheader.csv")
+    
+    csv_ngsplot = os.path.join(work_dir,"slurm","ngsplot.csv")
+    
+    csv_list = [csv_mate1,csv_reheader,csv_reheader_index, csv_ngsplot]
+    
+    utils.removeFiles(csv_list) #make sure they do not exist already
+    
+    #create first mate only BAM files and reheader for hg38 (required for ngs.plot)
+    if genome == "hg38":
         
-    if slurm == True:
+        bam_files = glob.glob(os.path.join(work_dir,"bam",genome,f"*[!fwdrev]_merged.bam"))
+        
+        for bam in bam_files:
+           bam_mate1 = bam.replace(".bam","_mate1.bam")
+           bam_mate1_reheader = bam.replace(".bam","_reheader_mate1.bam")
+            
+           mate1 = f"samtools view -@ {threads} -h -b -f 64 {bam} -o {bam_mate1}"
+           utils.appendCSV(csv_mate1,mate1)
+           
+           reheader = f"samtools view -@ $THREADS -H ${bam_mate1} | sed -e 's/SN:\([0-9XY]*\)/SN:chr\1/' -e 's/SN:MT/SN:chrM/' | samtools reheader - {bam_mate1} > {bam_mate1_reheader}"
+           utils.appendCSV(csv_reheader,reheader)
+           
+           index = f"samtools index -@ {threads} {bam_mate1_reheader}"
+           utils.appendCSV(csv_reheader_index,index)
+        
+        #generate slurm script
+        slurm_file = os.path.join(work_dir, "slurm", f"mate1_{genome}.sh")
+        utils.slurmTemplateScript(work_dir,"mate1",slurm_file,slurm,None,True,csv_list)
+                                 #work_dir,name,file,slurm,commands,array=False,csv=None,dep=None
+        
+        #submit slurm script to HPC
+        job_id_mate1 = utils.runSLURM(work_dir, slurm_file, "mate1")
+        
+        #get sample names
+        samples = utils.getSampleNames(work_dir)
+        
+        #create ngs.plot config file
+        #make sure config file does not exist pre-plotting
+        config = os.path.join(work_dir,"ngsplot",f"config.txt")
+        utils.removeFiles(config)
+            
+        #add sample info to config file
+        for sample in samples:
+            bam = os.path.join(work_dir,"bam",genome,f"{sample}_{strand}_merged.bam")
+            line = f'{bam}\t"-1"\t"{sample}"'
+            utils.appendCSV(config, line)
+        
         #load slurm settings
+        threads = slurm_settings["TT-Seq"]["ngsplot"]["cpu"]
+        mem = slurm_settings["TT-Seq"]["ngsplot"]["mem"]
+        time = slurm_settings["TT-Seq"]["ngsplot"]["time"]
+        account = slurm_settings["groupname"]
+        partition = slurm_settings["partition"]
+        
+        slurm = {"threads": threads, 
+                 "mem": mem,
+                 "time": time,
+                 "account": account,
+                 "partition": partition
+                 }
+        
+        #prepare ngsplot commands
+        regions = ["genebody","tss","tes"]
+        strands = ["both","same","opposite"]
+        
+        for region in regions:
+            for strand in strands:
+                output = os.path.join(work_dir,"ngsplot",f"{region}_{strand}")
+                ngsplot = f"ngs.plot.r -G {genome} -R {region} -C {config} -O {output} -P {threads} -SS {strand} -SE 1 -L 5000 -F chipseq -D ensembl"
+                utils.appendCSV(csv_ngsplot, ngsplot)
+                
+        #generate slurm script
+        slurm_file = os.path.join(work_dir, "slurm", f"ngsplot_{genome}.sh")
+        utils.slurmTemplateScript(work_dir,"ngsplot",slurm_file,slurm,None,True,csv_ngsplot,job_id_mate1)
+        
+        #submit slurm script to HPC
+        job_id_ngsplot1 = utils.runSLURM(work_dir, slurm_file, "ngsplot1")
+
+'''
+## Genebody
+REGION="genebody"
+for STRAND in both same opposite
+do
+    OUTPUT="${PROFDIR}${SAMPLE}.${REGION}.${STRAND}"
+    ngs.plot.r -G hg38 -R $REGION -C ${MATE1REHEADER} -O $OUTPUT -P $THREADS -SS $STRAND -SE 1 -L 5000 -F chipseq -D ensembl
+done
+
+## TSS
+REGION="tss"
+for STRAND in both same opposite
+do
+    OUTPUT="${PROFDIR}${SAMPLE}.${REGION}.${STRAND}"
+    ngs.plot.r -G hg38 -R $REGION -C ${MATE1REHEADER} -O $OUTPUT -P $THREADS -SS $STRAND -SE 1 -L 5000 -F chipseq -D ensembl
+done
+
+## TES
+REGION="tes"
+for STRAND in both same opposite
+do
+    OUTPUT="${PROFDIR}${SAMPLE}.${REGION}.${STRAND}"
+    ngs.plot.r -G hg38 -R $REGION -C ${MATE1REHEADER} -O $OUTPUT -P $THREADS -SS $STRAND -SE 1 -L 5000 -F chipseq -D ensembl
+done
+''      
         
         
-        #create first mate only BAM files
-        bam_files_fwd = glob.glob(os.path.join(work_dir,"bam",genome,"*fwd_merged.bam"))
-        bam_files_rev = glob.glob(os.path.join(work_dir,"bam",genome,"*rev_merged.bam"))
+        
+        
+        
+        
+        
         
