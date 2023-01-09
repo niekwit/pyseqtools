@@ -521,7 +521,7 @@ def splitBam(work_dir, genome, slurm,threads='1'):
             for j in strand:
                 bam_files = sorted(glob.glob(os.path.join(work_dir,"bam",genome,f"{i}*",f"*_{j}.bam")))
                 out_bam = os.path.join(work_dir,"bam",genome,f"{i}_{j}_merged.bam")
-                merge = ["samtools","merge","-@",threads,"-o",out_bam]
+                merge = ["samtools","merge","-f","-@",threads,out_bam]
                 merge.extend(bam_files)
                 
                 #write command to csv
