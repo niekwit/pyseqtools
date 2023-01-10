@@ -987,7 +987,7 @@ def main():
         slurm = args["slurm"]
         genome = args["genome"]
         rename = args["rename"]
-        sizeFactors = args["sizeFactors"]
+        scaleFactors = args["scaleFactors"]
         md5sum = args["md5sum"]
         splitBAM = args["splitBAM"]
         
@@ -1027,8 +1027,8 @@ def main():
                 tt_seq_utils.splitBam(work_dir, genome, slurm, threads)
             
         #get scale factors from yeast spike-in
-        if sizeFactors == True:
-            tt_seq_utils.sizeFactors(script_dir, work_dir, slurm)
+        if scaleFactors == True:
+            tt_seq_utils.scaleFactors(script_dir, work_dir, slurm)
             
         #create BigWig files
         bigwig = args["bigwig"]
