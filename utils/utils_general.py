@@ -508,11 +508,14 @@ def removeFiles(file):
             os.remove(file)
             
             
-def appendCSV(csv,command_list):
+def appendCSV(csv,command):
     '''Appends a line to a (CSV) file
     '''
     csv_ = open(csv, "a")  
-    csv_.write(" ".join(command_list) + "\n")
+    if type(command) == list: #for compatibility reasons
+        csv_.write(" ".join(command) + "\n")
+    else:
+        csv_.write(command + "\n")
     csv_.close()
 
 

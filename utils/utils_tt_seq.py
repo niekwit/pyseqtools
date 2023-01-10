@@ -535,16 +535,17 @@ def splitBam(work_dir, genome, slurm,threads='1'):
         job_id_merge = utils.runSLURM(work_dir, slurm_file, "mergeBAM")
         
 
-def sizeFactors(script_dir, work_dir, slurm=False):
+def scaleFactors(script_dir, work_dir, slurm=False):
     """
-    Creates size factors based on yeast RNA spike-in for generating BigWig files
+    Creates scale factors based on yeast RNA spike-in
     Based on https://github.com/crickbabs/DRB_TT-seq/blob/master/bigwig.md with modifications
 
+    NOTE: Multiply by scale factors and divide by size factors for correction
     """
     puts(colored.green("Generating size factors for normalisation using DESeq2"))
             
-    #run DESeq2 to obtain size factors for normalisation
-    deseq2 = ["Rscript", os.path.join(script_dir, "R", "tt-seq_sizeFactors.R")]
+    #run DESeq2 to obtain scale factors for normalisation
+    deseq2 = ["Rscript", os.path.join(script_dir, "R", "tt-seq_scaleFactors.R")]
     if slurm == False:
         subprocess.call(deseq2)
     else:
@@ -552,37 +553,34 @@ def sizeFactors(script_dir, work_dir, slurm=False):
         with open(os.path.join(script_dir,"yaml","slurm.yaml")) as file:
             slurm_settings = yaml.full_load(file)        
 
-        threads = slurm_settings["RNA-Seq"]["deseq2_CPU"]
-        mem = slurm_settings["RNA-Seq"]["deseq2_mem"]
-        time = slurm_settings["RNA-Seq"]["deseq2_time"]
+        threads = slurm_settings["RNA-Seq"]["deseq2"]["cpu"]
+        mem = slurm_settings["RNA-Seq"]["deseq2"]["mem"]
+        time = slurm_settings["RNA-Seq"]["deseq2"]["time"]
         account = slurm_settings["groupname"]
         partition = slurm_settings["RNA-Seq"]["partition"]
         
-        #generate SLURM script
-        deseq2 = " ".join(deseq2)
-        print("Generating SLURM script for caculating scale factors with DESeq2")
-        script_ = os.path.join(work_dir,"slurm","slurm_scaleFactors.sh")
-        script = open(script_, "w")  
-        script.write("#!/bin/bash" + "\n")
-        script.write("\n")
-        script.write(f"#SBATCH -A {account}\n")
-        script.write("#SBATCH --mail-type=BEGIN,FAIL,END" + "\n")
-        script.write(f"#SBATCH -p {partition}\n")
-        script.write(f"#SBATCH -D {work_dir}\n")
-        script.write("#SBATCH -o slurm/slurm_scaleFactors.log" + "\n")
-        script.write(f"#SBATCH -c {threads}\n")
-        script.write(f"#SBATCH -t {time}\n")
-        script.write(f"#SBATCH --mem={mem}\n")
-        script.write("#SBATCH -J scaleFactors\n")
-        script.write("\n")
-        script.write(f"{deseq2}\n")
-        script.write("\n")
-        script.close()
+        slurm = {"threads": threads, 
+                 "mem": mem,
+                 "time": time,
+                 "account": account,
+                 "partition": partition
+                 }
         
-        #send job to cluster
-        job_id = subprocess.check_output(f"sbatch {script_} | cut -d ' ' -f 4", shell = True)
-        job_id = job_id.decode("UTF-8").replace("\n","")
-        print(f"Submitted SLURM script to cluster (job ID {job_id})")
+        
+        #generate slurm script
+        slurm_file = os.path.join(work_dir,"slurm","slurm_scaleFactors.sh")
+        utils.slurmTemplateScript(work_dir,"scaleFactors",slurm_file,slurm,deseq2)
+                                 
+        #submit slurm script to HPC
+        job_id = utils.runSLURM(work_dir, slurm_file, "scaleFactors")
+        
+                
+        
+def scaleBAM(scale_factors):
+    ''' Generate scaled BAM files with samtools view
+    
+    '''
+    max_scale_factor = []
     
     
 def ttSeqBigWig(work_dir, threads, tt_seq_settings, genome, slurm):
@@ -901,7 +899,7 @@ def mergeBAM(work_dir, script_dir,genome,slurm=False,threads='1',):
             bams = sorted(glob.glob(os.path.join(work_dir,"bam",genome,f"{sample}*",f"{sample}*_sorted.bam")))
                            
             #create commands to merge and sort replicate BAM files
-            out_bam = os.path.join(work_dir,"bam",genome,f"{sample}_merged_{strand}.bam")
+            out_bam = os.path.join(work_dir,"bam",genome,f"{sample}_merged.bam")
             merge = ["samtools", "merge", "-f","-@", threads, "-"]
             merge.extend(bams)
             merge.extend(["|", "samtools", "sort", "-@", threads, "-" ,">", out_bam])
@@ -1088,6 +1086,9 @@ def txReadThrough(work_dir, threads):
     pass
 
 
+
+
+
 def ngsPlotSlurm(work_dir,genome):
     '''
     Creation of metagene profiles using ngs.plot (https://github.com/crickbabs/DRB_TT-seq/blob/master/metaprofiles.md)
@@ -1114,6 +1115,19 @@ def ngsPlotSlurm(work_dir,genome):
              "partition": partition
              }
     
+    #### create scaled bam files
+    scale_factors = os.path.join(work_dir,"scaleFactors.csv")
+    if not os.path.exists(scale_factors):
+        print("ERROR: scaleFactors.csv not found. Please run pyseqtools tt-seq --scaleFactors first")
+        return()
+    else:
+        scale_factors = pd.read_csv(scale_factors)
+    
+    #### merge replicate bam files
+    #first merge all replicate bam files (containing both fwd and rev strand reads)
+    job_id_merge = mergeBAM(work_dir, script_dir,genome,True)
+    
+    #### create mate1 bam files
     print("Generating mate1 only for merged bam files required for ngs.plot")
     
     #create csv file names for commands
@@ -1147,8 +1161,7 @@ def ngsPlotSlurm(work_dir,genome):
         
         #generate slurm script
         slurm_file = os.path.join(work_dir, "slurm", f"mate1_{genome}.sh")
-        utils.slurmTemplateScript(work_dir,"mate1",slurm_file,slurm,None,True,csv_list)
-                                 #work_dir,name,file,slurm,commands,array=False,csv=None,dep=None
+        utils.slurmTemplateScript(work_dir,"mate1",slurm_file,slurm,None,True,csv_list,job_id_merge)
         
         #submit slurm script to HPC
         job_id_mate1 = utils.runSLURM(work_dir, slurm_file, "mate1")
@@ -1156,6 +1169,7 @@ def ngsPlotSlurm(work_dir,genome):
         #get sample names
         samples = utils.getSampleNames(work_dir)
         
+        #### run ngsplot
         #create ngs.plot config file
         #make sure config file does not exist pre-plotting
         config = os.path.join(work_dir,"ngsplot",f"config.txt")
@@ -1163,7 +1177,7 @@ def ngsPlotSlurm(work_dir,genome):
             
         #add sample info to config file
         for sample in samples:
-            bam = os.path.join(work_dir,"bam",genome,f"{sample}_{strand}_merged.bam")
+            bam = os.path.join(work_dir,"bam",genome,f"{sample}_merged.bam")
             line = f'{bam}\t"-1"\t"{sample}"'
             utils.appendCSV(config, line)
         
@@ -1197,36 +1211,11 @@ def ngsPlotSlurm(work_dir,genome):
         
         #submit slurm script to HPC
         job_id_ngsplot1 = utils.runSLURM(work_dir, slurm_file, "ngsplot1")
+        
+        
+        
+        
 
-'''
-## Genebody
-REGION="genebody"
-for STRAND in both same opposite
-do
-    OUTPUT="${PROFDIR}${SAMPLE}.${REGION}.${STRAND}"
-    ngs.plot.r -G hg38 -R $REGION -C ${MATE1REHEADER} -O $OUTPUT -P $THREADS -SS $STRAND -SE 1 -L 5000 -F chipseq -D ensembl
-done
-
-## TSS
-REGION="tss"
-for STRAND in both same opposite
-do
-    OUTPUT="${PROFDIR}${SAMPLE}.${REGION}.${STRAND}"
-    ngs.plot.r -G hg38 -R $REGION -C ${MATE1REHEADER} -O $OUTPUT -P $THREADS -SS $STRAND -SE 1 -L 5000 -F chipseq -D ensembl
-done
-
-## TES
-REGION="tes"
-for STRAND in both same opposite
-do
-    OUTPUT="${PROFDIR}${SAMPLE}.${REGION}.${STRAND}"
-    ngs.plot.r -G hg38 -R $REGION -C ${MATE1REHEADER} -O $OUTPUT -P $THREADS -SS $STRAND -SE 1 -L 5000 -F chipseq -D ensembl
-done
-''      
-        
-        
-        
-        
         
         
         

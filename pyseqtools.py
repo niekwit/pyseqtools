@@ -382,7 +382,7 @@ def main():
                              required = False,
                              action = 'store_true',
                              help = "Generate forward and reverse strand specific BAM files")
-    parser_ttseq.add_argument("-f", "--sizeFactors",
+    parser_ttseq.add_argument("--scaleFactors",
                              required = False,
                              action = 'store_true',
                              help = "Calculate size factors from yeast spike-in RNA with DESeq2")
@@ -711,7 +711,7 @@ def main():
                 rnaseq_utils.diff_expr(work_dir,gtf,script_dir,species,pvalue,genome, slurm)
                 
             if scaleFactors == True:
-                tt_seq_utils.sizeFactors(script_dir, work_dir, slurm)
+                tt_seq_utils.scaleFactors(script_dir, work_dir, slurm)
             
             if bigwig == True:
                 rnaseq_utils.BigWig(work_dir, threads, genome, rna_seq_settings, slurm)   
@@ -758,7 +758,7 @@ def main():
                  rnaseq_utils.diff_expr(work_dir,gtf,script_dir,species,pvalue,genome, slurm)
                  
              if scaleFactors == True:
-                 tt_seq_utils.sizeFactors(script_dir, work_dir, slurm)
+                 tt_seq_utils.scaleFactors(script_dir, work_dir, slurm)
              
              if bigwig == True:
                  rnaseq_utils.BigWig(work_dir, threads, genome, rna_seq_settings, slurm)   
