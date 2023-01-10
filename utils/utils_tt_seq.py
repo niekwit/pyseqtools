@@ -545,10 +545,13 @@ def scaleFactors(script_dir, work_dir, slurm=False):
     puts(colored.green("Generating size factors for normalisation using DESeq2"))
             
     #run DESeq2 to obtain scale factors for normalisation
-    deseq2 = ["Rscript", os.path.join(script_dir, "R", "tt-seq_scaleFactors.R")]
     if slurm == False:
+        deseq2 = ["Rscript", os.path.join(script_dir, "R", "tt-seq_scaleFactors.R")]
         subprocess.call(deseq2)
     else:
+        scale_script = os.path.join(script_dir, "R", "tt-seq_scaleFactors.R")
+        deseq2 = f"Rscript {scale_script}"
+        
         #load SLURM settings
         with open(os.path.join(script_dir,"yaml","slurm.yaml")) as file:
             slurm_settings = yaml.full_load(file)        
@@ -568,7 +571,7 @@ def scaleFactors(script_dir, work_dir, slurm=False):
         
         
         #generate slurm script
-        slurm_file = os.path.join(work_dir,"slurm","slurm_scaleFactors.sh")
+        slurm_file = os.path.join(work_dir,"slurm","scaleFactors.sh")
         utils.slurmTemplateScript(work_dir,"scaleFactors",slurm_file,slurm,deseq2)
                                  
         #submit slurm script to HPC
