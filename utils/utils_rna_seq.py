@@ -938,7 +938,7 @@ def isoformAnalysis(work_dir, script_dir, rna_seq_settings, genome, slurm, isofo
         if slurm == True:
             print("RSEM/MISO selected")
             #load SLURM settings
-            with open(os.path.join(os.path.dirname(script_dir),"yaml","slurm.yaml")) as file:
+            with open(os.path.join(script_dir,"yaml","slurm.yaml")) as file:
                 slurm_settings = yaml.full_load(file)
             threads = str(slurm_settings["RNA-Seq"]["rsem_CPU"])
             mem = str(slurm_settings["RNA-Seq"]["rsem_mem"])
