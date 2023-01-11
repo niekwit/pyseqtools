@@ -542,7 +542,7 @@ def scaleFactors(script_dir, work_dir, slurm=False):
 
     NOTE: Multiply by scale factors and divide by size factors for correction
     """
-    puts(colored.green("Generating size factors for normalisation using DESeq2"))
+    puts(colored.green("Generating scale factors for normalisation using DESeq2"))
             
     #run DESeq2 to obtain scale factors for normalisation
     if slurm == False:
@@ -579,12 +579,79 @@ def scaleFactors(script_dir, work_dir, slurm=False):
         
                 
         
-def scaleBAM(scale_factors):
-    ''' Generate scaled BAM files with samtools view
+def scaleBAM(work_dir,slurm,genome):
+    ''' Generate scaled BAM files based on scale factors
     
     '''
-    max_scale_factor = []
-    
+    if slurm == True:
+        #load scale factors
+        scale_factors = pd.read_csv(os.path.join(work_dir,"scaleFactors.csv"))
+        
+        #calculate maximum scale factor
+        max_scale_factor = max(scale_factors["scaleFactors"])
+        
+        #convert each scale factor to 0.0 ≤ FLOAT ≤ 1.0 required for samtools
+        scale_factors["subsample_float"] = scale_factors["scaleFactors"] / max_scale_factor
+        
+        #set seed for subsampling
+        seed = "123"
+        
+        #create samtools float
+        scale_factors["subsample_float"] = scale_factors["subsample_float"].astype(str)
+        scale_factors["subsample_float"] = seed + "." + scale_factors["subsample_float"].str.rsplit(".",expand=True).iloc[:,1]
+        
+        #create csv files
+        csv_subsample = os.path.join(work_dir,"slurm","subsample.csv")
+        csv_subsample_index = os.path.join(work_dir,"slurm","subsample_index.csv")
+            
+        csv_list = [csv_subsample,csv_subsample_index]
+        
+        utils.removeFiles(csv_list) #make sure they do not exist already
+        
+        #load slurm settings
+        with open(os.path.join(script_dir,"yaml","slurm.yaml")) as file:
+            slurm_settings = yaml.full_load(file)        
+
+        threads = slurm_settings["samtools"]["cpu"]
+        mem = slurm_settings["samtools"]["mem"]
+        time = slurm_settings["samtools"]["time"]
+        account = slurm_settings["groupname"]
+        partition = slurm_settings["partition"]
+        
+        slurm = {"threads": threads, 
+                 "mem": mem,
+                 "time": time,
+                 "account": account,
+                 "partition": partition
+                 }
+        
+        #generate samtools commands for scaling and indexing
+        for index,row in scale_factors.iterrows():
+            sample = row[0]
+            subsample_float = row[2]
+            bam_in = os.path.join(work_dir,"bam",genome,sample,f"{sample}_sorted.bam")
+            bam_subsample_sorted = os.path.join(work_dir,"bam",genome,sample,f"{sample}_subsample_sorted.bam")
+            
+            #scaling
+            if subsample_float == seed + ".0": #sample that does not require scaling will just be copied
+                copy = f"cp {bam_in} {bam_subsample_sorted}"
+                utils.appendCSV(csv_subsample, copy)
+            else:
+                samtools = f"samtools view -h -@ {threads} -s {subsample_float} {bam_in} | samtools sort -@ {threads} - > {bam_subsample_sorted}"
+                utils.appendCSV(csv_subsample, samtools)
+            
+            #index
+            index = f"samtools index -@ {threads} {bam_subsample_sorted}"
+            utils.appendCSV(csv_subsample_index, index)
+            
+        #generate slurm script
+        slurm_file = os.path.join(work_dir, "slurm", f"scaleBAM_{genome}.sh")
+        utils.slurmTemplateScript(work_dir,"scale",slurm_file,slurm,None,True,csv_list)                   
+        
+        #run slurm script
+        job_id_scaleBAM = utils.runSLURM(work_dir, slurm_file, "mergeBAM")
+        
+        return(job_id_scaleBAM)
     
 def ttSeqBigWig(work_dir, threads, tt_seq_settings, genome, slurm):
     """
@@ -805,7 +872,7 @@ def metaProfiles(work_dir, threads, tt_seq_settings, genome):
     plotProfile(work_dir, threads, "rev")
 
 
-def mergeBAM(work_dir, script_dir,genome,slurm=False,threads='1',):
+def mergeBAM(work_dir, script_dir,genome,extension,slurm=False,dependency=None,threads='1',):
     '''
     Merge replicate BAM files using samtools
     '''
@@ -888,21 +955,19 @@ def mergeBAM(work_dir, script_dir,genome,slurm=False,threads='1',):
         
         #csv files for commands
         csv_merge = os.path.join(work_dir,"slurm","merge.csv")
-        csv_index = os.path.join(work_dir,"slurm","index_merge.csv")
+        csv_index = os.path.join(work_dir,"slurm","merge_index.csv")
         
         csv_list = [csv_merge,csv_index]
         
-        for i in csv_list:
-            if os.path.exists(i) == True:
-                os.remove(i)
+        utils.removeFiles(csv_list)
         
         #create commands for merging strand specific bam files
-        
         for sample in sample_names:
-            bams = sorted(glob.glob(os.path.join(work_dir,"bam",genome,f"{sample}*",f"{sample}*_sorted.bam")))
-                           
+            bams = sorted(glob.glob(os.path.join(work_dir,"bam",genome,f"{sample}*",f"{sample}*{extension}")))
+            new_extension = extension.replace(".bam","_merged.bam")            
+            
             #create commands to merge and sort replicate BAM files
-            out_bam = os.path.join(work_dir,"bam",genome,f"{sample}_merged.bam")
+            out_bam = os.path.join(work_dir,"bam",genome,f"{sample}{new_extension}")
             merge = ["samtools", "merge", "-f","-@", threads, "-"]
             merge.extend(bams)
             merge.extend(["|", "samtools", "sort", "-@", threads, "-" ,">", out_bam])
@@ -914,7 +979,7 @@ def mergeBAM(work_dir, script_dir,genome,slurm=False,threads='1',):
 
         #generate slurm script
         slurm_file = os.path.join(work_dir, "slurm", f"merge-bam_{genome}.sh")
-        utils.slurmTemplateScript(work_dir,"merge",slurm_file,slurm,None,True,csv_list)
+        utils.slurmTemplateScript(work_dir,"merge",slurm_file,slurm,None,True,csv_list,dependency)
         
         #run slurm script
         job_id = utils.runSLURM(work_dir, slurm_file, "merge-bam")
@@ -1119,20 +1184,13 @@ def ngsPlotSlurm(work_dir,genome):
              }
     
     #### create scaled bam files
-    scale_factors = os.path.join(work_dir,"scaleFactors.csv")
-    if not os.path.exists(scale_factors):
-        print("ERROR: scaleFactors.csv not found. Please run pyseqtools tt-seq --scaleFactors first")
-        return()
-    else:
-        scale_factors = pd.read_csv(scale_factors)
+    job_id_scaleBAM = scaleBAM(work_dir,slurm,genome)
     
-    #### merge replicate bam files
-    #first merge all replicate bam files (containing both fwd and rev strand reads)
-    job_id_merge = mergeBAM(work_dir, script_dir,genome,True)
+    #### merge replicate scaled bam files
+    job_id_merge = mergeBAM(work_dir, script_dir,genome,"_subsample_sorted.bam",True,threads,job_id_scaleBAM)
     
     #### create mate1 bam files
-    print("Generating mate1 only for merged bam files required for ngs.plot")
-    
+       
     #create csv file names for commands
     csv_mate1 = os.path.join(work_dir,"slurm","mate1.csv")
     csv_reheader = os.path.join(work_dir,"slurm","reheader.csv")
@@ -1175,7 +1233,7 @@ def ngsPlotSlurm(work_dir,genome):
         #### run ngsplot
         #create ngs.plot config file
         #make sure config file does not exist pre-plotting
-        config = os.path.join(work_dir,"ngsplot",f"config.txt")
+        config = os.path.join(work_dir,"ngsplot","config.txt")
         utils.removeFiles(config)
             
         #add sample info to config file
@@ -1213,7 +1271,7 @@ def ngsPlotSlurm(work_dir,genome):
         utils.slurmTemplateScript(work_dir,"ngsplot",slurm_file,slurm,None,True,csv_ngsplot,job_id_mate1)
         
         #submit slurm script to HPC
-        job_id_ngsplot1 = utils.runSLURM(work_dir, slurm_file, "ngsplot1")
+        job_id_ngsplot = utils.runSLURM(work_dir, slurm_file, "ngsplot1")
         
         
         

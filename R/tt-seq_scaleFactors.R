@@ -17,7 +17,7 @@ if (file.exists(out.file) == FALSE){
   #check if number of gene count files matches sample number
   if(length(count.files) != length(rownames(sampleTable))){
     print("ERROR: number of ReadsPerGene.out.tab (STAR) files does not match sample number in samples.csv")
-    exit()
+    quit(save = "no")
   }
   
   #get gene/sample names for index names

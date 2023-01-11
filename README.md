@@ -116,7 +116,7 @@ D8SORT,D21SORT;D8LIB,D21LIB
 ```
 The first line is the header line (test;sample). Each following line contains a unique sample comparison: test sample name(s);control sample name(s)
 The sample names should be the same as the fastq files, but wihout the fastq.gz/fq.gz file extension. Multiple samples can be grouped when seperated with a comma (see example).
-In the `MAGeCK` output file scores for depletion and enrichment which will correspond to depletion/enrichment of sgRNAs against genes in the test sample compared to the control sample.
+In the `MAGeCK` output file scores for depletion and enrichment which will correspond to depletion/enrichment of sgRNAs in the test sample compared to the control sample.
 
 2. `rename.config` file.
 This contains information for renaming fastq files before analyis (optional):

@@ -128,7 +128,7 @@ def main():
                              required = False,
                              default = None,
                              choices = [None,"miso","rmats"],
-                             help = "Alternative isoform analysis with RSEM/MISO or rMATS")
+                             help = "Alternative isoform analysis with RSEM/MISO or rMATS. Default is None")
     parser_rnaseq.add_argument("--indexBAM",
                              required = False,
                              action = 'store_true',

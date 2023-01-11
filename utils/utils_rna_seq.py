@@ -942,11 +942,19 @@ def isoformAnalysis(work_dir, script_dir, rna_seq_settings, genome, slurm, isofo
                 slurm_settings = yaml.full_load(file)
             threads = str(slurm_settings["RNA-Seq"]["rsem_CPU"])
             mem = str(slurm_settings["RNA-Seq"]["rsem_mem"])
-            slurm_time = str(slurm_settings["RNA-Seq"]["rsem_time"])
+            time = str(slurm_settings["RNA-Seq"]["rsem_time"])
             account = slurm_settings["groupname"]
             partition = slurm_settings["partition"]
             strand = slurm_settings["RNA-Seq"]["rsem_strand"]
             
+            '''
+            slurm = {"threads": threads, 
+                     "mem": mem,
+                     "time": time,
+                     "account": account,
+                     "partition": partition
+                     }
+            '''
             #load STAR index (IMPORTANT: created via RSEM!)
             star_index = rna_seq_settings["RSEM_STAR_index"][genome]
             
@@ -970,16 +978,13 @@ def isoformAnalysis(work_dir, script_dir, rna_seq_settings, genome, slurm, isofo
             csv_miso_compare = os.path.join(work_dir,"slurm", "miso_compare.csv")
             csv_miso = os.path.join(work_dir,"slurm", "miso.csv")
             
+            csv_list = [csv_merge1,csv_merge2,csv_rsem,csv_move,csv_sort,csv_index,
+                        csv_picard,csv_miso_compare,csv_miso]
+            
             script_rsem = os.path.join(work_dir, "slurm", f"rsem_{genome}.sh")
             script_miso_compare = os.path.join(work_dir, "slurm", f"miso_compare_{genome}.sh")
             
-            try:
-                remove_csvs = [csv_merge1, csv_merge2, csv_rsem, csv_move, csv_sort, 
-                               csv_index, csv_miso, csv_picard, csv_miso_compare, csv_miso]
-                for csv in remove_csvs:
-                    os.remove(csv)
-            except FileNotFoundError:
-                pass
+            utils.removeFiles(csv_list)
             
             #run RSEM/MISO
             for condition in conditions:
@@ -990,91 +995,57 @@ def isoformAnalysis(work_dir, script_dir, rna_seq_settings, genome, slurm, isofo
                 read2 = glob.glob(os.path.join(work_dir, "trim", f"{condition}*_val_2.fq.gz"))
                 read2.sort()
                             
-                csv_ = open(csv_merge1, "a")
                 
                 read1_merged = os.path.join(work_dir, "trim", f"{condition}_merged_val_1.fq.gz")
                 command = ["cat", " ".join(read1), ">", read1_merged]
-        
-                csv_.write(" ".join(command) + "\n")
-                csv_.close()
-                            
-                csv_ = open(csv_merge2, "a")
+                utils.appendCSV(csv_merge1, read1_merged)
                 
                 read2_merged = os.path.join(work_dir, "trim", f"{condition}_merged_val_2.fq.gz")
                 command = ["cat", " ".join(read2), ">", read2_merged]
-                
-                csv_.write(" ".join(command) + "\n")
-                csv_.close()
+                utils.appendCSV(csv_merge2, read2_merged)
                 
                 #run RSEM
-                csv_ = open(csv_rsem, "a")  
-                            
                 command = ["rsem-calculate-expression", "--paired-end","--star", "-p", threads,
                         "--strandedness", strand, "--star-output-genome-bam",
                         "--estimate-rspd", "--star-gzipped-read-file",
                         "--time", read1_merged, read2_merged, star_index, condition]
-                csv_.write(" ".join(command) + "\n")
-                csv_.close()
+                utils.appendCSV(csv_rsem, command)
                 
                 #move rsem files to correct directory
-                csv_ = open(csv_move, "a")  
                 command = ["mv", os.path.join(work_dir, "*.stat",),
                            os.path.join(work_dir, "*.results",),
                            os.path.join(work_dir, "*.bam",),
                            os.path.join(work_dir, "*.time",),
                            os.path.join(work_dir, f"{condition}*.log",),
                            rsem_dir]
-                csv_.write(" ".join(command) + "\n")
-                csv_.close()
+                utils.appendCSV(csv_move, command)
                 
                 #sort BAM file
                 rsem_bam = os.path.join(rsem_dir, f"{condition}.STAR.genome.bam")
                 sorted_bam = rsem_bam.replace(".STAR.genome.bam","_sorted.bam")
-                
-                csv_ = open(csv_sort, "a")  
-                
                 command = ["samtools", "sort", "--threads", threads, "-o", sorted_bam, rsem_bam]
-                
-                csv_.write(" ".join(command) + "\n")
-                csv_.close()
+                utils.appendCSV(csv_sort, command)
                 
                 #index sorted BAM file
-                csv_ = open(csv_index, "a")  
-                
                 command = ["samtools", "index", "-@", threads, sorted_bam]
-                
-                csv_.write(" ".join(command) + "\n")
-                csv_.close()
+                utils.appendCSV(csv_index, command)
                 
                 #determine insert length distribution and SD
                 picard_dir = os.path.join(work_dir, "picard")
                 os.makedirs(picard_dir, exist_ok=True)
                 insert_sizes = os.path.join(picard_dir, f"{condition}.insert_sizes.txt")
                 insert_sizes_pdf = os.path.join(picard_dir, f"{condition}.insert_sizes.pdf")
-                
-                csv_ = open(csv_picard, "a")  
-                
                 command = ["picard", "CollectInsertSizeMetrics", f"I={sorted_bam}",
                            f"O={insert_sizes}", f"H={insert_sizes_pdf}", "M=0.5",
                            "MAX_RECORDS_IN_RAM=2000000", "VALIDATION_STRINGENCY=LENIENT"]
                 
-                csv_.write(" ".join(command) + "\n")
-                csv_.close()
-                
+                utils.appendCSV(csv_picard, command)
                            
                 #create csv with sample info to run MISO 
                 miso_dir = os.path.join(work_dir,"miso", genome, condition)
-                
                 gff_index = rna_seq_settings["MISO_index"][genome.split("_")[0]] #(make sure GFF3 file is indexed first)
-                csv_ = open(csv_miso, "a")  
-                
                 command = [sorted_bam, insert_sizes, miso_dir]
-                
-                csv_.write(" ".join(command) + "\n")
-                csv_.close()
-                
-                #summarise MISO data
-                #miso_summary_dir = os.path.join(work_dir,"miso", genome, condition, "summary")
+                utils.appendCSV(csv_miso, command)
                 
             #create SLURM bash script for RSEM/MISO
             print("Generating SLURM script for RSEM and MISO SUMMARY")
@@ -1091,32 +1062,22 @@ def isoformAnalysis(work_dir, script_dir, rna_seq_settings, genome, slurm, isofo
             script.write(f"#SBATCH -p {partition}\n")
             script.write(f"#SBATCH -o {slurm_log}\n")
             script.write(f"#SBATCH -c {threads}\n")
-            script.write(f"#SBATCH -t {slurm_time}\n")
+            script.write(f"#SBATCH -t {time}\n")
             script.write(f"#SBATCH --mem={mem}\n")
             script.write("#SBATCH -J alt_spl\n")
             script.write(f"#SBATCH -a 1-{commands}\n")
             
-            script.write("echo 'Merging replicate genotype fq.gz files'\n")
             script.write("sed -n ${SLURM_ARRAY_TASK_ID}p " + f"{csv_merge1} | bash\n")
             script.write("sed -n ${SLURM_ARRAY_TASK_ID}p " + f"{csv_merge2} | bash\n")
-            script.write("echo 'Merging replicate genotype fq.gz files completed'\n\n")
-            
-            script.write("echo 'Running RSEM'\n")
+                        
             script.write("sed -n ${SLURM_ARRAY_TASK_ID}p " + f"{csv_rsem} | bash\n")
             script.write("sed -n ${SLURM_ARRAY_TASK_ID}p " + f"{csv_move} | bash\n")
-            script.write("echo 'RSEM done'\n\n")
-                    
-            script.write("echo 'Running samtools sort'\n")
+            
             script.write("sed -n ${SLURM_ARRAY_TASK_ID}p " + f"{csv_sort} | bash\n")
-            script.write("echo 'Sorting done'\n\n")
             
-            script.write("echo 'Running samtools index'\n")
             script.write("sed -n ${SLURM_ARRAY_TASK_ID}p " + f"{csv_index} | bash\n")
-            script.write("echo 'Indexing done'\n\n")
             
-            script.write("echo 'Running PICARD CollectInsertSizeMetrics'\n")
             script.write("sed -n ${SLURM_ARRAY_TASK_ID}p " + f"{csv_picard} | bash\n")
-            script.write("echo 'PICARD CollectInsertSizeMetrics done'\n\n")
             
             script.write("echo 'Running MISO'\n")
             script.write("source ~/.bashrc\n")
@@ -1178,7 +1139,7 @@ def isoformAnalysis(work_dir, script_dir, rna_seq_settings, genome, slurm, isofo
             script.write(f"#SBATCH -p {partition}\n")
             script.write(f"#SBATCH -o {slurm_log}\n")
             script.write(f"#SBATCH -c {threads}\n")
-            script.write(f"#SBATCH -t {slurm_time}\n")
+            script.write(f"#SBATCH -t {time}\n")
             script.write(f"#SBATCH --mem={mem}\n")
             script.write("#SBATCH -J miso_compare\n")
             if len(commands) > 1:
