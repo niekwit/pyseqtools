@@ -944,12 +944,15 @@ def slurmTemplateScript(work_dir,name,file,slurm,commands,array=False,csv=None,d
         #write commands to slurm script
         #check if command is a list of command(s)
         if type(commands) == list:
-            for i in commands:
-                if type(i) == list: #check if i is not a list itself (should be string)
-                    i = " ".join(i)
-                    script.write(f"{i}\n")
-                else:
-                    script.write(f"{i}\n")
+            if len(commands) == 1:
+                script.write(f"{commands[0]}\n")
+            else:
+                for i in commands:
+                    if type(i) == list: #check if i is not a list itself (should be string)
+                        i = " ".join(i)
+                        script.write(f"{i}\n")
+                    else:
+                        script.write(f"{i}\n")
         else: #one command not parsed as a list
             script.write(f"{commands}\n")
             
