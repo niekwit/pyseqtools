@@ -947,14 +947,14 @@ def isoformAnalysis(work_dir, script_dir, rna_seq_settings, genome, slurm, isofo
             partition = slurm_settings["partition"]
             strand = slurm_settings["RNA-Seq"]["rsem_strand"]
             
-            '''
+            
             slurm = {"threads": threads, 
                      "mem": mem,
                      "time": time,
                      "account": account,
                      "partition": partition
                      }
-            '''
+            
             #load STAR index (IMPORTANT: created via RSEM!)
             star_index = rna_seq_settings["RSEM_STAR_index"][genome]
             
@@ -1101,9 +1101,10 @@ def isoformAnalysis(work_dir, script_dir, rna_seq_settings, genome, slurm, isofo
             script.close()
             
             #submit RSEM/MISO job to cluster 
-            job_id = subprocess.check_output(f"sbatch {script_rsem} | cut -d ' ' -f 4", shell = True)
-            job_id = job_id.decode("UTF-8").replace("\n","")
-            print(f"Submitted SLURM script to cluster (job ID {job_id})")
+            job_id_miso = subprocess.check_output(f"sbatch {script_rsem} | cut -d ' ' -f 4", shell = True)
+            job_id_miso = job_id_miso.decode("UTF-8").replace("\n","")
+            print(f"Submitted SLURM script to cluster (job ID {job_id_miso})")
+            utils.SLURM_job_id_log(work_dir, "rsem/miso", job_id_miso)
             
             #run compare_miso (compare to reference sample)
             ref_condition = sample_info[(sample_info["ref"] == "ref" )]
@@ -1112,20 +1113,25 @@ def isoformAnalysis(work_dir, script_dir, rna_seq_settings, genome, slurm, isofo
             test_conditions = sample_info[(sample_info["ref"] != "ref" )]
             test_conditions = list(set(test_conditions["genotype"]))
                   
-            #generate csv with commands
+            #generate list with commands
+            commands = []
             for i in test_conditions:
                 samples = [ref_condition, i]
                 miso_dirs = " ".join([os.path.join(work_dir,"miso", genome, x) for x in samples])
                 miso_out_dir = os.path.join(work_dir, "miso", genome, "_vs_".join(samples))
                 names = " ".join(samples)
-                
-                csv_ = open(csv_miso_compare, "a")
+                                
                 command = ["compare_miso", "--compare-samples", miso_dirs, miso_out_dir, 
                            "--comparison-labels", names]
+                commands.append(" ".join(command))
                 
-                csv_.write(" ".join(command) + "\n")
-                csv_.close()
+            #generate slurm script
+            slurm_file = os.path.join(work_dir, "slurm", f"miso-compare_{genome}.sh")
+            utils.slurmTemplateScript(work_dir,"miso_comp",slurm_file,slurm,command,False,None,job_id_miso)
             
+            #run slurm script
+            job_id_miso_compare = utils.runSLURM(work_dir, slurm_file, "miso-compare")
+            '''
             #generate slurm script
             print("Generating SLURM script for MISO COMPARE")
             slurm_log = os.path.join(work_dir, "slurm", 'miso_compare_%a.log')
@@ -1162,6 +1168,7 @@ def isoformAnalysis(work_dir, script_dir, rna_seq_settings, genome, slurm, isofo
             job_id_miso = subprocess.check_output(f"sbatch {script_miso_compare} | cut -d ' ' -f 4", shell = True)
             job_id_miso = job_id_miso.decode("UTF-8").replace("\n","")
             print(f"Submitted SLURM script to cluster (job ID {job_id_miso})")
+            '''
     elif isoformAnalysis == "rmats":
         #check if data is single-end
         singleEnd = os.path.exists(os.path.join(work_dir,".single-end"))

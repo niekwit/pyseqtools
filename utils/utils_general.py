@@ -945,8 +945,12 @@ def slurmTemplateScript(work_dir,name,file,slurm,commands,array=False,csv=None,d
         #check if command is a list of command(s)
         if type(commands) == list:
             for i in commands:
-                script.write(f"{i}\n")
-        else: #probably just one command not parsed as a list
+                if type(i) == list: #check if i is not a list itself (should be string)
+                    i = " ".join(i)
+                    script.write(f"{i}\n")
+                else:
+                    script.write(f"{i}\n")
+        else: #one command not parsed as a list
             script.write(f"{commands}\n")
             
     script.close()
