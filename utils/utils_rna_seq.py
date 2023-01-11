@@ -17,18 +17,17 @@ from pathlib import Path
 import tempfile
 import warnings
 
-
 import yaml
 from clint.textui import colored, puts
 import pysam
 import gseapy as gp
 from gseapy.plot import gseaplot
 
-
 script_dir = os.path.abspath(os.path.dirname(__file__))
 sys.path.append(os.path.join(script_dir, "utils"))
 import utils_general as utils
 import utils_tt_seq as ttseq
+
 
 def install_packages(): #check for required python packages; installs if absent
     required = {"pyyaml, cutadapt, multiqc"}
@@ -1069,17 +1068,12 @@ def isoformAnalysis(work_dir, script_dir, rna_seq_settings, genome, slurm, isofo
             
             script.write("sed -n ${SLURM_ARRAY_TASK_ID}p " + f"{csv_merge1} | bash\n")
             script.write("sed -n ${SLURM_ARRAY_TASK_ID}p " + f"{csv_merge2} | bash\n")
-                        
             script.write("sed -n ${SLURM_ARRAY_TASK_ID}p " + f"{csv_rsem} | bash\n")
             script.write("sed -n ${SLURM_ARRAY_TASK_ID}p " + f"{csv_move} | bash\n")
-            
             script.write("sed -n ${SLURM_ARRAY_TASK_ID}p " + f"{csv_sort} | bash\n")
-            
             script.write("sed -n ${SLURM_ARRAY_TASK_ID}p " + f"{csv_index} | bash\n")
-            
             script.write("sed -n ${SLURM_ARRAY_TASK_ID}p " + f"{csv_picard} | bash\n")
             
-            script.write("echo 'Running MISO'\n")
             script.write("source ~/.bashrc\n")
             script.write("conda deactivate\n")
             script.write("conda activate miso\n\n")
@@ -1123,7 +1117,7 @@ def isoformAnalysis(work_dir, script_dir, rna_seq_settings, genome, slurm, isofo
                                 
                 command = ["compare_miso", "--compare-samples", miso_dirs, miso_out_dir, 
                            "--comparison-labels", names]
-                commands.append(" ".join(command))
+                commands.append(command)
                 
             #generate slurm script
             slurm_file = os.path.join(work_dir, "slurm", f"miso-compare_{genome}.sh")
@@ -1169,6 +1163,8 @@ def isoformAnalysis(work_dir, script_dir, rna_seq_settings, genome, slurm, isofo
             job_id_miso = job_id_miso.decode("UTF-8").replace("\n","")
             print(f"Submitted SLURM script to cluster (job ID {job_id_miso})")
             '''
+            
+            
     elif isoformAnalysis == "rmats":
         #check if data is single-end
         singleEnd = os.path.exists(os.path.join(work_dir,".single-end"))
