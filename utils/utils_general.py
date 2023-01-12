@@ -918,7 +918,7 @@ def slurmTemplateScript(work_dir,name,file,slurm,commands,array=False,csv=None,d
     script.write(f"#SBATCH -t {time}\n")
     script.write(f"#SBATCH --mem={mem}\n")
     script.write(f"#SBATCH -J {name}\n")
-    if dep != None:
+    if dep != None: #add dependency
         script.write(f"#SBATCH --dependency=afterok:{dep}\n")
     if array == True:
         #set numer of jobs for array
@@ -927,7 +927,7 @@ def slurmTemplateScript(work_dir,name,file,slurm,commands,array=False,csv=None,d
         
         csv_ = csv[0] #pick one csv with commands (all csvs should have same amount of commands)
         commands_number = int(subprocess.check_output(f"cat {csv_} | wc -l", shell = True).decode("utf-8"))
-        script.write("#SBATCH -a " + f"1-{commands_number}\n")
+        script.write(f"#SBATCH -a 1-{commands_number}\n")
         
         #set log location
         log = os.path.join(work_dir, "slurm", f"{name}_%a.log")
