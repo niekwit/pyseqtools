@@ -893,7 +893,7 @@ def fastqc(script_dir, work_dir, threads, file_extension):
         print("Skipping FastQC/MultiQC (already performed)")
 
 
-def slurmTemplateScript(work_dir,name,file,slurm,commands,array=False,csv=None,dep=None):
+def slurmTemplateScript(work_dir,name,file,slurm,commands,array=False,csv=None,dep=None,conda=None):
     '''
     Generates SLURM scripts
 
@@ -933,6 +933,12 @@ def slurmTemplateScript(work_dir,name,file,slurm,commands,array=False,csv=None,d
         log = os.path.join(work_dir, "slurm", f"{name}_%a.log")
         script.write(f"#SBATCH -o {log}\n\n")
         
+        #activate conda env if required
+        if conda != None:
+            script.write("source ~/.bashrc\n")
+            script.write("conda deactivate\n")
+            script.write(f"conda activate {conda}\n\n")
+        
         #write array commands for each csv file
         for i in csv:
             script.write("sed -n ${SLURM_ARRAY_TASK_ID}p " + f"{i} | bash\n")
@@ -940,6 +946,12 @@ def slurmTemplateScript(work_dir,name,file,slurm,commands,array=False,csv=None,d
         #set log location
         log = os.path.join(work_dir, "slurm", f"{name}.log")
         script.write(f"#SBATCH -o {log}\n\n")
+        
+        #activate conda env if required
+        if conda != None:
+            script.write("source ~/.bashrc\n")
+            script.write("conda deactivate\n")
+            script.write(f"conda activate {conda}\n\n")
         
         #write commands to slurm script
         #check if command is a list of command(s)
