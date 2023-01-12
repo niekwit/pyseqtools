@@ -396,8 +396,9 @@ def main():
                              help = "Calculate differential genes using DESeq2")
     parser_ttseq.add_argument("--metagene",
                              required = False,
-                             action = 'store_true',
-                             help = "Generate metagene plots and heatmaps with ngs.plot")
+                             choices = ["deeptools","ngsplot", None],
+                             default = None,
+                             help = "Generate metagene plots and heatmaps with ngs.plot or deeptools")
     parser_ttseq.add_argument("--readRatio",
                              required = False,
                              action = 'store_true',
@@ -990,9 +991,8 @@ def main():
         scaleFactors = args["scaleFactors"]
         md5sum = args["md5sum"]
         splitBAM = args["splitBAM"]
-        
-        print(f"TT-Seq analysis selected for {genome}")
-        
+        metagene = args["metagene"]
+                
         #set thread count for processing
         if slurm == False:
             max_threads = str(multiprocessing.cpu_count())
@@ -1035,7 +1035,7 @@ def main():
         if bigwig == True:
             tt_seq_utils.ttSeqBigWig(work_dir, threads, tt_seq_settings, genome, slurm)
             
-            
+        #get differential signal    
         deseq2 = args["deseq2"]
         if deseq2 == True:
             tt_seq_utils.DESeq2(script_dir, genome)
@@ -1047,7 +1047,16 @@ def main():
             else:
                 tt_seq_utils.readRatio(work_dir, script_dir, genome, slurm, threads)
             
+        if metagene != None:
+            if slurm == True:
+                if metagene == "ngsplot":
+                    tt_seq_utils.ngsPlotSlurm(work_dir,genome)
+                elif metagene == "deeptools":
+                    pass
+            else:
+                pass
                 
+    
     def geneSymConv(args, script_dir):
         conversion = args["conversion"]
         gene_list = args["input"]
@@ -1109,9 +1118,6 @@ if __name__ == "__main__":
 
     #log all command line arguments to commands.log
     utils.logCommandLineArgs(work_dir)
-
-    #check if required Python packages are available
-    #checkPythonPackages()
 
     ###loads available CRISPR libraries from library.yaml
     import yaml
