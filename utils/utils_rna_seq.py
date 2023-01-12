@@ -1104,8 +1104,9 @@ def isoformAnalysis(work_dir, script_dir, rna_seq_settings, genome, slurm, isofo
             test_conditions = sample_info[(sample_info["ref"] != "ref" )]
             test_conditions = list(set(test_conditions["genotype"]))
                   
-            #generate list with commands
+            #generate list for commands
             commands = []
+            
             for i in test_conditions:
                 samples = [ref_condition, i]
                 miso_dirs = " ".join([os.path.join(work_dir,"miso", genome, x) for x in samples])
@@ -1116,10 +1117,12 @@ def isoformAnalysis(work_dir, script_dir, rna_seq_settings, genome, slurm, isofo
                            "--comparison-labels", names]
                 command = " ".join(command)
                 commands.append(command)
+            
                 
+            
             #generate slurm script
             slurm_file = os.path.join(work_dir, "slurm", f"miso-compare_{genome}.sh")
-            utils.slurmTemplateScript(work_dir,"miso_comp",slurm_file,slurm,command,False,None,job_id_miso)
+            utils.slurmTemplateScript(work_dir,"miso_comp",slurm_file,slurm,command,False,None,job_id_miso,"miso")
             
             #run slurm script
             job_id_miso_compare = utils.runSLURM(work_dir, slurm_file, "miso-compare")
