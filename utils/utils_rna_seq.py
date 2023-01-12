@@ -997,11 +997,11 @@ def isoformAnalysis(work_dir, script_dir, rna_seq_settings, genome, slurm, isofo
                 
                 read1_merged = os.path.join(work_dir, "trim", f"{condition}_merged_val_1.fq.gz")
                 command = ["cat", " ".join(read1), ">", read1_merged]
-                utils.appendCSV(csv_merge1, read1_merged)
+                utils.appendCSV(csv_merge1, command)
                 
                 read2_merged = os.path.join(work_dir, "trim", f"{condition}_merged_val_2.fq.gz")
                 command = ["cat", " ".join(read2), ">", read2_merged]
-                utils.appendCSV(csv_merge2, read2_merged)
+                utils.appendCSV(csv_merge2, command)
                 
                 #run RSEM
                 command = ["rsem-calculate-expression", "--paired-end","--star", "-p", threads,
