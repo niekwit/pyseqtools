@@ -362,7 +362,7 @@ def STAR(work_dir, threads, script_dir, rna_seq_settings, genome, slurm, job_id_
             else:
                 #create csv files with STAR commands for SLURM job
                 if not utils.file_exists(bam):
-                    csv = open(os.path.join(work_dir,"slurm",f"slurm_STAR_{genome}.csv"), "a")  
+                    csv = open(os.path.join(work_dir,"slurm",f"STAR_{genome}.csv"), "a")  
                     csv.write(" ".join(star) +"\n")
                     csv.close()   
                     
@@ -613,7 +613,7 @@ def geneSetEnrichment(work_dir,pvalue,gene_sets):
           GSEA(df,i,out_dir)    
     
 
-def retroElements(work_dir, script_dir, rna_seq_settings, threads, genome, slurm):
+def retroElements(work_dir,script_dir,rna_seq_settings,genome,slurm=False,threads='1'):
     '''
     Analysis of transposable elements using TEtranscripts
     https://hammelllab.labsites.cshl.edu/software/#TEtranscripts
@@ -1308,8 +1308,6 @@ def isoformAnalysis(work_dir, script_dir, rna_seq_settings, genome, slurm, isofo
                 script.write("conda activate miso\n\n")
                 
                 script.write("sed -n 1p " + f"{csv_rmats} | bash\n\n")
-                
-                
                   
             script.close()
             
@@ -1355,6 +1353,6 @@ def isoformAnalysis(work_dir, script_dir, rna_seq_settings, genome, slurm, isofo
             job_id_rmatsplot = utils.runSLURM(work_dir, slurm_file, "rMATS-plot")
             
             
-            
+def teTranscripts
 
 

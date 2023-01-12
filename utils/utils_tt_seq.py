@@ -1205,7 +1205,7 @@ def ngsPlotSlurm(work_dir,genome):
     #create first mate only BAM files and reheader for hg38 (required for ngs.plot)
     if genome == "hg38":
         
-        bam_files = glob.glob(os.path.join(work_dir,"bam",genome,f"*[!fwdrev]_merged.bam"))
+        bam_files = glob.glob(os.path.join(work_dir,"bam",genome,"*[!fwdrev]_merged.bam"))
         
         for bam in bam_files:
            bam_mate1 = bam.replace(".bam","_mate1.bam")
