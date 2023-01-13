@@ -1353,6 +1353,6 @@ def isoformAnalysis(work_dir, script_dir, rna_seq_settings, genome, slurm, isofo
             job_id_rmatsplot = utils.runSLURM(work_dir, slurm_file, "rMATS-plot")
             
             
-def teTranscripts
+
 
 
