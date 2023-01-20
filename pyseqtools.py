@@ -737,7 +737,7 @@ def main():
                  utils.trimSLURM(script_dir, work_dir,module, pe_tags)
              
              if align == "star":
-                 rnaseq_utils.slurmSTAR(work_dir,script_dir,genome)
+                 job_id_star = rnaseq_utils.slurmSTAR(work_dir,script_dir,genome)
                  
              if isoformAnalysis != None:
                  rnaseq_utils.isoformAnalysis(work_dir, script_dir, rna_seq_settings, genome, slurm, isoformAnalysis)
