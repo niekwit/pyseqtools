@@ -772,7 +772,7 @@ def retroElementsSLURM(work_dir,script_dir,genome,dependency):
             
     
     #generate slurm script
-    slurm_file = os.path.join(work_dir,"slurm","star.sh")
+    slurm_file = os.path.join(work_dir,"slurm","te.sh")
     utils.slurmTemplateScript(work_dir,"TEtrx",slurm_file,slurm,None,True,csv_list)
     
     #submit slurm script to HPC
