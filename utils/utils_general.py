@@ -1200,16 +1200,15 @@ def trimSLURM(script_dir, work_dir, module, pe_tags):
             out_file1 = read1.replace(fwd_tag,"_val_1.fq.gz")
             out_file1 = out_file1.replace("raw-data", "trim")
             
-            if not file_exists(out_file1):
-                base_name = os.path.basename(read1.replace(fwd_tag,""))
-                trim_galore = ["trim_galore","-j", str(threads), "-o",
-                               os.path.join(work_dir,"trim"), "--paired", read1, read2,
-                               "--basename", base_name, "\n"]
-                trim_galore = " ".join(trim_galore)
-                csv = os.path.join(work_dir,"slurm","slurm_trim.csv")
-                csv = open(csv, "a")  
-                csv.write(trim_galore)
-                csv.close()
+            base_name = os.path.basename(read1.replace(fwd_tag,""))
+            trim_galore = ["trim_galore","-j", str(threads), "-o",
+                           os.path.join(work_dir,"trim"), "--paired", read1, read2,
+                           "--basename", base_name, "\n"]
+            trim_galore = " ".join(trim_galore)
+            csv = os.path.join(work_dir,"slurm","slurm_trim.csv")
+            csv = open(csv, "a")  
+            csv.write(trim_galore)
+            csv.close()
     else: #single-end data
         for read1 in read1_list:
             trim_galore = ["trim_galore","-j", str(threads), "-o", os.path.join(work_dir,"trim"), read1, "\n"]
@@ -1222,10 +1221,7 @@ def trimSLURM(script_dir, work_dir, module, pe_tags):
             
     #if trimming has already been done return none
     csv = os.path.join(work_dir,"slurm","slurm_trim.csv")
-    if not os.path.exists(csv):
-        print("Skipping trimming (already performed for all files)")
-        return(None)
-    
+        
     #generate slurm bash script
     script = os.path.join(work_dir,"slurm","slurm_trim.sh")
     script = open(script, "w")  
