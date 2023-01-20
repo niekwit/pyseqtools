@@ -294,6 +294,8 @@ def slurmSTAR(work_dir,script_dir,genome):
     '''
     Alignment for RNA-Seq with STAR from trimmed paired-end data
     '''
+    puts(colored.green(f"STAR alignment for RNA-Seq for {genome}"))
+    
     #get trimmed fastq files
     file_list = glob.glob(os.path.join(work_dir,"trim","*_val_1.fq.gz"))
     if len(file_list) == 0:
@@ -365,15 +367,14 @@ def slurmSTAR(work_dir,script_dir,genome):
         index_bam = " ".join(index_bam)
         utils.appendCSV(csv_index,index_bam)
     
-        #generate slurm script
-        slurm_file = os.path.join(work_dir,"slurm","star.sh")
-        utils.slurmTemplateScript(work_dir,"star",slurm_file,slurm,None,True,csv_list)
+    #generate slurm script
+    slurm_file = os.path.join(work_dir,"slurm","star.sh")
+    utils.slurmTemplateScript(work_dir,"star",slurm_file,slurm,None,True,csv_list)
+    
+    #submit slurm script to HPC
+    job_id_star = utils.runSLURM(work_dir, slurm_file, "star")
+    
         
-        #submit slurm script to HPC
-        job_id_star = utils.runSLURM(work_dir, slurm_file, "star")
-    
-    
-    
 
 def STAR(work_dir, threads, script_dir, rna_seq_settings, genome, slurm, job_id_trim=None):
     '''
