@@ -647,6 +647,7 @@ def main():
         slurm = args["slurm"] 
         rsemIndex = args["rsemIndex"]
         md5sum = args["md5sum"]
+        fastqc = args["fastqc"]
         
         if slurm == False:
             ###set thread count for processing
@@ -734,6 +735,9 @@ def main():
              
              if md5sum == True:
                  utils.checkMd5(work_dir,script_dir,slurm)   
+             
+             if fastqc == True:
+                 utils.fastqcSLURM(work_dir, script_dir)
              
              if rsemIndex != None:
                  if len(rsemIndex) == 3:
