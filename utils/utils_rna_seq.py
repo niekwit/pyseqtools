@@ -757,10 +757,14 @@ def retroElementsSLURM(work_dir,script_dir,genome,dependency):
         
         #create command for each individual test sample vs reference
         for test_sample in test_samples:
-            test_bams = sorted(glob.glob(os.path.join(work_dir,"bam",genome,f"{test_sample}*","*Aligned.out.bam")))
+            if len(set(sample_info["condition"])) == 1:
+                test_bams = list(sample_info[sample_info["genotype"] == test_sample]["sample"])
+            test_bams = [os.path.join(work_dir,"bam",genome,x,f"{x}_sorted.bam") for x in test_bams]
             test_bams = " ".join(test_bams)
     
-            ref_bams = sorted(glob.glob(os.path.join(work_dir,"bam",genome,f"{reference}*","*Aligned.out.bam")))
+            if len(set(sample_info["condition"])) == 1:        
+                ref_bams = list(sample_info[sample_info["genotype"] == reference]["sample"])
+            ref_bams = [os.path.join(work_dir,"bam",genome,x,f"{x}_sorted.bam") for x in ref_bams]
             ref_bams = " ".join(ref_bams)
             
             project_name = f"{test_sample}_vs_{reference}"
