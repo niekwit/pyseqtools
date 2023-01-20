@@ -353,7 +353,7 @@ def slurmSTAR(work_dir,script_dir,genome,TE=False):
                 "PL:illumina", "--outSAMtype","BAM", "Unsorted", "--outTmpDir", temp_dir,
                 "--outFileNamePrefix", os.path.join(work_dir,"bam",genome,sample,sample)]
         if TE == True: #special settings for multimapping required for TEtranscripts
-            extension = ["--outFilterMultimapNmax","100","--outAnchorMultimapNmax","100"]
+            extension = ["--outFilterMultimapNmax","100","--winAnchorMultimapNmax","100"]
             star.extend(extension)
         star = " ".join(star)
         utils.appendCSV(csv_star,star)
@@ -777,7 +777,7 @@ def retroElementsSLURM(work_dir,script_dir,genome,dependency):
     
     #generate slurm script
     slurm_file = os.path.join(work_dir,"slurm","te.sh")
-    utils.slurmTemplateScript(work_dir,"TEtrx",slurm_file,slurm,None,True,csv_list)
+    utils.slurmTemplateScript(work_dir,"TEtrx",slurm_file,slurm,None,True,csv_list,dependency)
     
     #submit slurm script to HPC
     job_id_te = utils.runSLURM(work_dir, slurm_file, "TEtrx")
