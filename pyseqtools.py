@@ -753,7 +753,8 @@ def main():
                  rnaseq_utils.BigWig(work_dir, threads, genome, rna_seq_settings, slurm)   
              
              if TE == True:
-                 rnaseq_utils.retroElements(work_dir, script_dir, rna_seq_settings, threads, genome, slurm)
+                 job_id_star = rnaseq_utils.slurmSTAR(work_dir,script_dir,genome,TE=True)
+                 rnaseq_utils.retroElementsSLURM(work_dir,script_dir,genome,job_id_star)
              
 
     def chip_seq(args, script_dir, module):

@@ -1491,7 +1491,7 @@ def getBamFiles(work_dir,genome):
     
     
 def getSampleNames(work_dir):
-    '''Get unique sample name from samples.csv
+    '''Get unique sample names from samples.csv
     '''
     sample_info = pd.read_csv(os.path.join(work_dir,"samples.csv"))
     

@@ -290,7 +290,7 @@ def plotPCA(work_dir,script_dir):
         return(None)
 
 
-def slurmSTAR(work_dir,script_dir,genome):
+def slurmSTAR(work_dir,script_dir,genome,TE=False):
     '''
     Alignment for RNA-Seq with STAR from trimmed paired-end data
     '''
@@ -352,6 +352,9 @@ def slurmSTAR(work_dir,script_dir,genome):
                 "None", "--outSAMattrRGline","ID:"+sample,"PU:"+sample,"SM:"+sample,"LB:unknown",
                 "PL:illumina", "--outSAMtype","BAM", "Unsorted", "--outTmpDir", temp_dir,
                 "--outFileNamePrefix", os.path.join(work_dir,"bam",genome,sample,sample)]
+        if TE == True: #special settings for multimapping required for TEtranscripts
+            extension = ["--outFilterMultimapNmax","100","--outAnchorMultimapNmax","100"]
+            star.extend(extension)
         star = " ".join(star)
         utils.appendCSV(csv_star,star)
         
@@ -700,6 +703,83 @@ def geneSetEnrichment(work_dir,pvalue,gene_sets):
           GSEA(df,i,out_dir)    
     
 
+def retroElementsSLURM(work_dir,script_dir,genome,dependency):
+    '''
+    Analysis of transposable elements using TEtranscripts
+    '''
+    puts(colored.green("TE transcript analysis"))
+    
+    te_dir = os.path.join(work_dir,"TEtranscripts")
+    os.makedirs(te_dir,exist_ok=True)
+    
+    #load RNA-Seq settings   
+    with open(os.path.join(script_dir,"yaml","rna-seq.yaml")) as file:
+        rna_seq_settings = yaml.full_load(file) 
+    
+    genome = genome.split("_",2)[0]
+    gtf = rna_seq_settings["gtf"][genome]
+    te_gtf = rna_seq_settings["TEtranscript"][genome]
+    strand = rna_seq_settings["TEtranscript"]["strand"]
+    
+    #load slurm settings
+    with open(os.path.join(script_dir,"yaml","slurm.yaml")) as file:
+        slurm_settings = yaml.full_load(file) 
+    
+    threads = slurm_settings["RNA-Seq"]["TEtranscript"]["cpu"]
+    mem = slurm_settings["RNA-Seq"]["TEtranscript"]["mem"]
+    time = slurm_settings["RNA-Seq"]["TEtranscript"]["time"]
+    account = slurm_settings["groupname"]
+    partition = slurm_settings["RNA-Seq"]["partition"]
+    
+    slurm = {"threads": threads, 
+             "mem": mem,
+             "time": time,
+             "account": account,
+             "partition": partition}
+    
+    #get sample info
+    sample_info = pd.read_csv(os.path.join(work_dir,"samples.csv"))
+    all_samples = set(utils.getSampleNames(work_dir))
+    
+    if len(set(sample_info["condition"])) == 1:
+        reference_samples = set(sample_info[sample_info["ref"] == "ref"]["genotype"])
+    
+    #CSV files for commands
+    csv_te = os.path.join(work_dir,"slurm","TEtranscripts.csv")
+    csv_list = [csv_te]
+    
+    utils.removeFiles(csv_list) #make sure they do not exist already
+    
+    #create TEtranscript commands
+    for reference in reference_samples:
+        #get all test samples for this reference
+        test_samples = all_samples - {reference}
+        
+        #create command for each individual test sample vs reference
+        for test_sample in test_samples:
+            test_bams = sorted(glob.glob(os.path.join(work_dir,"bam",genome,f"{test_sample}*","*Aligned.out.bam")))
+            test_bams = " ".join(test_bams)
+    
+            ref_bams = sorted(glob.glob(os.path.join(work_dir,"bam",genome,f"{reference}*","*Aligned.out.bam")))
+            ref_bams = " ".join(ref_bams)
+            
+            project_name = f"{test_sample}_vs_{reference}"
+            out_dir_sample = os.path.join(te_dir,project_name)
+            os.makedirs(out_dir_sample,exist_ok=True)
+            
+            command = f"TEtranscripts -t {test_bams} -c {ref_bams} --GTF {gtf} --TE {te_gtf} --sortByPos --project {project_name} --outdir {out_dir_sample} --stranded {strand}"
+            utils.appendCSV(csv_te,command)
+            
+    
+    #generate slurm script
+    slurm_file = os.path.join(work_dir,"slurm","star.sh")
+    utils.slurmTemplateScript(work_dir,"TEtrx",slurm_file,slurm,None,True,csv_list)
+    
+    #submit slurm script to HPC
+    job_id_te = utils.runSLURM(work_dir, slurm_file, "TEtrx")
+    
+    
+
 def retroElements(work_dir,script_dir,rna_seq_settings,genome,slurm=False,threads='1'):
     '''
     Analysis of transposable elements using TEtranscripts
@@ -734,6 +814,8 @@ def retroElements(work_dir,script_dir,rna_seq_settings,genome,slurm=False,thread
     
     #get number of comparisons
     comparisons = len(samples.columns) - 1 #number of comparisons +1
+    
+    
     
     #create TEtranscript commands for each comparison
     for i in range(1, comparisons):
