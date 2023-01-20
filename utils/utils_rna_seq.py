@@ -288,7 +288,92 @@ def plotPCA(work_dir,script_dir):
     except:
         print("PCA plot for all samples failed, check log")
         return(None)
-  
+
+
+def slurmSTAR(work_dir,script_dir,genome):
+    '''
+    Alignment for RNA-Seq with STAR from trimmed paired-end data
+    '''
+    #get trimmed fastq files
+    file_list = glob.glob(os.path.join(work_dir,"trim","*_val_1.fq.gz"))
+    if len(file_list) == 0:
+        print("ERROR: no trimmed paired-end fastq files found")
+        return
+    
+    #CSV files for commands
+    csv_star = os.path.join(work_dir,"slurm","star.csv")
+    csv_sort = os.path.join(work_dir,"slurm","star_sort.csv")
+    csv_index = os.path.join(work_dir,"slurm","star_index.csv")
+    
+    csv_list = [csv_star,csv_sort,csv_index]
+    
+    utils.removeFiles(csv_list) #make sure they do not exist already
+    
+    #create commands
+    for read1 in file_list:
+        read2 = read1.replace("_val_1.fq.gz","_val_2.fq.gz")
+        sample = os.path.basename(read1).replace("_val_1.fq.gz","")
+        
+        #each command should have a unique temp dir otherwise parallel alignments cannot be run
+        temp_dir = os.path.join(work_dir,f"temp_{sample}")
+        
+        #create output dir
+        out_dir = os.path.join(work_dir,"bam",genome,sample)
+        os.makedirs(out_dir, exist_ok = True)
+    
+        #load slurm settings    
+        with open(os.path.join(script_dir,"yaml","slurm.yaml")) as file:
+            slurm_settings = yaml.full_load(file) 
+        
+        threads = slurm_settings["RNA-Seq"]["STAR"]["cpu"]
+        mem = slurm_settings["RNA-Seq"]["STAR"]["mem"]
+        time = slurm_settings["RNA-Seq"]["STAR"]["time"]
+        account = slurm_settings["groupname"]
+        partition = slurm_settings["RNA-Seq"]["partition"]
+        
+        slurm = {"threads": threads, 
+                 "mem": mem,
+                 "time": time,
+                 "account": account,
+                 "partition": partition}
+        
+        #load RNA-Seq settings   
+        with open(os.path.join(script_dir,"yaml","rna-seq.yaml")) as file:
+            rna_seq_settings = yaml.full_load(file) 
+            
+        index = rna_seq_settings["STAR_index"][genome]
+            
+        #create STAR command
+        star = ["STAR", "--runThreadN", threads,"--runMode", "alignReads", "--genomeDir", index,
+                "--readFilesIn", read1, read2, "--readFilesCommand", "zcat", "--quantMode",
+                "TranscriptomeSAM", "GeneCounts", "--twopassMode", "Basic", "--outSAMunmapped",
+                "None", "--outSAMattrRGline","ID:"+sample,"PU:"+sample,"SM:"+sample,"LB:unknown",
+                "PL:illumina", "--outSAMtype","BAM", "Unsorted", "--outTmpDir", temp_dir,
+                "--outFileNamePrefix", os.path.join(work_dir,"bam",genome,sample,sample)]
+        star = " ".join(star)
+        utils.appendCSV(csv_star,star)
+        
+        #create sort command
+        unsorted_bam = os.path.join(out_dir,f"{sample}Aligned.out.bam")
+        sorted_bam = unsorted_bam.replace("Aligned.out.bam","_sorted.bam")
+        sort_bam = ["samtools","sort","-@",threads,"-o",sorted_bam,unsorted_bam]
+        sort_bam = " ".join(sort_bam)
+        utils.appendCSV(csv_sort,sort_bam)
+        
+        #create index command
+        index_bam = ["samtools","index","-@",threads,sorted_bam]
+        index_bam = " ".join(index_bam)
+        utils.appendCSV(csv_index,index_bam)
+    
+        #generate slurm script
+        slurm_file = os.path.join(work_dir,"slurm","star.sh")
+        utils.slurmTemplateScript(work_dir,"star",slurm_file,slurm,None,True,csv_list)
+        
+        #submit slurm script to HPC
+        job_id_star = utils.runSLURM(work_dir, slurm_file, "star")
+    
+    
+    
 
 def STAR(work_dir, threads, script_dir, rna_seq_settings, genome, slurm, job_id_trim=None):
     '''
@@ -447,6 +532,7 @@ def STAR(work_dir, threads, script_dir, rna_seq_settings, genome, slurm, job_id_
             print(f"Skipping STAR alignment, all output BAM files for {genome} already detected")
     else:
         align(work_dir, index, threads, genome, slurm)
+
 
 '''    
 def hisat2(work_dir, rna_seq_settings, threads, genome):

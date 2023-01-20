@@ -129,14 +129,6 @@ def main():
                              default = None,
                              choices = [None,"miso","rmats"],
                              help = "Alternative isoform analysis with RSEM/MISO or rMATS. Default is None")
-    parser_rnaseq.add_argument("--indexBAM",
-                             required = False,
-                             action = 'store_true',
-                             help = "Index BAM files with samtools")
-    parser_rnaseq.add_argument("--sortBAM",
-                             required = False,
-                             action = 'store_true',
-                             help = "Sort BAM files with samtools")
     parser_rnaseq.add_argument("-f", "--scaleFactors",
                              required = False,
                              action = 'store_true',
@@ -641,8 +633,6 @@ def main():
         deseq2 = args["deseq2"]
         bigwig = args["bigwig"]
         scaleFactors = args["scaleFactors"]
-        indexBAM = args["indexBAM"]
-        sortBAM = args["sortBAM"]
         pe_tags = args["peTags"]
         slurm = args["slurm"] 
         rsemIndex = args["rsemIndex"]
@@ -745,15 +735,9 @@ def main():
              
              if trim == True:
                  utils.trimSLURM(script_dir, work_dir,module, pe_tags)
-                 
-             if indexBAM == True:
-                 utils.indexBam(work_dir, threads, genome, slurm, script_dir)
-                 
-             if sortBAM == True:
-                 tt_seq_utils.bamSortSLURM(work_dir, genome)
              
              if align == "star":
-                 rnaseq_utils.STAR(work_dir, threads, script_dir, rna_seq_settings, genome, slurm)
+                 rnaseq_utils.slurmSTAR(work_dir,script_dir,genome)
                  
              if isoformAnalysis != None:
                  rnaseq_utils.isoformAnalysis(work_dir, script_dir, rna_seq_settings, genome, slurm, isoformAnalysis)
