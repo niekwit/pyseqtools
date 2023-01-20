@@ -318,6 +318,8 @@ def slurmSTAR(work_dir,script_dir,genome,TE=False):
         
         #each command should have a unique temp dir otherwise parallel alignments cannot be run
         temp_dir = os.path.join(work_dir,f"temp_{sample}")
+        if os.path.isdir(temp_dir) == True:
+            shutil.rmtree(temp_dir)
         
         #create output dir
         out_dir = os.path.join(work_dir,"bam",genome,sample)
