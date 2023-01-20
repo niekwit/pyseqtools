@@ -376,6 +376,7 @@ def slurmSTAR(work_dir,script_dir,genome,TE=False):
     
     #submit slurm script to HPC
     job_id_star = utils.runSLURM(work_dir, slurm_file, "star")
+    return(job_id_star)
     
         
 

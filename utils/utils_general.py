@@ -960,7 +960,7 @@ def slurmTemplateScript(work_dir,name,file,slurm,commands,array=False,csv=None,d
                 script.write(f"{commands[0]}\n")
             else:
                 for i in commands:
-                    if type(i) == list: #check if i is not a list itself (should be string)
+                    if type(i) == list: #check if it is not a list itself (should be string)
                         i = " ".join(i)
                         script.write(f"{i}\n")
                     else:
