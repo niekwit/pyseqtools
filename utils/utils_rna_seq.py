@@ -719,9 +719,8 @@ def retroElementsSLURM(work_dir,script_dir,genome,dependency):
     with open(os.path.join(script_dir,"yaml","rna-seq.yaml")) as file:
         rna_seq_settings = yaml.full_load(file) 
     
-    genome = genome.split("_",2)[0]
-    gtf = rna_seq_settings["gtf"][genome]
-    te_gtf = rna_seq_settings["TEtranscript"][genome]
+    gtf = rna_seq_settings["gtf"][genome.split("_",2)[0]]
+    te_gtf = rna_seq_settings["TEtranscript"][genome.split("_",2)[0]]
     strand = rna_seq_settings["TEtranscript"]["strand"]
     
     #load slurm settings
