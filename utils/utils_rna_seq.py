@@ -330,7 +330,7 @@ def slurmSTAR(work_dir,script_dir,genome,TE=False):
         if TE == False:
             out_dir = os.path.join(work_dir,"bam",genome,sample)
         else:
-            out_dir = os.path.join(work_dir,"te_bam",genome,sample)
+            out_dir = os.path.join(work_dir,"bam_te",genome,sample)
         os.makedirs(out_dir, exist_ok = True)
     
         #load slurm settings    
@@ -356,12 +356,17 @@ def slurmSTAR(work_dir,script_dir,genome,TE=False):
         index = rna_seq_settings["STAR_index"][genome]
             
         #create STAR command
+        if TE == False:
+            prefix = os.path.join(work_dir,"bam",genome,sample,sample)
+        else:
+            prefix = os.path.join(work_dir,"bam_te",genome,sample,sample)
+        
         star = ["STAR", "--runThreadN", threads,"--runMode", "alignReads", "--genomeDir", index,
                 "--readFilesIn", read1, read2, "--readFilesCommand", "zcat", "--quantMode",
                 "TranscriptomeSAM", "GeneCounts", "--twopassMode", "Basic", "--outSAMunmapped",
                 "None", "--outSAMattrRGline","ID:"+sample,"PU:"+sample,"SM:"+sample,"LB:unknown",
                 "PL:illumina", "--outSAMtype","BAM", "Unsorted", "--outTmpDir", temp_dir,
-                "--outFileNamePrefix", os.path.join(work_dir,"bam",genome,sample,sample)]
+                "--outFileNamePrefix", prefix]
         if TE == True: #special settings for multimapping required for TEtranscripts
             extension = ["--outFilterMultimapNmax","100","--winAnchorMultimapNmax","100"]
             star.extend(extension)
@@ -777,12 +782,12 @@ def retroElementsSLURM(work_dir,script_dir,genome,dependency):
         for test_sample in test_samples:
             if len(set(sample_info["condition"])) == 1:
                 test_bams = list(sample_info[sample_info["genotype"] == test_sample]["sample"])
-            test_bams = [os.path.join(work_dir,"te_bam",genome,x,f"{x}_sorted.bam") for x in test_bams]
+            test_bams = [os.path.join(work_dir,"bam_te",genome,x,f"{x}_sorted.bam") for x in test_bams]
             test_bams = " ".join(test_bams)
     
             if len(set(sample_info["condition"])) == 1:        
                 ref_bams = list(sample_info[sample_info["genotype"] == reference]["sample"])
-            ref_bams = [os.path.join(work_dir,"te_bam",genome,x,f"{x}_sorted.bam") for x in ref_bams]
+            ref_bams = [os.path.join(work_dir,"bam_te",genome,x,f"{x}_sorted.bam") for x in ref_bams]
             ref_bams = " ".join(ref_bams)
             
             project_name = f"{test_sample}_vs_{reference}"
