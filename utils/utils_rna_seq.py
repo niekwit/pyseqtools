@@ -303,9 +303,14 @@ def slurmSTAR(work_dir,script_dir,genome,TE=False):
         return
     
     #CSV files for commands
-    csv_star = os.path.join(work_dir,"slurm","star.csv")
-    csv_sort = os.path.join(work_dir,"slurm","star_sort.csv")
-    csv_index = os.path.join(work_dir,"slurm","star_index.csv")
+    if TE == False:
+        csv_star = os.path.join(work_dir,"slurm","star.csv")
+        csv_sort = os.path.join(work_dir,"slurm","star_sort.csv")
+        csv_index = os.path.join(work_dir,"slurm","star_index.csv")
+    else:
+        csv_star = os.path.join(work_dir,"slurm","te_star.csv")
+        csv_sort = os.path.join(work_dir,"slurm","te_star_sort.csv")
+        csv_index = os.path.join(work_dir,"slurm","te_star_index.csv")
     
     csv_list = [csv_star,csv_sort,csv_index]
     
@@ -322,7 +327,10 @@ def slurmSTAR(work_dir,script_dir,genome,TE=False):
             shutil.rmtree(temp_dir)
         
         #create output dir
-        out_dir = os.path.join(work_dir,"bam",genome,sample)
+        if TE == False:
+            out_dir = os.path.join(work_dir,"bam",genome,sample)
+        else:
+            out_dir = os.path.join(work_dir,"te_bam",genome,sample)
         os.makedirs(out_dir, exist_ok = True)
     
         #load slurm settings    
@@ -373,11 +381,19 @@ def slurmSTAR(work_dir,script_dir,genome,TE=False):
         utils.appendCSV(csv_index,index_bam)
     
     #generate slurm script
-    slurm_file = os.path.join(work_dir,"slurm","star.sh")
-    utils.slurmTemplateScript(work_dir,"star",slurm_file,slurm,None,True,csv_list)
+    if TE == False:
+        slurm_file = os.path.join(work_dir,"slurm","star.sh")
+        utils.slurmTemplateScript(work_dir,"star",slurm_file,slurm,None,True,csv_list)
+        
+        #submit slurm script to HPC
+        job_id_star = utils.runSLURM(work_dir, slurm_file, "star")
+    else:
+        slurm_file = os.path.join(work_dir,"slurm","te_star.sh")
+        utils.slurmTemplateScript(work_dir,"te_star",slurm_file,slurm,None,True,csv_list)
+        
+        #submit slurm script to HPC
+        job_id_star = utils.runSLURM(work_dir, slurm_file, "te_star")
     
-    #submit slurm script to HPC
-    job_id_star = utils.runSLURM(work_dir, slurm_file, "star")
     return(job_id_star)
     
         
