@@ -598,9 +598,9 @@ def diff_expr(work_dir,gtf,script_dir,species,pvalue,genome, slurm=False):
         with open(os.path.join(script_dir,"yaml","slurm.yaml")) as file:
             slurm_settings = yaml.full_load(file)        
 
-        threads = slurm_settings["RNA-Seq"]["deseq2_CPU"]
-        mem = slurm_settings["RNA-Seq"]["deseq2_mem"]
-        time = slurm_settings["RNA-Seq"]["deseq2_time"]
+        threads = slurm_settings["RNA-Seq"]["deseq2"]["cpu"]
+        mem = slurm_settings["RNA-Seq"]["deseq2"]["mem"]
+        time = slurm_settings["RNA-Seq"]["deseq2"]["time"]
         account = slurm_settings["groupname"]
         partition = slurm_settings["RNA-Seq"]["partition"]
 
