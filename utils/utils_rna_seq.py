@@ -777,12 +777,12 @@ def retroElementsSLURM(work_dir,script_dir,genome,dependency):
         for test_sample in test_samples:
             if len(set(sample_info["condition"])) == 1:
                 test_bams = list(sample_info[sample_info["genotype"] == test_sample]["sample"])
-            test_bams = [os.path.join(work_dir,"bam",genome,x,f"{x}_sorted.bam") for x in test_bams]
+            test_bams = [os.path.join(work_dir,"te_bam",genome,x,f"{x}_sorted.bam") for x in test_bams]
             test_bams = " ".join(test_bams)
     
             if len(set(sample_info["condition"])) == 1:        
                 ref_bams = list(sample_info[sample_info["genotype"] == reference]["sample"])
-            ref_bams = [os.path.join(work_dir,"bam",genome,x,f"{x}_sorted.bam") for x in ref_bams]
+            ref_bams = [os.path.join(work_dir,"te_bam",genome,x,f"{x}_sorted.bam") for x in ref_bams]
             ref_bams = " ".join(ref_bams)
             
             project_name = f"{test_sample}_vs_{reference}"
