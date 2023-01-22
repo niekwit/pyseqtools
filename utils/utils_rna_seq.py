@@ -294,7 +294,10 @@ def slurmSTAR(work_dir,script_dir,genome,TE=False):
     '''
     Alignment for RNA-Seq with STAR from trimmed paired-end data
     '''
-    puts(colored.green(f"STAR alignment for RNA-Seq for {genome}"))
+    if TE == False:
+        puts(colored.green(f"STAR alignment for RNA-Seq for {genome}"))
+    else:
+        puts(colored.green(f"STAR alignment for RNA-Seq for {genome} with relaxed multimapping required for TEtranscripts"))
     
     #get trimmed fastq files
     file_list = glob.glob(os.path.join(work_dir,"trim","*_val_1.fq.gz"))
@@ -316,13 +319,32 @@ def slurmSTAR(work_dir,script_dir,genome,TE=False):
     
     utils.removeFiles(csv_list) #make sure they do not exist already
     
+    #load slurm settings    
+    with open(os.path.join(script_dir,"yaml","slurm.yaml")) as file:
+        slurm_settings = yaml.full_load(file) 
+    
+    threads = slurm_settings["RNA-Seq"]["STAR"]["cpu"]
+    mem = slurm_settings["RNA-Seq"]["STAR"]["mem"]
+    time = slurm_settings["RNA-Seq"]["STAR"]["time"]
+    account = slurm_settings["groupname"]
+    partition = slurm_settings["RNA-Seq"]["partition"]
+    
+    slurm = {"threads": threads, 
+             "mem": mem,
+             "time": time,
+             "account": account,
+             "partition": partition}
+    
     #create commands
     for read1 in file_list:
         read2 = read1.replace("_val_1.fq.gz","_val_2.fq.gz")
         sample = os.path.basename(read1).replace("_val_1.fq.gz","")
         
         #each command should have a unique temp dir otherwise parallel alignments cannot be run
-        temp_dir = os.path.join(work_dir,f"temp_{sample}")
+        if TE == False:
+            temp_dir = os.path.join(work_dir,f"temp_{sample}")
+        else:
+            temp_dir = os.path.join(work_dir,f"temp_{sample}_te")
         if os.path.isdir(temp_dir) == True:
             shutil.rmtree(temp_dir)
         
@@ -333,22 +355,6 @@ def slurmSTAR(work_dir,script_dir,genome,TE=False):
             out_dir = os.path.join(work_dir,"bam_te",genome,sample)
         os.makedirs(out_dir, exist_ok = True)
     
-        #load slurm settings    
-        with open(os.path.join(script_dir,"yaml","slurm.yaml")) as file:
-            slurm_settings = yaml.full_load(file) 
-        
-        threads = slurm_settings["RNA-Seq"]["STAR"]["cpu"]
-        mem = slurm_settings["RNA-Seq"]["STAR"]["mem"]
-        time = slurm_settings["RNA-Seq"]["STAR"]["time"]
-        account = slurm_settings["groupname"]
-        partition = slurm_settings["RNA-Seq"]["partition"]
-        
-        slurm = {"threads": threads, 
-                 "mem": mem,
-                 "time": time,
-                 "account": account,
-                 "partition": partition}
-        
         #load RNA-Seq settings   
         with open(os.path.join(script_dir,"yaml","rna-seq.yaml")) as file:
             rna_seq_settings = yaml.full_load(file) 
