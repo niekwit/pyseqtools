@@ -243,17 +243,21 @@ if (dir.exists(file.path(work.dir,"salmon"))){
               row.names=FALSE)
     
   }
-} else if (dir.exists(file.path(work.dir,"bam"))){
+} else if (dir.exists(file.path(work.dir,"bam"))){ #STAR aligned data
   #import sample table
   sampleTable <- read.csv(file.path(work.dir,"samples.csv"))
   
   #set conditions for DESeq2
-  sampleTable$geno_cond <- paste(sampleTable$genotype,sampleTable$condition, sep="_")
+  conditions <- length(unique(sampleTable$condition))
+  if (conditions == 1){
+    sampleTable$geno_cond <- sampleTable$genotype
+  } ###to do multiple genotypes and multiple conditions at once
+    
   
   #extract reference conditions
   sample_references <- sampleTable[sampleTable$ref %in% "ref",]
   sample_references <- unique(sample_references$geno_cond)
-  sampleTable <- sampleTable %>% dplyr::select(-one_of("genotype","condition","ref"))
+  sampleTable <- subset(sampleTable, select = c("sample","geno_cond"))
   
   sampleTable$geno_cond <- factor(sampleTable$geno_cond)
   rownames(sampleTable) <- sampleTable$sample
@@ -295,7 +299,7 @@ if (dir.exists(file.path(work.dir,"salmon"))){
   
   #reorder data frame columns
   samples <- rownames(sampleTable)
-  countMatrix <- countMatrix %>% dplyr::select(samples)
+  #countMatrix <- countMatrix %>% dplyr::select(samples)
   
   #load data for gene annotation
   mart <- useMart("ensembl")
@@ -368,15 +372,24 @@ if (dir.exists(file.path(work.dir,"salmon"))){
     #create output directory
     dir.create(file.path(work.dir,"DESeq2"), showWarnings = FALSE)
     
-    #save data frames to separate sheets of an excel fileq
+    #save data frames to separate sheets of an excel file
     #dir.create(file.path(work.dir,"DESeq2"), showWarnings = FALSE)
     write.xlsx(df.master, file = excel, asTable = TRUE)
+    
+    #also save data frames as separate files
+    for (i in names(df.master)){
+      write.csv(df.master[i],file.path(work.dir,"DESeq2",paste0("DESeq2_",i,".csv")),row.names = FALSE)
+    }
     
     #generate heatmap of sample distances
     vsd <- vst(dds, blind=FALSE) #count data transformation for visualisation
     sampleDists <- dist(t(assay(vsd)))
     sampleDistMatrix <- as.matrix(sampleDists)
-    rownames(sampleDistMatrix) <- paste0(dds$geno_cond,rep(c("_1","_2","_3"),length(levels(dds$geno_cond))))
+    replicate.number <- nrow(sampleTable) / length(levels(sampleTable$geno_cond)) 
+    replicate.names <- paste0("_",1:replicate.number)
+    rownames(sampleDistMatrix) <- paste0(dds$geno_cond,rep(replicate.names,length(levels(dds$geno_cond))))
+    
+    
     colnames(sampleDistMatrix) <- NULL
     colors <- colorRampPalette( rev(brewer.pal(9, "Blues")) )(255)
     pheatmap(sampleDistMatrix,
@@ -387,7 +400,11 @@ if (dir.exists(file.path(work.dir,"salmon"))){
     
     #plot PCA
     pdf(file=file.path(work.dir,"DESeq2","PCA_plot.pdf"))
-    plotPCA(vsd, intgroup=c("genotype","condition"))
+    if (conditions == 1){
+      plotPCA(vsd, intgroup="geno_cond")
+    } else {
+      plotPCA(vsd, intgroup=c("genotype","condition"))
+    }
     dev.off()
   }
   
