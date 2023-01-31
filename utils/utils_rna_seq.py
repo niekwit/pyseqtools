@@ -1195,6 +1195,7 @@ def isoformAnalysis(work_dir, script_dir, rna_seq_settings, genome, slurm, isofo
                 else: #data is single-end
                     read1 = glob.glob(os.path.join(work_dir, "trim", f"{condition}*_trimmed.fq.gz"))
                     read1.sort()
+                    read1_merged = os.path.join(work_dir, "trim", f"{condition}_merged_trimmed.fq.gz")
                     
                     command = ["cat", " ".join(read1), ">", read1_merged]
                     utils.appendCSV(csv_merge1, command)
