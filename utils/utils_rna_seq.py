@@ -1115,8 +1115,13 @@ def isoformAnalysis(work_dir, script_dir, rna_seq_settings, genome, slurm, isofo
     Alternative isoform analysis using RSEM/MISO, based on CRICK scripts, or rMATS
 
     '''
-    
+        
     puts(colored.green("Isoform analysis using MISO or rMATS"))
+    
+    if utils.pairedEnd():
+        print("Paired-end data detected")
+    else:
+        print("Single-end data detected")
     
     #load sample info
     sample_info = pd.read_csv(os.path.join(work_dir,"samples.csv"))
@@ -1156,7 +1161,8 @@ def isoformAnalysis(work_dir, script_dir, rna_seq_settings, genome, slurm, isofo
             
             #remove pre-existing command files
             csv_merge1 = os.path.join(work_dir, "slurm", "RSEM", "merge1.csv")
-            csv_merge2 = os.path.join(work_dir, "slurm", "RSEM", "merge2.csv")
+            if utils.pairedEnd():
+                csv_merge2 = os.path.join(work_dir, "slurm", "RSEM", "merge2.csv")
             csv_rsem = os.path.join(work_dir,"slurm", "RSEM", f"RSEM_{genome}.csv")
             csv_move = os.path.join(work_dir,"slurm", "RSEM", "move.csv")
             csv_sort = os.path.join(work_dir,"slurm", "RSEM", "sort.csv")
@@ -1165,21 +1171,26 @@ def isoformAnalysis(work_dir, script_dir, rna_seq_settings, genome, slurm, isofo
             csv_miso_compare = os.path.join(work_dir,"slurm", "miso_compare.csv")
             csv_miso = os.path.join(work_dir,"slurm", "miso.csv")
             
-            csv_list = [csv_merge1,csv_merge2,csv_rsem,csv_move,csv_sort,csv_index,
+            if utils.pairedEnd():
+                csv_list = [csv_merge1,csv_merge2,csv_rsem,csv_move,csv_sort,csv_index,
+                        csv_picard,csv_miso_compare,csv_miso]
+            else:
+                csv_list = [csv_merge1,csv_rsem,csv_move,csv_sort,csv_index,
                         csv_picard,csv_miso_compare,csv_miso]
             
             script_rsem = os.path.join(work_dir, "slurm", f"rsem_{genome}.sh")
-            script_miso_compare = os.path.join(work_dir, "slurm", f"miso_compare_{genome}.sh")
+            #script_miso_compare = os.path.join(work_dir, "slurm", f"miso_compare_{genome}.sh")
             
             utils.removeFiles(csv_list)
             
+                               
             #run RSEM/MISO
             for condition in conditions:
                 ###create csv files with all commands (for SLURM array script)###
                 #merge replicate fastq files by genotype
                 read1 = glob.glob(os.path.join(work_dir, "trim", f"{condition}*_val_1.fq.gz"))
                 
-                if len(read1) != 0: #data is paired-end
+                if utils.pairedEnd():
                     read1.sort()
                     read2 = glob.glob(os.path.join(work_dir, "trim", f"{condition}*_val_2.fq.gz"))
                     read2.sort()
@@ -1200,21 +1211,19 @@ def isoformAnalysis(work_dir, script_dir, rna_seq_settings, genome, slurm, isofo
                     command = ["cat", " ".join(read1), ">", read1_merged]
                     utils.appendCSV(csv_merge1, command)
                     
-                    #remove read2 merge from csv_list
-                    csv_list = [csv_merge1,csv_rsem,csv_move,csv_sort,csv_index,
-                                csv_picard,csv_miso_compare,csv_miso]
+                    
                 
                 #run RSEM
-                if len(read1) != 0: #data is paired-end
+                if utils.pairedEnd():
                     command = ["rsem-calculate-expression", "--paired-end","--star", "-p", threads,
                             "--strandedness", strand, "--star-output-genome-bam",
                             "--estimate-rspd", "--star-gzipped-read-file",
                             "--time", read1_merged, read2_merged, star_index, condition]
                 else:
                     command = ["rsem-calculate-expression","--star", "-p", threads,
-                            "--strandedness", strand, "--star-output-genome-bam",
-                            "--estimate-rspd", "--star-gzipped-read-file",
-                            "--time", read1_merged, star_index, condition]
+                                "--strandedness", strand, "--star-output-genome-bam",
+                                "--estimate-rspd", "--star-gzipped-read-file",
+                                "--time", read1_merged, star_index, condition]
                     
                     
                 utils.appendCSV(csv_rsem, command)
