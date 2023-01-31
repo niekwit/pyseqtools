@@ -36,6 +36,8 @@ except ModuleNotFoundError:
     subprocess.check_call([sys.executable, "-m", "pip", "install", "GitPython"])
 
 
+work_dir = os.getcwd()
+
 ###GENERAL FUNCTIONS
 
 def check_whitespace(work_dir):
@@ -1501,3 +1503,22 @@ def getSampleNames(work_dir):
         samples = sorted(list(set(sample_info["genotype"])))
     
     return(samples)
+
+
+def plotAlignRatesSTAR(work_dir,script_dir,TE=False,slurm=False):
+    pass
+
+
+def pairedEnd():
+    '''Check if fastq files in trim/ are single or paired-end
+    '''
+    fastq = glob.glob(os.path.join(work_dir,"trim","*.gz"))
+    
+    if any(["val_1.fq.gz" in x for x in fastq]):
+        return(True)
+    elif any(["trimmed.fq.gz" in x for x in fastq]):
+        return(False)
+    
+    
+    
+    
