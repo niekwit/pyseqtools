@@ -1188,9 +1188,9 @@ def isoformAnalysis(work_dir, script_dir, rna_seq_settings, genome, slurm, isofo
             for condition in conditions:
                 ###create csv files with all commands (for SLURM array script)###
                 #merge replicate fastq files by genotype
-                read1 = glob.glob(os.path.join(work_dir, "trim", f"{condition}*_val_1.fq.gz"))
-                
+                               
                 if utils.pairedEnd():
+                    read1 = glob.glob(os.path.join(work_dir, "trim", f"{condition}*_val_1.fq.gz"))
                     read1.sort()
                     read2 = glob.glob(os.path.join(work_dir, "trim", f"{condition}*_val_2.fq.gz"))
                     read2.sort()
@@ -1285,7 +1285,8 @@ def isoformAnalysis(work_dir, script_dir, rna_seq_settings, genome, slurm, isofo
             script.write(f"#SBATCH -a 1-{commands}\n")
             
             script.write("sed -n ${SLURM_ARRAY_TASK_ID}p " + f"{csv_merge1} | bash\n")
-            script.write("sed -n ${SLURM_ARRAY_TASK_ID}p " + f"{csv_merge2} | bash\n")
+            if utils.pairedEnd():
+                script.write("sed -n ${SLURM_ARRAY_TASK_ID}p " + f"{csv_merge2} | bash\n")
             script.write("sed -n ${SLURM_ARRAY_TASK_ID}p " + f"{csv_rsem} | bash\n")
             script.write("sed -n ${SLURM_ARRAY_TASK_ID}p " + f"{csv_move} | bash\n")
             script.write("sed -n ${SLURM_ARRAY_TASK_ID}p " + f"{csv_sort} | bash\n")
