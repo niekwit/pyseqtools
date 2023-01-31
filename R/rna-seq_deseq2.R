@@ -114,18 +114,15 @@ if (dir.exists(file.path(work.dir,"salmon"))){
     #Construct DESeq2 data set
     dds <- DESeqDataSetFromTximport(txi,
                                     colData=samples,
-                                    design= ~ condition)
+                                    design= ~ genotype)
     
     #Pre-filtering: remove rows with very few reads
     keep <- rowSums(counts(dds)) >= 10
     dds <- dds[keep,]
     
     #Set reference level: condition that is marked control in exp column
-    ref <- which(samples == "control", arr.ind=TRUE) #select rows that contain control
-    ref <- ref[,"row"]#get indeces of rows that contain control
-    ref <- samples[ref[[1]],] #subset samples for row that contains just control condition
-    ref <- ref[["condition"]] #extract reference condition
-    dds$condition <- relevel(dds$condition, ref=ref)
+    ref <- unique(samples[samples$exp1 == "control", ]$genotype)
+    dds$genotype <- relevel(dds$genotype, ref=ref)
     
     #Differential expression analysis
     dds <- DESeq(dds)
@@ -185,9 +182,9 @@ if (dir.exists(file.path(work.dir,"salmon"))){
     
     #Generate PCA plot
     vsd <- vst(dds, blind=FALSE)
-    pcaData <- plotPCA(vsd, intgroup=c("condition", "sample"), returnData=TRUE)
+    pcaData <- plotPCA(vsd, intgroup=c("genotype", "sample"), returnData=TRUE)
     percentVar <- round(100* attr(pcaData, "percentVar"))
-    p <- ggplot(pcaData, aes(PC1, PC2, color=condition,shape=sample)) +
+    p <- ggplot(pcaData, aes(PC1, PC2, color=genotype,shape=sample)) +
       theme_bw(base_size = 20) +
       theme(legend.position = "right") +
       geom_point(size=5) +
