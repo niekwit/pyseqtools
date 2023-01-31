@@ -40,6 +40,10 @@ def install_packages(): #check for required python packages; installs if absent
                                *missing], stdout = subprocess.DEVNULL)
 
 
+def salmonSLURM(work_dir):
+    pass
+
+
 def salmon(salmon_index, threads, work_dir, gtf, fasta, script_dir, settings, reference):
     
     #check for salmon
@@ -81,8 +85,7 @@ def salmon(salmon_index, threads, work_dir, gtf, fasta, script_dir, settings, re
         print("No Salmon index found: generating Salmon index")
         if os.path.isfile(fasta):
             index_dir = os.path.join(script_dir,"index", "salmon", reference)
-            os.makedirs(index_dir, 
-                        exist_ok = True)
+            os.makedirs(index_dir, exist_ok = True)
             salmon_index_command = [salmon_file, "index", "-t", fasta, "-i", index_dir, "--gencode"]
             #log commands
             with open(os.path.join(work_dir, "commands.log"), "a") as file:
@@ -108,8 +111,7 @@ def salmon(salmon_index, threads, work_dir, gtf, fasta, script_dir, settings, re
     
     def salmonSE(work_dir, threads, gtf, salmon_index, reference):
         salmon_output_dir = os.path.join(work_dir,"salmon")
-        os.makedirs(salmon_output_dir, 
-                exist_ok = True)
+        os.makedirs(salmon_output_dir,exist_ok = True)
         trim_list = glob.glob(os.path.join(work_dir,"trim/*_trimmed.fq.gz"))
         for read1 in trim_list:
             base_read1 = os.path.basename(read1).replace("_trimmed.fq.gz", "") + "-quant"
@@ -131,15 +133,15 @@ def salmon(salmon_index, threads, work_dir, gtf, fasta, script_dir, settings, re
     def salmonPE(work_dir, threads, gtf, salmon_index, reference):
         salmon_output_dir = os.path.join(work_dir,"salmon")
         os.makedirs(salmon_output_dir, exist_ok = True)
-        trim_list = glob.glob(os.path.join(work_dir,"trim","*_R1_001_val_1.fq.gz"))
+        trim_list = glob.glob(os.path.join(work_dir,"trim","*_val_1.fq.gz"))
         salmon_index = settings["salmon_index"][reference] #reload index
         for read1 in trim_list:
-            base_read1 = os.path.basename(read1).replace("_R1_001_val_1.fq.gz", "") + "-quant"
+            base_read1 = os.path.basename(read1).replace("_val_1.fq.gz", "") + "-quant"
             salmon_folder_test = os.path.join(salmon_output_dir, base_read1)
             if not utils.file_exists(salmon_folder_test):
-                print("Mapping sample " + read1.replace("_R1_001_val_1.fq.gz", ""))
-                read2 = read1.replace("R1_001_val_1.fq.gz", "R2_001_val_2.fq.gz")
-                out_file = os.path.basename(read1.replace("_R1_001_val_1.fq.gz",""))
+                print("Mapping sample " + read1.replace("_val_1.fq.gz", ""))
+                read2 = read1.replace("_val_1.fq.gz", "_val_2.fq.gz")
+                out_file = os.path.basename(read1.replace("_val_1.fq.gz",""))
                 salmon_output_file = os.path.join(work_dir,"salmon",out_file)+"-quant"
                 salmon_command = [salmon_file,"quant","--index",salmon_index,"-l","A",
                 "-g", gtf,"-p",threads,"-1", read1,"-2",read2,"--validateMappings",
@@ -288,6 +290,10 @@ def plotPCA(work_dir,script_dir):
     except:
         print("PCA plot for all samples failed, check log")
         return(None)
+
+
+def plotAlignmentRatesSTAR(work_dir,slurm):
+    pass
 
 
 def slurmSTAR(work_dir,script_dir,genome,TE=False):
@@ -568,24 +574,6 @@ def STAR(work_dir, threads, script_dir, rna_seq_settings, genome, slurm, job_id_
         align(work_dir, index, threads, genome, slurm)
 
 
-'''    
-def hisat2(work_dir, rna_seq_settings, threads, genome):
-    read1_list = glob.glob(os.path.join(work_dir,"trim","*_R1_001_val_1.fq.gz"))
-    hisat2_index = rna_seq_settings["HISAT2_index"][genome]
-    
-    for read1 in read1_list:
-        read2 = read1.replace("_R1_001_val_1.fq.gz","_R2_001_val_1.fq.gz")
-        bam = os.path.join(work_dir,"bam",os.path.basename(read1.replace("_R1_001_val_1.fq.gz","_sort.bam")))
-        if not utils.file_exists(bam):
-            hisat2 = ["hisat2", "-p", str(threads), "--dta", "-x", hisat2_index,"-1", read1, "-2", read2,
-                      "2>>", os.path.join(work_dir,"align.log"), "|", "samtools", "view", "-q", "15", "-F", 
-                      "260", "-b", "-@", str(threads), "-", "|", "samtools", "sort", "-@", threads, "-",
-                      ">", bam]
-            utils.write2log(work_dir, " ".join(hisat2))
-            subprocess.call(hisat2)
-'''
-
-
 def diff_expr(work_dir,gtf,script_dir,species,pvalue,genome, slurm=False):
     '''
     Differential expression analysis using DESeq2
@@ -847,8 +835,6 @@ def retroElements(work_dir,script_dir,rna_seq_settings,genome,slurm=False,thread
     
     #get number of comparisons
     comparisons = len(samples.columns) - 1 #number of comparisons +1
-    
-    
     
     #create TEtranscript commands for each comparison
     for i in range(1, comparisons):
@@ -1192,24 +1178,44 @@ def isoformAnalysis(work_dir, script_dir, rna_seq_settings, genome, slurm, isofo
                 ###create csv files with all commands (for SLURM array script)###
                 #merge replicate fastq files by genotype
                 read1 = glob.glob(os.path.join(work_dir, "trim", f"{condition}*_val_1.fq.gz"))
-                read1.sort()
-                read2 = glob.glob(os.path.join(work_dir, "trim", f"{condition}*_val_2.fq.gz"))
-                read2.sort()
-                            
                 
-                read1_merged = os.path.join(work_dir, "trim", f"{condition}_merged_val_1.fq.gz")
-                command = ["cat", " ".join(read1), ">", read1_merged]
-                utils.appendCSV(csv_merge1, command)
-                
-                read2_merged = os.path.join(work_dir, "trim", f"{condition}_merged_val_2.fq.gz")
-                command = ["cat", " ".join(read2), ">", read2_merged]
-                utils.appendCSV(csv_merge2, command)
+                if len(read1) != 0: #data is paired-end
+                    read1.sort()
+                    read2 = glob.glob(os.path.join(work_dir, "trim", f"{condition}*_val_2.fq.gz"))
+                    read2.sort()
+                                
+                    
+                    read1_merged = os.path.join(work_dir, "trim", f"{condition}_merged_val_1.fq.gz")
+                    command = ["cat", " ".join(read1), ">", read1_merged]
+                    utils.appendCSV(csv_merge1, command)
+                    
+                    read2_merged = os.path.join(work_dir, "trim", f"{condition}_merged_val_2.fq.gz")
+                    command = ["cat", " ".join(read2), ">", read2_merged]
+                    utils.appendCSV(csv_merge2, command)
+                else: #data is single-end
+                    read1 = glob.glob(os.path.join(work_dir, "trim", f"{condition}*_trimmed.fq.gz"))
+                    read1.sort()
+                    
+                    command = ["cat", " ".join(read1), ">", read1_merged]
+                    utils.appendCSV(csv_merge1, command)
+                    
+                    #remove read2 merge from csv_list
+                    csv_list = [csv_merge1,csv_rsem,csv_move,csv_sort,csv_index,
+                                csv_picard,csv_miso_compare,csv_miso]
                 
                 #run RSEM
-                command = ["rsem-calculate-expression", "--paired-end","--star", "-p", threads,
-                        "--strandedness", strand, "--star-output-genome-bam",
-                        "--estimate-rspd", "--star-gzipped-read-file",
-                        "--time", read1_merged, read2_merged, star_index, condition]
+                if len(read1) != 0: #data is paired-end
+                    command = ["rsem-calculate-expression", "--paired-end","--star", "-p", threads,
+                            "--strandedness", strand, "--star-output-genome-bam",
+                            "--estimate-rspd", "--star-gzipped-read-file",
+                            "--time", read1_merged, read2_merged, star_index, condition]
+                else:
+                    command = ["rsem-calculate-expression","--star", "-p", threads,
+                            "--strandedness", strand, "--star-output-genome-bam",
+                            "--estimate-rspd", "--star-gzipped-read-file",
+                            "--time", read1_merged, star_index, condition]
+                    
+                    
                 utils.appendCSV(csv_rsem, command)
                 
                 #move rsem files to correct directory
@@ -1323,7 +1329,7 @@ def isoformAnalysis(work_dir, script_dir, rna_seq_settings, genome, slurm, isofo
                 
             
             #generate slurm script
-            slurm_file = os.path.join(work_dir, "slurm", f"miso-compare_{genome}.sh")
+            slurm_file = os.path.join(work_dir, "slurm", f"miso_compare_{genome}.sh")
             utils.slurmTemplateScript(work_dir,"miso_comp",slurm_file,slurm,command,False,None,job_id_miso,"miso")
             
             #run slurm script
