@@ -16,7 +16,7 @@ work.dir <- args[1]
 genome <- args[2]
 
 #create output dir
-out.dir <- file.path(work.dir,"peaks",genome,"diffbind")
+out.dir <- file.path(work.dir,"diffbind")
 dir.create(out.dir,showWarnings = FALSE)
 
 #load appropriate genome db
@@ -95,7 +95,7 @@ for (i in ipSamples){
 }
 
 #write diffbind df to file
-write.csv(diffbind.sheet,file=file.path(work.dir,"peaks",genome,"diffbind_samples.csv"))
+write.csv(diffbind.sheet,file=file.path(out.dir,"diffbind_samples.csv"))
 
 
 
