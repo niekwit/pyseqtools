@@ -1492,7 +1492,9 @@ def getBamFiles(work_dir,genome):
     dedup = any("dedup" in x for x in bam_list)
     if dedup == True:
         bam_list = sorted(glob.glob(os.path.join(work_dir, "bam", genome, "*dedupl.bam")))
-        return(bam_list)
+    
+    return(bam_list)
+    
     
     
 def getSampleNames(work_dir):
