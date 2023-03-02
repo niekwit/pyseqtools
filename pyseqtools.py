@@ -193,7 +193,7 @@ def main():
     parser_chip.add_argument("-g", "--genome",
                              required = False,
                              default = "hg38",
-                             help = "Choose reference genome (default is hg19)")
+                             help = "Choose reference genome (default is hg38)")
     parser_chip.add_argument("--indexBAM",
                              required = False,
                              action = 'store_true',

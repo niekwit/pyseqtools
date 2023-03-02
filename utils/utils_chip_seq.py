@@ -762,7 +762,7 @@ def peak(work_dir, threads, genome, chip_seq_settings):
         peak_setting = ["--broad", "--broad-cutoff", str(broad_cutoff)]
         
     #check if there are any deduplicated bam files
-    bam_list = sorted(glob.glob(os.path.join(work_dir, "bam", "*.bam")))
+    bam_list = sorted(glob.glob(os.path.join(work_dir,genome, "bam", "*.bam")))
     dedup = b_any("dedupl" in x for x in bam_list)
     if dedup == True:
         bam_list = glob.glob(os.path.join(work_dir, "bam", "*sort-bl-dedupl*.bam"))
@@ -979,15 +979,15 @@ def peakSLURM(work_dir, genome):
         with open(os.path.join(script_dir,"yaml","chip-seq.yaml")) as file:
                 chip_settings = yaml.full_load(file)
             
-        extsize = chip_settings["MACS3"]["extsize"]
+        extsize = str(chip_settings["MACS3"]["extsize"])
         if "hg" in genome:
             macs3_genome = "hs"
         elif "mm" in genome:
             macs3_genome = "mm"
         ip = chip_settings["MACS3"]["ip"]
-        cut_off = chip_settings["MACS3"]["broad-cutoff"]
+        cut_off = str(chip_settings["MACS3"]["broad-cutoff"])
         macs3_format = chip_settings["MACS3"]["format"]
-        qvalue = chip_settings["MACS3"]["qvalue"]
+        qvalue = str(chip_settings["MACS3"]["qvalue"])
         
         csv_macs3 = os.path.join(work_dir,"slurm",f"macs3_{name}_{genome}.csv")
         csv_bed = os.path.join(work_dir,"slurm",f"bed_{name}_{genome}.csv")
@@ -999,6 +999,9 @@ def peakSLURM(work_dir, genome):
         for i in csv_list:
             if os.path.exists(i) == True:
                 os.remove(i)
+        
+        #get path to HOMER annotatePeaks.pl
+        annotatePeaks = shutil.which("annotatePeaks.pl")
         
         #prepare csv files with commands for each sample
         for sample,chip_bam,input_bam in zip(sample_list,chip_bams,input_bams):
@@ -1034,8 +1037,7 @@ def peakSLURM(work_dir, genome):
             
             #create command for peak annotation (homer)
             out_file = bed_file.replace(".bed", "_annotated-peaks.txt")
-            annotatePeaks = shutil.which("annotatePeaks.pl")
-                   
+                               
             homer = ["perl",annotatePeaks,bed_file,genome, ">",out_file]
             
             csv = open(csv_homer, "a")  

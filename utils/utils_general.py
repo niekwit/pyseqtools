@@ -137,7 +137,7 @@ def set_threads(args):
 
 
 def rename(work_dir):
-    file = open(os.path.join(work_dir,"rename.config"), "r")
+    file = open(os.path.join(work_dir,"rename.csv"), "r")
     lines = file.readlines()
     count = 0
     for line in lines: #removes newline characters
@@ -145,7 +145,7 @@ def rename(work_dir):
         count+=1
 
     for line in lines:#rename files
-        old_name,new_name=line.split(";")
+        old_name,new_name=line.split(",")
         os.rename(os.path.join(work_dir,
                     "raw-data",
                     old_name),os.path.join(work_dir,
@@ -521,11 +521,14 @@ def appendCSV(csv,command):
     csv_.close()
 
 
-def deduplicationSLURM(script_dir,work_dir,genome,bam_list):
+def deduplicationSLURM(script_dir,work_dir,genome):
     """
     Deduplication of BAM files using PICARD on Cambridge HPC
     """
     puts(colored.green("Performing deduplication of BAM files using PICARD"))
+    
+    #get bam files
+    bam_list = getBamFiles(work_dir,genome)
     
     #create csv files for arrayed commands
     csv_picard = os.path.join(work_dir,"slurm",f"picard_{genome}.csv")
