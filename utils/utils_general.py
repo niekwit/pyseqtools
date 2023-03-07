@@ -37,6 +37,7 @@ except ModuleNotFoundError:
 
 
 work_dir = os.getcwd()
+script_dir = script_dir = os.path.abspath(os.path.dirname(__file__))
 
 ###GENERAL FUNCTIONS
 
@@ -807,7 +808,47 @@ def createBigWig(work_dir, script_dir, threads, chip_seq_settings, genome="hg38"
         
         #log slurm job id
         SLURM_job_id_log(work_dir, "bamCoverage", job_id_bigwig)
-        
+
+
+def loadYaml(name):
+    '''
+    '''
+    
+    yaml_file = os.path.join(script_dir,"yaml",f"{name}.yaml")
+    
+    with open(yaml_file) as f:
+        doc = yaml.safe_load(f)
+    
+    return(doc)
+
+
+def bigWigSLURM(genome):
+    ''' Create BigWig files for each individual sample with deeptools on HPC
+    ''' 
+    
+    bam_files = getBamFiles(genome)
+    
+    #according to https://deeptools.readthedocs.io/en/latest/content/feature/effectiveGenomeSize.html
+    effective_genome_sizes = {"hg19":{"50":"2685511504", "75":"2736124973", "100":"2776919808", "150":"2827437033", "200":"2855464000"},
+                              "hg38":{"50":"2701495761", "75":"2747877777", "100":"2805636331", "150":"2862010578", "200":"2887553303"}}
+    
+    #load bamCoverage settings
+    chip_seq_settings = loadYaml("chip-seq")
+    read_length = chip_seq_settings["BigWig"]["readLength"]
+    effective_genome_size = effective_genome_sizes[genome][read_length]
+    normalisation = chip_seq_settings["BigWig"]["normalizeUsing"]
+    
+    #csv file for bamCoverage commands
+    csv = os.path.join(work_dir,"slurm",f"bamCoverage_{genome}.csv")
+    
+    #remove pre-existing csv
+    removeFiles([csv])
+    
+    #create commands for bamCoverage and add to csv
+    for bam in bam_files:
+    
+    
+    
 
 def bigwigQC(work_dir, threads):
 
@@ -1484,7 +1525,7 @@ def bamToFastq(work_dir):
     pass
         
         
-def getBamFiles(work_dir,genome):
+def getBamFiles(genome):
     '''Get BAM files from experiment
     '''
     #get bam files

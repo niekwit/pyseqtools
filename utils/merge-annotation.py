@@ -6,6 +6,7 @@ Merges MACS3 xls file with HOMER peak annotations
 
 import pandas as pd
 import sys
+import subprocess
 
 #get parsed arguments
 args = sys.argv
@@ -13,8 +14,13 @@ args = sys.argv
 macs3 = args[1]
 homer = args[2]
 
+#remove all comments and empty rows from peak data
+macs3_clean = macs3.replace(".xls","_cleaned.xls")
+bash = f"grep -v '#' {macs3} | sed '/^$/d' > {macs3_clean}"
+subprocess.run(bash,shell=True)
+
 #load data
-df_macs3 = pd.read_csv(macs3, skiprows=29,sep = "\t")
+df_macs3 = pd.read_csv(macs3_clean,sep = "\t")
 
 df_homer = pd.read_csv(homer, sep = "\t")
 df_homer = df_homer.rename(columns = {df_homer.columns[0]: "name"})

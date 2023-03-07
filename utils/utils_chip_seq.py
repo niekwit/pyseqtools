@@ -1001,7 +1001,7 @@ def peakSLURM(work_dir, genome):
                 os.remove(i)
         
         #get path to HOMER annotatePeaks.pl
-        annotatePeaks = shutil.which("annotatePeaks.pl")
+        annotatePeaks = '/home/niek/Documents/scripts/pyseqtools/homer/bin/annotatePeaks.pl'#shutil.which("annotatePeaks.pl")
         
         #prepare csv files with commands for each sample
         for sample,chip_bam,input_bam in zip(sample_list,chip_bams,input_bams):
@@ -1104,7 +1104,7 @@ def peakSLURM(work_dir, genome):
     
     job_id_peak_replicate=peakCall(work_dir,script_dir,genome,"replicate",samples,chip_bams,input_bams)
                                   #work_dir,script_dir,genome,name,sample_list,chip_bams,input_bams
-    #run peak calling for single chip/input files
+    #run peak calling for single chip/input files (required for diffbind)
     chip_samples = sorted(list(sample_info[sample_info["type"] == "ip"]["sample"]))
     input_samples = sorted(list(sample_info[sample_info["type"] == "input"]["sample"]))
     
