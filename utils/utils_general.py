@@ -835,18 +835,35 @@ def bigWigSLURM(genome):
     #load bamCoverage settings
     chip_seq_settings = loadYaml("chip-seq")
     read_length = chip_seq_settings["BigWig"]["readLength"]
+    binSize = chip_seq_settings["BigWig"]["binSize"]
     effective_genome_size = effective_genome_sizes[genome][read_length]
-    normalisation = chip_seq_settings["BigWig"]["normalizeUsing"]
+    normalizeUsing = chip_seq_settings["BigWig"]["normalizeUsing"]
+    extendReads = chip_seq_settings["BigWig"]["extendReads"]
+    genome_size = effective_genome_sizes[genome][read_length]
     
+    #load SLURM settings
+    slurm = loadYaml("slurm")
+    threads = slurm["ChIP-Seq"]["bamCoverage"]["CPU"]
+    mem = slurm["ChIP-Seq"]["bamCoverage"]["mem"]
+    time = slurm["ChIP-Seq"]["bamCoverage"]["time"]
+    
+        
     #csv file for bamCoverage commands
     csv = os.path.join(work_dir,"slurm",f"bamCoverage_{genome}.csv")
     
     #remove pre-existing csv
     removeFiles([csv])
     
+    #create output dir
+    out_dir = os.path.join(work_dir,"bigwig",genome)
+    os.makedirs(out_dir,exist_ok=True)
+    
     #create commands for bamCoverage and add to csv
     for bam in bam_files:
-    
+        bigwig = os.path.join(out_dir,os.path.basename(bam).replace(".bam",".bw"))
+        command = ["bamCoverage", "-p", threads, "--binSize", binSize, "--normalizeUsing",
+                   normalizeUsing, "--extendReads", extendReads, "--effectiveGenomeSize",
+                   genome_size,"-b", bam, "-o", bigwig]
     
     
 
