@@ -840,7 +840,7 @@ def main():
 
         bigwig = args["bigwig"]
         if bigwig == True:
-            utils.createBigWig(work_dir, script_dir, threads, chip_seq_settings, genome, slurm)
+            utils.bigWigSLURM(genome)
     
         qc = args["qc"]
         if qc == True:
