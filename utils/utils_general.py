@@ -37,7 +37,7 @@ except ModuleNotFoundError:
 
 
 work_dir = os.getcwd()
-script_dir = script_dir = os.path.abspath(os.path.dirname(__file__))
+script_dir = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 
 ###GENERAL FUNCTIONS
 
