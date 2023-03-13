@@ -839,14 +839,21 @@ def bigWigSLURM(genome):
     effective_genome_size = effective_genome_sizes[genome][read_length]
     normalizeUsing = chip_seq_settings["BigWig"]["normalizeUsing"]
     extendReads = chip_seq_settings["BigWig"]["extendReads"]
-    genome_size = effective_genome_sizes[genome][read_length]
     
     #load SLURM settings
     slurm = loadYaml("slurm")
+    account = slurm["groupname"]
+    partition = slurm["partition"]
     threads = slurm["ChIP-Seq"]["bamCoverage"]["CPU"]
     mem = slurm["ChIP-Seq"]["bamCoverage"]["mem"]
     time = slurm["ChIP-Seq"]["bamCoverage"]["time"]
     
+    slurm = {"threads": threads, 
+             "mem": mem,
+             "time": time,
+             "account": account,
+             "partition": partition
+             }
         
     #csv file for bamCoverage commands
     csv = os.path.join(work_dir,"slurm",f"bamCoverage_{genome}.csv")
@@ -863,7 +870,18 @@ def bigWigSLURM(genome):
         bigwig = os.path.join(out_dir,os.path.basename(bam).replace(".bam",".bw"))
         command = ["bamCoverage", "-p", threads, "--binSize", binSize, "--normalizeUsing",
                    normalizeUsing, "--extendReads", extendReads, "--effectiveGenomeSize",
-                   genome_size,"-b", bam, "-o", bigwig]
+                   effective_genome_size,"-b", bam, "-o", bigwig]
+        
+        #add command to csv
+        appendCSV(csv,command)
+        
+    #generate slurm script
+    slurm_file = os.path.join(work_dir, "slurm", f"bamCoverage_{genome}.sh")
+    slurmTemplateScript(work_dir,"bigwig",slurm_file,slurm,None,True,csv)
+                       #work_dir,name,file,slurm,commands,array=False,csv=None,dep=None
+    
+    #submit slurm script to HPC
+    job_id_bamcoverage = runSLURM(work_dir, slurm_file, "bigwig")
     
     
 
