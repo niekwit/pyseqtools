@@ -647,7 +647,7 @@ def main():
                 threads = max_threads
 
             ### Check md5sums
-            utils.checkMd5(work_dir,script_dir,slurm)
+            #utils.checkMd5(work_dir,script_dir,slurm)
     
             ###Run FastQC/MultiQC
             file_extension = utils.get_extension(work_dir)
@@ -821,6 +821,13 @@ def main():
                 
             if peak == True:
                 chipseq_utils.peakSLURM(work_dir, genome)
+                
+            bigwig = args["bigwig"]
+            if bigwig == True:
+                job_id_bamcoverage = utils.bamCompareSLURM(genome)
+                utils.bamCompareSLURM(genome)
+                utils.pcaBwSLURM(genome,job_id_bamcoverage)
+                
 
         dedup = args["deduplication"]
         if dedup == True:
@@ -838,9 +845,7 @@ def main():
         if indexBAM == True:
             utils.indexBam(work_dir, threads, genome, slurm, script_dir)        
 
-        bigwig = args["bigwig"]
-        if bigwig == True:
-            utils.bigWigSLURM(genome)
+        
     
         qc = args["qc"]
         if qc == True:

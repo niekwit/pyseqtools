@@ -13,8 +13,8 @@ import numpy as np
 
 import yaml
 import pandas as pd
-import pybedtools
-import pysam
+#import pybedtools
+#import pysam
 from clint.textui import colored, puts
 
 script_dir = os.path.abspath(os.path.dirname(__file__))

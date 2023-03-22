@@ -688,6 +688,11 @@ def indexBam(work_dir, threads, genome, slurm, script_dir):
 
 
 def createBigWig(work_dir, script_dir, threads, chip_seq_settings, genome="hg38", slurm=False):
+    '''
+    '''
+    
+    puts(colored.green("Creaing BigWig files with bamCoverage"))
+    
     #creates BigWig files for all existing BAM files
     puts(colored.green("Generating BigWig files with deepTools"))
           
@@ -822,21 +827,30 @@ def loadYaml(name):
     return(doc)
 
 
-def bigWigSLURM(genome):
-    ''' Create BigWig files for each individual sample with deeptools on HPC
-    ''' 
-    
-    bam_files = getBamFiles(genome)
+def effectiveGenomeSize(genome,readlength):
+    '''Returns effective genome size based on genome build and read length (for Deeptools)
+    '''
     
     #according to https://deeptools.readthedocs.io/en/latest/content/feature/effectiveGenomeSize.html
     effective_genome_sizes = {"hg19":{"50":"2685511504", "75":"2736124973", "100":"2776919808", "150":"2827437033", "200":"2855464000"},
                               "hg38":{"50":"2701495761", "75":"2747877777", "100":"2805636331", "150":"2862010578", "200":"2887553303"}}
     
+    egs = effective_genome_sizes[genome][readlength]
+    
+    return(egs)
+
+
+def bamCoverageSLURM(genome):
+    ''' Create BigWig files for each individual sample with deeptools on HPC
+    ''' 
+    
+    bam_files = getBamFiles(genome)
+    
     #load bamCoverage settings
     chip_seq_settings = loadYaml("chip-seq")
-    read_length = chip_seq_settings["BigWig"]["readLength"]
+    readlength = chip_seq_settings["BigWig"]["readLength"]
     binSize = chip_seq_settings["BigWig"]["binSize"]
-    effective_genome_size = effective_genome_sizes[genome][read_length]
+    effective_genome_size = effectiveGenomeSize(genome, readlength)
     normalizeUsing = chip_seq_settings["BigWig"]["normalizeUsing"]
     extendReads = chip_seq_settings["BigWig"]["extendReads"]
     
@@ -862,7 +876,7 @@ def bigWigSLURM(genome):
     removeFiles([csv])
     
     #create output dir
-    out_dir = os.path.join(work_dir,"bigwig",genome)
+    out_dir = os.path.join(work_dir,"bigwig",genome,"single_bw")
     os.makedirs(out_dir,exist_ok=True)
     
     #create commands for bamCoverage and add to csv
@@ -881,10 +895,145 @@ def bigWigSLURM(genome):
                        #work_dir,name,file,slurm,commands,array=False,csv=None,dep=None
     
     #submit slurm script to HPC
-    job_id_bamcoverage = runSLURM(work_dir, slurm_file, "bigwig")
+    job_id_bamcoverage = runSLURM(work_dir, slurm_file, "bamCov")
     
+    return(job_id_bamcoverage)
     
 
+def pcaBwSLURM(genome,dependency):
+    ''' Create PCA plot for single BW files
+    '''
+    #load SLURM settings
+    slurm = loadYaml("slurm")
+    account = slurm["groupname"]
+    partition = slurm["partition"]
+    threads = slurm["ChIP-Seq"]["multiBigwigSummary"]["CPU"]
+    mem = slurm["ChIP-Seq"]["multiBigwigSummary"]["mem"]
+    time = slurm["ChIP-Seq"]["multiBigwigSummary"]["time"]
+    
+    slurm = {"threads": threads, 
+             "mem": mem,
+             "time": time,
+             "account": account,
+             "partition": partition
+             }
+    
+    #load sample_info
+    sample_info = pd.read_csv(os.path.join(work_dir,"samples.csv"))
+    
+    #load all bw files
+    bw = glob.glob(os.path.join(work_dir,"bigwig",genome,"single_bw","*.bw"))
+    
+    #get bw file for each sample
+    samples = list(sample_info["sample"])
+    bw_list = []
+    for i in samples:
+        bw_list.extend([x for x in bw if i in x])
+    
+    #add bw files to sample_info
+    sample_info["bw"] = bw_list
+    
+    #create multiBigwigSummary file
+    labels = " ".join(list(sample_info["sample"]))
+    bw = " ".join(list(sample_info["bw"]))
+    output_summary = os.path.join(work_dir,"bigwig",genome,"single_bw","multiBigwigSummary.npz")
+    
+    multiBigwigSummary = f"multiBigwigSummary bins -p {threads} -b {bw} -l {labels} -o {output_summary}"
+    
+    #generate slurm script
+    slurm_file = os.path.join(work_dir, "slurm", f"multiBigwigSummary_{genome}.sh")
+    slurmTemplateScript(work_dir,"mBS",slurm_file,slurm,multiBigwigSummary,False,None,dependency)
+    
+    #submit slurm script to HPC
+    job_id_bigwigsummary = runSLURM(work_dir, slurm_file, "mBS")
+    
+    #prepare symbols for PCA plot (different symbols for ip/input)
+    symbols = list(sample_info["type"])
+    for i,n in enumerate(symbols):
+        if n == "ip":
+            symbols[i] = "s"
+        else:
+            symbols[i] = "o"
+    
+    sample_info["symbol"] = symbols
+    
+    #prepare colours for PCA plot (unique colours for genotypes per treatment)
+    main_colours = ["#000000","#e33900","#27b7de","#fa8d22","#aeaeff",
+                    "#654751","#a1a2a9","#ffaded","#badaff"]
+    genotypes = len(set(sample_info["genotype"]))
+    treatments = len(set(sample_info["treatment"]))
+    
+
+def bamCompareSLURM(genome): 
+    
+    #get bam files
+    bam_files = getBamFiles(genome)
+    
+    #load sample info
+    sample_info = pd.read_csv(os.path.join(work_dir,"samples.csv"))
+    
+    #get genotype/treatment conditions and replicate number
+    genotypes = set(sample_info["genotype"])
+    treatments = set(sample_info["treatment"])
+    
+    #create paired lists for input and ip samples
+    ip_samples = []
+    input_samples = []
+    
+    for genotype in genotypes:
+        for treatment in treatments:
+            df = sample_info[sample_info["genotype"] == genotype]
+            df_ip = df[df["type"] == "ip"]
+            df_input = df[df["type"] == "input"]
+            
+            ip_samples.extend(list(df_ip["sample"]))
+            input_samples.extend(list(df_input["sample"]))
+            
+    #load SLURM settings
+    slurm = loadYaml("slurm")
+    account = slurm["groupname"]
+    partition = slurm["partition"]
+    threads = slurm["ChIP-Seq"]["bamCoverage"]["CPU"]
+    mem = slurm["ChIP-Seq"]["bamCoverage"]["mem"]
+    time = slurm["ChIP-Seq"]["bamCoverage"]["time"]
+    
+    slurm = {"threads": threads, 
+             "mem": mem,
+             "time": time,
+             "account": account,
+             "partition": partition
+             }
+    
+    #csv file for bamCoverage commands
+    csv = os.path.join(work_dir,"slurm",f"bamCompare_{genome}.csv")
+    
+    #remove pre-existing csv
+    removeFiles([csv])
+    
+    #create output dir
+    out_dir = os.path.join(work_dir,"bigwig",genome,"input_vs_ip_bw")
+    os.makedirs(out_dir,exist_ok=True)
+        
+    #create bamCompare commands and add to csv
+    for i,j in zip(ip_samples,input_samples):
+        ip_bam = [x for x in bam_files if i in x][0]
+        input_bam = [x for x in bam_files if j in x][0]
+        bw = os.path.basename(ip_bam).split("-",1)[0]
+        bw = os.path.join(out_dir,bw) + ".log2.bw"
+        
+        bamCompare = f"bamCompare -p {threads} -b1 {ip_bam} -b2 {input_bam} -o {bw}"
+
+        #add command to csv
+        appendCSV(csv,bamCompare)
+    
+    #generate slurm script
+    slurm_file = os.path.join(work_dir, "slurm", f"bamCompare_{genome}.sh")
+    slurmTemplateScript(work_dir,"bamComp",slurm_file,slurm,None,True,csv)
+    
+    #submit slurm script to HPC
+    job_id_bamcompare = runSLURM(work_dir, slurm_file, "bamCov")
+        
+    
 def bigwigQC(work_dir, threads):
 
     #generate PCA plot of all BigWig files
