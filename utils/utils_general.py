@@ -24,6 +24,7 @@ from clint.textui import colored, puts
 import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
+import numpy as np
 try: 
     import pysam
 except ModuleNotFoundError:
@@ -936,7 +937,8 @@ def pcaBwSLURM(genome,dependency):
     #create multiBigwigSummary file
     labels = " ".join(list(sample_info["sample"]))
     bw = " ".join(list(sample_info["bw"]))
-    output_summary = os.path.join(work_dir,"bigwig",genome,"single_bw","multiBigwigSummary.npz")
+    out_dir = os.path.join(work_dir,"bigwig",genome,"single_bw")
+    output_summary = os.path.join(out_dir,"multiBigwigSummary.npz")
     
     multiBigwigSummary = f"multiBigwigSummary bins -p {threads} -b {bw} -l {labels} -o {output_summary}"
     
@@ -956,12 +958,35 @@ def pcaBwSLURM(genome,dependency):
             symbols[i] = "o"
     
     sample_info["symbol"] = symbols
+    symbols = " ".join(symbols)
     
     #prepare colours for PCA plot (unique colours for genotypes per treatment)
     main_colours = ["#000000","#e33900","#27b7de","#fa8d22","#aeaeff",
                     "#654751","#a1a2a9","#ffaded","#badaff"]
     genotypes = len(set(sample_info["genotype"]))
     treatments = len(set(sample_info["treatment"]))
+    replicates = int(len(sample_info["genotype"]) / treatments / 2)
+    
+    if treatments == 1:
+        colours = main_colours[0:genotypes]
+        colours = list(np.concatenate([([i]*replicates) for i in colours], axis=0))
+        
+    else:
+        pass #to do
+        
+    colours = " ".join(colours)
+    sample_info["colour"] = colours
+    
+    #create plotPCA command
+    pca = os.path.join(out_dir,"PCA_single_bw.pdf")
+    plotPCA = f"plotPCA -in {output_summary} -o {pca} --colors {colours} --markers {symbols}"
+    
+    #generate slurm script
+    slurm_file = os.path.join(work_dir, "slurm", f"pcaBigWig_{genome}.sh")
+    slurmTemplateScript(work_dir,"pca",slurm_file,slurm,plotPCA,False,None,job_id_bigwigsummary)
+    
+    #submit slurm script to HPC
+    job_id_pca = runSLURM(work_dir, slurm_file, "pca")
     
 
 def bamCompareSLURM(genome): 
