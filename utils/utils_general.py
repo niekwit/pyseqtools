@@ -965,14 +965,14 @@ def pcaBwSLURM(genome,dependency):
                     "#654751","#a1a2a9","#ffaded","#badaff"]
     genotypes = len(set(sample_info["genotype"]))
     treatments = len(set(sample_info["treatment"]))
-    replicates = int(len(sample_info["genotype"]) / treatments / 2)
+    replicates = int(len(sample_info["sample"]) / genotypes / treatments / 2)
     
-    if treatments == 1:
-        colours = main_colours[0:genotypes]
-        colours = list(np.concatenate([([i]*replicates) for i in colours], axis=0))
-        
-    else:
-        pass #to do
+    
+    colours = main_colours[0:(genotypes * treatments)]
+    colours = list(np.concatenate([([i] * replicates * treatments * 2) for i in colours], axis=0))
+    sample_info["colour"] = colours
+    colours = " ".join(colours)
+    
         
     colours = " ".join(colours)
     sample_info["colour"] = colours

@@ -824,7 +824,7 @@ def main():
                 
             bigwig = args["bigwig"]
             if bigwig == True:
-                job_id_bamcoverage = utils.bamCompareSLURM(genome)
+                job_id_bamcoverage = utils.bamCoverageSLURM(genome)
                 utils.bamCompareSLURM(genome)
                 utils.pcaBwSLURM(genome,job_id_bamcoverage)
                 
