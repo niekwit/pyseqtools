@@ -922,15 +922,15 @@ def pcaBwSLURM(genome,dependency):
     #load sample_info
     sample_info = pd.read_csv(os.path.join(work_dir,"samples.csv"))
     
-    #load all bw files
-    bw = glob.glob(os.path.join(work_dir,"bigwig",genome,"single_bw","*.bw"))
-    
-    #get bw file for each sample
-    samples = list(sample_info["sample"])
+    #create list of all bw files
+    csv = os.path.join(work_dir,"slurm",f"bamCoverage_{genome}.csv")
+    csv = open(csv)
     bw_list = []
-    for i in samples:
-        bw_list.extend([x for x in bw if i in x])
-    
+    for line in csv:
+        bw = line.rsplit(" ",1)[1]
+        bw_list.append(bw)
+    csv.close()
+        
     #add bw files to sample_info
     sample_info["bw"] = bw_list
     
@@ -988,6 +988,9 @@ def pcaBwSLURM(genome,dependency):
     #submit slurm script to HPC
     job_id_pca = runSLURM(work_dir, slurm_file, "pca")
     
+    #save updated samples.csv
+    sample_info.to_csv(os.path.join(work_dir,"samples.csv"),index=False)
+
 
 def bamCompareSLURM(genome): 
     
