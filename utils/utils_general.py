@@ -845,6 +845,8 @@ def bamCoverageSLURM(genome):
     ''' Create BigWig files for each individual sample with deeptools on HPC
     ''' 
     
+    puts(colored.green("Creaing BigWig files and PCA plot"))
+    
     bam_files = getBamFiles(genome)
     
     #load bamCoverage settings
@@ -931,20 +933,20 @@ def pcaBwSLURM(genome,dependency):
         bw_list.append(bw)
     csv.close()
     
-    #add bw files to sample_info
+    #add bw files to sample_info (in the same order)
     bw_sample_names = [os.path.basename(x).split("-",1)[0] for x in bw_list]
     df = pd.DataFrame(list(zip(bw_sample_names,bw_list)), columns=["sample","bw"])
     sample_info = pd.merge(sample_info,df, on="sample", how="left")
         
     #get bw files from sample_info
-    sample_info["bw"] = bw_list
+    bw_list = " ".join(list(sample_info["bw"]))
     
     #create multiBigwigSummary file
     labels = " ".join(list(sample_info["sample"]))
     out_dir = os.path.join(work_dir,"bigwig",genome,"single_bw")
     output_summary = os.path.join(out_dir,"multiBigwigSummary.npz")
     
-    multiBigwigSummary = f"multiBigwigSummary bins -p {threads} -b {bw} -l {labels} -o {output_summary}"
+    multiBigwigSummary = f"multiBigwigSummary bins -p {threads} -b {bw_list} -l {labels} -o {output_summary}"
     
     #generate slurm script
     slurm_file = os.path.join(work_dir, "slurm", f"multiBigwigSummary_{genome}.sh")
@@ -971,15 +973,10 @@ def pcaBwSLURM(genome,dependency):
     treatments = len(set(sample_info["treatment"]))
     replicates = int(len(sample_info["sample"]) / genotypes / treatments / 2)
     
-    
     colours = main_colours[0:(genotypes * treatments)]
     colours = list(np.concatenate([([i] * replicates * treatments * 2) for i in colours], axis=0))
     sample_info["colour"] = colours
     colours = " ".join(colours)
-    
-        
-    colours = " ".join(colours)
-    sample_info["colour"] = colours
     
     #create plotPCA command
     pca = os.path.join(out_dir,"PCA_single_bw.pdf")
