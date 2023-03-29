@@ -925,18 +925,22 @@ def pcaBwSLURM(genome,dependency):
     #create list of all bw files
     csv = os.path.join(work_dir,"slurm",f"bamCoverage_{genome}.csv")
     csv = open(csv)
-    bw_list = []
+    bw_list = [] #not the same order as in sample_info
     for line in csv:
         bw = line.rsplit(" ",1)[1]
         bw_list.append(bw)
     csv.close()
-        
+    
     #add bw files to sample_info
+    bw_sample_names = [os.path.basename(x).split("-",1)[0] for x in bw_list]
+    df = pd.DataFrame(list(zip(bw_sample_names,bw_list)), columns=["sample","bw"])
+    sample_info = pd.merge(sample_info,df, on="sample", how="left")
+        
+    #get bw files from sample_info
     sample_info["bw"] = bw_list
     
     #create multiBigwigSummary file
     labels = " ".join(list(sample_info["sample"]))
-    bw = " ".join(list(sample_info["bw"]))
     out_dir = os.path.join(work_dir,"bigwig",genome,"single_bw")
     output_summary = os.path.join(out_dir,"multiBigwigSummary.npz")
     
