@@ -963,8 +963,8 @@ def pcaBwSLURM(genome,dependency):
     symbols = " ".join(symbols)
     
     #prepare colours for PCA plot (unique colours for genotypes per treatment)
-    main_colours = ["#000000","#e33900","#27b7de","#fa8d22","#aeaeff",
-                    "#654751","#a1a2a9","#ffaded","#badaff"]
+    main_colours = ["black","firebrick","dodgerblue","forestgreen","pink",
+                    "#cyan","orchid","purple","navy","slategrey"]
     genotypes = len(set(sample_info["genotype"]))
     treatments = len(set(sample_info["treatment"]))
     replicates = int(len(sample_info["sample"]) / genotypes / treatments / 2)
