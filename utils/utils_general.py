@@ -25,16 +25,10 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
 import numpy as np
-try: 
-    import pysam
-except ModuleNotFoundError:
-    pass
-    
+import pysam
 import yaml
-try:
-    import git #module name is GitPython
-except ModuleNotFoundError:
-    subprocess.check_call([sys.executable, "-m", "pip", "install", "GitPython"])
+import git #module name is GitPython
+
 
 
 work_dir = os.getcwd()
@@ -926,8 +920,9 @@ def pcaBwSLURM(genome,dependency):
     
     #create list of all bw files
     csv = os.path.join(work_dir,"slurm",f"bamCoverage_{genome}.csv")
+    bw_list = []
     csv = open(csv)
-    bw_list = [] #not the same order as in sample_info
+     #not the same order as in sample_info
     for line in csv:
         bw = line.rsplit(" ",1)[1]
         bw = bw.replace("\n","").replace("'","")
