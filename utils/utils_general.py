@@ -930,6 +930,8 @@ def pcaBwSLURM(genome,dependency):
     csv.close()
     
     #add bw files to sample_info (in the same order)
+    if "bw" in sample_info.columns:
+        sample_info = sample_info.drop("bw", axis=1)
     bw_sample_names = [os.path.basename(x).split("-",1)[0] for x in bw_list]
     df = pd.DataFrame(list(zip(bw_sample_names,bw_list)), columns=["sample","bw"])
     sample_info = pd.merge(sample_info,df, on="sample", how="left")
@@ -941,9 +943,8 @@ def pcaBwSLURM(genome,dependency):
     labels = " ".join(list(sample_info["sample"]))
     out_dir = os.path.join(work_dir,"bigwig",genome,"single_bw")
     output_summary = os.path.join(out_dir,"multiBigwigSummary.npz")
-    pca_data = os.path.join(out_dir,"PCA_data.txt")
-    
-    multiBigwigSummary = f"multiBigwigSummary bins -p {threads} -b {bw_list} -l {labels} -o {output_summary} --outFileNameData {pca_data}"
+        
+    multiBigwigSummary = f"multiBigwigSummary bins -p {threads} -b {bw_list} -l {labels} -o {output_summary}"
     
     #generate slurm script
     slurm_file = os.path.join(work_dir, "slurm", f"multiBigwigSummary_{genome}.sh")
@@ -953,6 +954,8 @@ def pcaBwSLURM(genome,dependency):
     job_id_bigwigsummary = runSLURM(work_dir, slurm_file, "mBS")
     
     #prepare symbols for PCA plot (different symbols for ip/input)
+    if "symbols" in sample_info.columns:
+        sample_info = sample_info.drop("symbols", axis=1)
     symbols = list(sample_info["type"])
     for i,n in enumerate(symbols):
         if n == "ip":
@@ -964,6 +967,8 @@ def pcaBwSLURM(genome,dependency):
     symbols = " ".join(symbols)
     
     #prepare colours for PCA plot (unique colours for genotypes per treatment)
+    if "colour" in sample_info.columns:
+        sample_info = sample_info.drop("colour", axis=1)
     main_colours = ["black","firebrick","dodgerblue","forestgreen","pink",
                     "#cyan","orchid","purple","navy","slategrey"]
     genotypes = len(set(sample_info["genotype"]))
@@ -976,8 +981,9 @@ def pcaBwSLURM(genome,dependency):
     colours = " ".join(colours)
     
     #create plotPCA command
+    pca_data = os.path.join(out_dir,"PCA_data.txt")
     pca = os.path.join(out_dir,"PCA_single_bw.pdf")
-    plotPCA = f"plotPCA -in {output_summary} -o {pca} --colors {colours} --markers {symbols}"
+    plotPCA = f"plotPCA -in {output_summary} -o {pca} --colors {colours} --markers {symbols} --outFileNameData {pca_data}"
     
     #generate slurm script
     slurm_file = os.path.join(work_dir, "slurm", f"pcaBigWig_{genome}.sh")
