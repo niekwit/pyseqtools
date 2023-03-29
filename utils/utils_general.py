@@ -845,7 +845,7 @@ def bamCoverageSLURM(genome):
     ''' Create BigWig files for each individual sample with deeptools on HPC
     ''' 
     
-    puts(colored.green("Creaing BigWig files and PCA plot"))
+    puts(colored.green("Creating BigWig files and PCA plot"))
     
     bam_files = getBamFiles(genome)
     
@@ -930,6 +930,7 @@ def pcaBwSLURM(genome,dependency):
     bw_list = [] #not the same order as in sample_info
     for line in csv:
         bw = line.rsplit(" ",1)[1]
+        bw = bw.replace("\n","").replace("'","")
         bw_list.append(bw)
     csv.close()
     
