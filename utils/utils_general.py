@@ -941,8 +941,9 @@ def pcaBwSLURM(genome,dependency):
     labels = " ".join(list(sample_info["sample"]))
     out_dir = os.path.join(work_dir,"bigwig",genome,"single_bw")
     output_summary = os.path.join(out_dir,"multiBigwigSummary.npz")
+    pca_data = os.path.join(out_dir,"PCA_data.txt")
     
-    multiBigwigSummary = f"multiBigwigSummary bins -p {threads} -b {bw_list} -l {labels} -o {output_summary}"
+    multiBigwigSummary = f"multiBigwigSummary bins -p {threads} -b {bw_list} -l {labels} -o {output_summary} --outFileNameData {pca_data}"
     
     #generate slurm script
     slurm_file = os.path.join(work_dir, "slurm", f"multiBigwigSummary_{genome}.sh")
