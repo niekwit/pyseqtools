@@ -855,7 +855,7 @@ def bamCoverageSLURM(genome):
     slurm = loadYaml("slurm")
     account = slurm["groupname"]
     partition = slurm["partition"]
-    threads = slurm["ChIP-Seq"]["bamCoverage"]["CPU"]
+    threads = slurm["ChIP-Seq"]["bamCoverage"]["cpu"]
     mem = slurm["ChIP-Seq"]["bamCoverage"]["mem"]
     time = slurm["ChIP-Seq"]["bamCoverage"]["time"]
     
@@ -904,7 +904,7 @@ def pcaBwSLURM(genome,dependency):
     slurm = loadYaml("slurm")
     account = slurm["groupname"]
     partition = slurm["partition"]
-    threads = slurm["ChIP-Seq"]["multiBigwigSummary"]["CPU"]
+    threads = slurm["ChIP-Seq"]["multiBigwigSummary"]["cpu"]
     mem = slurm["ChIP-Seq"]["multiBigwigSummary"]["mem"]
     time = slurm["ChIP-Seq"]["multiBigwigSummary"]["time"]
     
@@ -1025,7 +1025,7 @@ def bamCompareSLURM(genome):
     slurm = loadYaml("slurm")
     account = slurm["groupname"]
     partition = slurm["partition"]
-    threads = slurm["ChIP-Seq"]["bamCoverage"]["CPU"]
+    threads = slurm["ChIP-Seq"]["bamCoverage"]["cpu"]
     mem = slurm["ChIP-Seq"]["bamCoverage"]["mem"]
     time = slurm["ChIP-Seq"]["bamCoverage"]["time"]
     
@@ -1155,18 +1155,29 @@ def fastqc(script_dir, work_dir, threads, file_extension):
         print("Skipping FastQC/MultiQC (already performed)")
 
 
-def slurmTemplateScript(work_dir,name,file,slurm,commands,array=False,csv=None,dep=None,conda=None):
+def slurmTemplateScript(work_dir,name,file,slurm,commands,array=False,csv=None,dep=None,conda=None,yaml=None):
     '''
     Generates SLURM scripts
 
     '''
-    
-    #load slurm settings
-    threads = slurm["threads"]
-    mem = slurm["mem"]
-    time = slurm["time"]
-    account = slurm["account"]
-    partition = slurm["partition"]
+    #load SLURM setting from yaml
+    if not yaml and not slurm:
+        exp = yaml[0]
+        function = yaml[1]
+        
+        slurm = loadYaml("slurm")
+        account = slurm["groupname"]
+        partition = slurm["partition"]
+        threads = slurm[exp][function]["cpu"]
+        mem = slurm[exp][function]["mem"]
+        time = slurm[exp][function]["time"]
+    else: #for compatibility with older code
+        #load parsed slurm settings
+        threads = slurm["threads"]
+        mem = slurm["mem"]
+        time = slurm["time"]
+        account = slurm["account"]
+        partition = slurm["partition"]
     
     #prepare slurm srcipt
     script = file
