@@ -1404,7 +1404,7 @@ def chromSizes(genome):
         puts(colored.green("Generating chrom.sizes file"))
         samtools = f"samtools faidx {fasta}"
         fasta_index = fasta + ".fai"
-        cut = f"cut f1,2 {fasta_index} > {chrom_sizes_file}"
+        cut = f"cut -f1,2 {fasta_index} > {chrom_sizes_file}"
         commands = [samtools,cut]
         
         #generate slurm script
