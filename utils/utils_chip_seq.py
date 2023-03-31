@@ -1516,9 +1516,9 @@ def mergeBigWig(genome):
         csv_wiggle = os.path.join(work_dir,"slurm",f"wiggle_{genome}.csv")
         csv_w2bw = os.path.join(work_dir,"slurm",f"w2bw_{genome}.csv")
         
-        csv = [csv_wiggle,csv_w2bw]
+        csv_list = [csv_wiggle,csv_w2bw]
         
-        utils.removeFiles(csv)
+        utils.removeFiles(csv_list)
         
         #create commands for each file
         for i,j,k in zip(input_bw,wig_files,out_put_files):
@@ -1530,7 +1530,7 @@ def mergeBigWig(genome):
 
         #generate slurm script
         slurm_file = os.path.join(work_dir,"slurm",f"{slurm}_{genome}.sh")
-        utils.slurmTemplateScript(work_dir,"bigwig",slurm_file,None,None,True,csv,dependency,None,["ChIP-Seq","mean_bw"])
+        utils.slurmTemplateScript(work_dir,"bigwig",slurm_file,None,None,True,csv_list,dependency,None,["ChIP-Seq","mean_bw"])
         
         #submit slurm script to HPC
         job_id = utils.runSLURM(work_dir,slurm_file,slurm)
