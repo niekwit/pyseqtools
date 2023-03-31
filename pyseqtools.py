@@ -758,10 +758,19 @@ def main():
         pe_tags = args["peTags"]
         peak = args["peaks"]
         md5sum = args["md5sum"]
+        threads = args["threads"]
+        align = args["align"]
+        genome = args["genome"]
+        trim = args["trim"]
+        fastqc = args["fastqc"]
+        bigwig = args["bigwig"]
+        metagene = args["metagene"]
+        dedup = args["deduplication"]
+        downscale = args["downsample"]
+        qc = args["qc"]
         
         #set thread count for processing
         max_threads = str(multiprocessing.cpu_count())
-        threads = args["threads"]
         if threads == "max":
             threads = max_threads
 
@@ -770,11 +779,10 @@ def main():
             utils.checkMd5(work_dir,script_dir,slurm)
 
         #create BAM files
-        align = args["align"]
-        genome = args["genome"]
+        
         
         #trimming for cluster
-        trim = args["trim"]
+        
         if trim == True:
             if slurm == True:
                 utils.trimSLURM(script_dir, work_dir, module, pe_tags)
@@ -807,47 +815,41 @@ def main():
                     utils.indexBam(work_dir, threads)
             if peak == True:
                 chipseq_utils.peak(work_dir, threads, genome, chip_seq_settings)
+                
+            if dedup == True:
+                utils.deduplicationBam(script_dir, work_dir, threads, args)
+                utils.indexBam(work_dir, threads)
+            
+            if qc == True:
+                chipseq_utils.bam_bwQC(work_dir, threads)
+                
         else:
             if align == "hisat2":
                 chipseq_utils.hisat2SLURM(script_dir, work_dir, threads, chip_seq_settings, genome)
                 
-            fastqc = args["fastqc"]
             if fastqc == True:
                 utils.fastqcSLURM(work_dir, script_dir)
                 
             if peak == True:
                 chipseq_utils.peakSLURM(work_dir, genome)
                 
-            bigwig = args["bigwig"]
             if bigwig == True:
                 job_id_bamcoverage = utils.bamCoverageSLURM(genome)
                 utils.bamCompareSLURM(genome)
                 utils.pcaBwSLURM(genome,job_id_bamcoverage)
-                
+            
+            if metagene == True:
+                chipseq_utils.plotProfileSLURM(work_dir)
 
-        dedup = args["deduplication"]
-        if dedup == True:
-            if slurm == False:
-                utils.deduplicationBam(script_dir, work_dir, threads, args)
-                utils.indexBam(work_dir, threads)
-            else:
+            if dedup == True:
                 utils.deduplicationSLURM(script_dir, work_dir, genome)
 
-        downscale = args["downsample"]
-        if downscale == True:
-            chipseq_utils.downsample(script_dir, work_dir, threads, genome, slurm)
-           
-
-        qc = args["qc"]
-        if qc == True:
-            if slurm == False:
-                chipseq_utils.bam_bwQC(work_dir, threads)
-            else:
-                chipseq_utils.bamQCslurm(work_dir,script_dir,genome)
-
-        metagene = args["metagene"]
-        if metagene == True:
-            chipseq_utils.plotProfileSLURM(work_dir)
+            if downscale == True:
+                chipseq_utils.downsample(script_dir, work_dir, threads, genome, slurm)
+                
+            if qc == True:
+                    chipseq_utils.bamQCslurm(work_dir,script_dir,genome)
+                    
 
 
     def cutrun(args, script_dir):
