@@ -836,13 +836,8 @@ def main():
         downscale = args["downsample"]
         if downscale == True:
             chipseq_utils.downsample(script_dir, work_dir, threads, genome, slurm)
-        
-        indexBAM = args["indexBAM"]
-        if indexBAM == True:
-            utils.indexBam(work_dir, threads, genome, slurm, script_dir)        
+           
 
-        
-    
         qc = args["qc"]
         if qc == True:
             if slurm == False:
@@ -853,9 +848,6 @@ def main():
         metagene = args["metagene"]
         if metagene == True:
             chipseq_utils.plotProfileSLURM(work_dir)
-
-        
-        
 
 
     def cutrun(args, script_dir):
