@@ -1518,7 +1518,7 @@ def mergeBigWig(genome):
         
         csv = [csv_wiggle,csv_w2bw]
         
-        utils.removeFiles([csv])
+        utils.removeFiles(csv)
         
         #create commands for each file
         for i,j,k in zip(input_bw,wig_files,out_put_files):
