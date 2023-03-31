@@ -839,7 +839,7 @@ def main():
                 utils.pcaBwSLURM(genome,job_id_bamcoverage)
             
             if metagene == True:
-                chipseq_utils.plotProfileSLURM(work_dir)
+                chipseq_utils.plotProfileSLURM(genome)
 
             if dedup == True:
                 utils.deduplicationSLURM(script_dir, work_dir, genome)
