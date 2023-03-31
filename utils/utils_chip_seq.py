@@ -1378,6 +1378,7 @@ def bamQCslurm(work_dir,script_dir,genome):
 def chromSizes(genome):
     ''' Creates chrom.sizes file from fasta
     '''
+        
     #load fasta file
     yaml = utils.loadYaml("chip-seq")
     fasta = yaml["fasta"][genome]
@@ -1386,7 +1387,7 @@ def chromSizes(genome):
     settings = utils.loadYaml("slurm")
     account = settings["groupname"]
     partition = settings["partition"]
-    threads = settings["ChIP-Seq"]["chromSizes"]["CPU"]
+    threads = settings["ChIP-Seq"]["chromSizes"]["cpu"]
     mem = settings["ChIP-Seq"]["chromSizes"]["mem"]
     time = settings["ChIP-Seq"]["chromSizes"]["time"]
     
@@ -1400,6 +1401,7 @@ def chromSizes(genome):
     chrom_sizes_file = fasta.rsplit(".",1)[0] + ".chrom.sizes"
     if not os.path.exists(chrom_sizes_file):
         #generate commands
+        puts(colored.green("Generating chrom.sizes file"))
         samtools = f"samtools faidx {fasta}"
         fasta_index = fasta + ".fai"
         cut = f"cut f1,2 {fasta_index} > {chrom_sizes_file}"
@@ -1421,6 +1423,8 @@ def mergeBigWig(genome):
     1. Merge bw files with wiggletools (creates wig file)
     2. Convert wig back to bigwig with wigToBigWig
     '''
+    puts(colored.green("Merging replicate BigWig files"))
+    
     #get chrom.size file (derived from fasta file)
     job_id_chrom_sizes,chrom_sizes = chromSizes(genome)
    
@@ -1543,6 +1547,7 @@ def mergeBigWig(genome):
 def plotProfileSLURM(genome,gene_list=None):
     '''Create meta plots with plotProfile (deeptools)
     '''
+    
     #create merged bw files for input
     dep_merge,dep_merge_norm,merged_bw_txt,merged_bw_norm_txt = mergeBigWig(genome)
     
@@ -1551,6 +1556,8 @@ def plotProfileSLURM(genome,gene_list=None):
     gtf = yaml["gtf"][genome]
     
     def computeMatrix(bw_text,dependency):
+        puts(colored.green("Generating matrix data for plotProfile"))
+        
         #load thread count from yaml
         threads = utils.loadYaml("slurm")["computeMatrix"]["cpu"]
         
@@ -1577,6 +1584,8 @@ def plotProfileSLURM(genome,gene_list=None):
     job_id_matrix_norm,matrix_norm = computeMatrix(merged_bw_norm_txt,dep_merge_norm)
     
     def plot(job_id,matrix_plot):
+        puts(colored.green("Generating meta plots with plotProfile"))
+        
         out_pdf = os.path.join(os.path.dirname(matrix_plot),"meta_plot.pdf")
         command = f"plotProfile -m {matrix} -o {out_pdf} --perGroup"
         
