@@ -194,10 +194,6 @@ def main():
                              required = False,
                              default = "hg38",
                              help = "Choose reference genome (default is hg38)")
-    parser_chip.add_argument("--indexBAM",
-                             required = False,
-                             action = 'store_true',
-                             help = "Index BAM files with samtools")
     parser_chip.add_argument("--trim",
                              action = 'store_true',
                              required = False,
@@ -856,7 +852,7 @@ def main():
 
         metagene = args["metagene"]
         if metagene == True:
-            chipseq_utils.plotProfile(work_dir, chip_seq_settings, genome, threads, slurm)
+            chipseq_utils.plotProfileSLURM(work_dir)
 
         
         

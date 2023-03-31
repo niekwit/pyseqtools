@@ -13,8 +13,8 @@ import numpy as np
 
 import yaml
 import pandas as pd
-#import pybedtools
-#import pysam
+import pybedtools
+import pysam
 from clint.textui import colored, puts
 
 script_dir = os.path.abspath(os.path.dirname(__file__))
@@ -22,6 +22,8 @@ script_dir = os.path.dirname(script_dir)
 sys.path.append(os.path.join(script_dir, "utils"))
 import utils_general as utils
 
+
+work_dir = os.getcwd()
 
 ###CHIP-SEQ ANALYSIS SPECIFIC FUNCTIONS
  
@@ -1371,7 +1373,225 @@ def bamQCslurm(work_dir,script_dir,genome):
     
     #run slurm script
     job_id_bamqc = utils.runSLURM(work_dir, slurm_file, "bam-qc")
+
+
+def chromSizes(genome):
+    ''' Creates chrom.sizes file from fasta
+    '''
+    #load fasta file
+    yaml = utils.loadYaml("chip-seq")
+    fasta = yaml["fasta"][genome]
+    
+    #load SLURM settings
+    settings = utils.loadYaml("slurm")
+    account = settings["groupname"]
+    partition = settings["partition"]
+    threads = settings["ChIP-Seq"]["chromSizes"]["CPU"]
+    mem = settings["ChIP-Seq"]["chromSizes"]["mem"]
+    time = settings["ChIP-Seq"]["chromSizes"]["time"]
+    
+    slurm = {"threads": threads, 
+             "mem": mem,
+             "time": time,
+             "account": account,
+             "partition": partition
+             }
+    
+    chrom_sizes_file = fasta.rsplit(".",1)[0] + ".chrom.sizes"
+    if not os.path.exists(chrom_sizes_file):
+        #generate commands
+        samtools = f"samtools faidx {fasta}"
+        fasta_index = fasta + ".fai"
+        cut = f"cut f1,2 {fasta_index} > {chrom_sizes_file}"
+        commands = [samtools,cut]
         
+        #generate slurm script
+        slurm_file = os.path.join(work_dir, "slurm", f"chrom.sizes_{genome}.sh")
+        utils.slurmTemplateScript(work_dir,"chromSizes",slurm_file,slurm,commands)
+                           #work_dir,name,file,slurm,commands,array=False,csv=None,dep=None,conda=None
+        #submit slurm script to HPC
+        job_id = utils.runSLURM(work_dir, slurm_file, "chromSizes")
+        return job_id, chrom_sizes_file
+    else:
+        return None, chrom_sizes_file
+   
+
+def mergeBigWig(genome):
+    '''Merge replicate BigWig files:
+    1. Merge bw files with wiggletools (creates wig file)
+    2. Convert wig back to bigwig with wigToBigWig
+    '''
+    #get chrom.size file (derived from fasta file)
+    job_id_chrom_sizes,chrom_sizes = chromSizes(genome)
+   
+    #load sample info
+    sample_info = pd.read_csv(os.path.join(work_dir,"samples.csv"))
+    
+    #remove samples that were marked outliers
+    if "keep" in sample_info.columns:
+        sample_info = sample_info[sample_info["keep"] == "y"]
+        
+    #get genotypes/treatments/factor/replicate number
+    genotypes = list(set(sample_info["genotype"]))
+    treatments = list(set(sample_info["treatment"]))
+    factor = list(set(sample_info["factor"]))[0] #one ip antibody per sample_info is expected
+    replicates = int(len(sample_info["sample"]) / len(genotypes) / len(treatments) / 2)
+    
+    #lists to contain all replicate samples as a single string and sample names
+    bw_samples = []
+    wig_names = []
+        
+    #create strings that contain all replicates for non-input normalised bw files and output file names
+    for treatment in treatments:
+        #subset sample_info for each treatment
+        df = sample_info[sample_info["treatment"] == treatment ]
+        
+        for genotype in genotypes:
+            #subset df for genotype
+            df_genotype = df[df["genotype"] == genotype ]
+            
+            #get ip and input bw files and add to bw_samples
+            df_ip = df_genotype[df_genotype["type"] == "ip" ]
+            ip_bw = " ".join(list(df_ip["bw"]))
+            bw_samples.append(ip_bw)
+            
+            df_input = df_genotype[df_genotype["type"] == "input" ]
+            input_bw = " ".join(list(df_input["bw"]))
+            bw_samples.append(input_bw)
+            
+            #add combined output file name to wig_names
+            wig_ip = f"{genotype}_{factor}_{treatment}_mean.wig"
+            wig_names.append(wig_ip)
+            wig_input = f"{genotype}_input_{treatment}_mean.wig"
+            wig_names.append(wig_input)
+    
+    #add directory to wig names
+    wig_names = [os.path.join(work_dir,"bigwig",genome,"single_bw",x) for x in wig_names]
+    
+    #lists to contain all replicate samples as a single string and sample names
+    bw_samples_norm = []
+    wig_names_norm = []
+    
+    #create strings that contain all replicates for input normalised bw files and output file names
+    for genotype in genotypes:
+        for treatment in treatments:
+            temp = []
+            for i in range(1,replicates + 1):
+                bw = f"{genotype}_{factor}_{treatment}_{i}"
+                temp.append(bw)
+            temp = [os.path.join(work_dir,"bigwig",genome,"input_vs_ip_bw",x + ".log2.bw") for x in temp]
+            bw_samples_norm.append(" ".join(temp))
+            
+            wig = f"{genotype}_{factor}_{treatment}.log2.wig"
+            wig_names_norm.append(wig)
+    
+    #add directory to wig names
+    wig_names_norm = [os.path.join(work_dir,"bigwig",genome,"input_vs_ip_bw",x) for x in wig_names_norm]
+    
+    #create file names for merged bw files
+    bigwig_names = [x.replace(".wig",".bw") for x in wig_names]
+    bigwig_names_norm = [x.replace(".wig",".bw") for x in wig_names_norm]
+    
+    #write merged bw files names to txt file (for use in another function)
+    def write2text(bw_list,path):
+        with open(path, "w") as outfile:
+            outfile.write("\n".join(str(i) for i in bw_list))
+    
+    merged_bw_txt = os.path.join(work_dir,"bigwig",genome,"single_bw","merged_bw_log2.txt")
+    write2text(bigwig_names,merged_bw_txt)
+    
+    merged_bw_norm_txt = os.path.join(work_dir,"bigwig",genome,"input_vs_ip_bw","merged_bw_log2.txt")
+    write2text(bigwig_names_norm,merged_bw_norm_txt)
+
+    #create commands to merge bigwigs and submit to HPC
+    def mean_bw(input_bw,wig_files,out_put_files,slurm):
+        #get chrom.sizes file 
+        dependency,chrom_sizes = chromSizes(genome)
+                
+        #csv files to store commands
+        csv_wiggle = os.path.join(work_dir,"slurm",f"wiggle_{genome}.csv")
+        csv_w2bw = os.path.join(work_dir,"slurm",f"w2bw_{genome}.csv")
+        
+        csv = [csv_wiggle,csv_w2bw]
+        
+        utils.removeFiles([csv])
+        
+        #create commands for each file
+        for i,j,k in zip(input_bw,wig_files,out_put_files):
+            wiggletools = f"wiggletools write {j} mean {i}"
+            utils.appendCSV(csv_wiggle, wiggletools)
+            
+            w2bw = f"wigToBigWig {j} {chrom_sizes} {k}"
+            utils.appendCSV(csv_w2bw, w2bw)
+
+        #generate slurm script
+        slurm_file = os.path.join(work_dir,"slurm",f"{slurm}_{genome}.sh")
+        utils.slurmTemplateScript(work_dir,"bigwig",slurm_file,None,None,True,csv,dependency,None,["ChIP-Seq","mean_bw"])
+        
+        #submit slurm script to HPC
+        job_id = utils.runSLURM(work_dir,slurm_file,slurm)
+        
+        return(job_id)
+    
+    #run merged bw files commands for non-input normalised bw files
+    job_id_merge = mean_bw(bw_samples,wig_names,bigwig_names,"mean_bw")
+    job_id_merge_norm = mean_bw(bw_samples_norm,wig_names_norm,bigwig_names_norm,"mean_bw_log2")
+
+    return job_id_merge,job_id_merge_norm,merged_bw_txt,merged_bw_norm_txt
+
+
+def plotProfileSLURM(genome,gene_list=None):
+    '''Create meta plots with plotProfile (deeptools)
+    '''
+    #create merged bw files for input
+    dep_merge,dep_merge_norm,merged_bw_txt,merged_bw_norm_txt = mergeBigWig(genome)
+    
+    #load gtf file for selected genome
+    yaml = utils.loadYaml("rna-seq")
+    gtf = yaml["gtf"][genome]
+    
+    def computeMatrix(bw_text,dependency):
+        #load thread count from yaml
+        threads = utils.loadYaml("slurm")["computeMatrix"]["cpu"]
+        
+        #load bw files from txt file
+        file = open(bw_text, "r")
+        lines = file.readlines()
+        bw_files = " ".join([x.replace("\n","") for x in lines])
+        matrix = os.path.join(os.path.dirname(bw_files.split(" ",1)[0]),"computeMatrix.mat.gz")
+        
+        title = os.path.basename(os.path.dirname(bw_files.split(" ",1)[0]))
+        
+        command = f"computeMatrix scale-regions -p {threads} -S {bw_files} -R {gtf} -b 3000 -o {matrix}"
+        
+        #run command on cluster
+        slurm_file = os.path.join(work_dir,"slurm",f"computeMatrix_{title}_{genome}.sh")
+        utils.slurmTemplateScript(work_dir,"computeMatrix",slurm_file,None,command,None,None,dependency,None,["ChIP-Seq","mean_bw"])
+                                 #work_dir,name,           file,      slurm,commands,array=False,csv=None,dep=None,conda=None,yaml=None 
+        job_id = utils.runSLURM(work_dir, slurm_file, "computeMatrix")
+        
+        return job_id,matrix
+     
+    #create matrix for each class of bw files
+    job_id_matrix,matrix = computeMatrix(merged_bw_txt,dep_merge)
+    job_id_matrix_norm,matrix_norm = computeMatrix(merged_bw_norm_txt,dep_merge_norm)
+    
+    def plot(job_id,matrix_plot):
+        out_pdf = os.path.join(os.path.dirname(matrix_plot),"meta_plot.pdf")
+        command = f"plotProfile -m {matrix} -o {out_pdf} --perGroup"
+        
+        #run command on cluster
+        title = os.path.basename(os.path.dirname(matrix_plot))
+        slurm_file = os.path.join(work_dir,"slurm",f"plotProfile_{title}_{genome}.sh")
+        utils.slurmTemplateScript(work_dir,"plotProfile",slurm_file,None,command,None,None,job_id,None,["ChIP-Seq","plotProfile"])
+                                 #work_dir,name,           file,      slurm,commands,array=False,csv=None,dep=None,conda=None,yaml=None 
+        job_id = utils.runSLURM(work_dir,slurm_file,"plotProfile")
+        
+    #create meta plots for each class of bw files
+    job_id_plot = plot(job_id_matrix,matrix)
+    job_id_plot_norm = plot(job_id_matrix_norm,matrix_norm)
+    
+    
 def plotProfile(work_dir, chip_seq_settings, genome, threads, slurm=False):
     
     if slurm == False:
