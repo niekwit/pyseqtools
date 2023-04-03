@@ -1097,6 +1097,7 @@ def bigwigQC(work_dir, threads):
             pca = "plotPCA -in " + summary_file + "-o " + pca_output + " -T PCA of BigWig files"
             subprocess.run(pca, shell = True)
 
+
 def checkFastqc(script_dir):
 
     #Check for FastQC in $PATH
@@ -1127,6 +1128,7 @@ def checkFastqc(script_dir):
     else:
         fastqc_file = "fastqc"
         return(fastqc_file)
+
 
 def fastqc(script_dir, work_dir, threads, file_extension):
 
@@ -1161,7 +1163,7 @@ def slurmTemplateScript(work_dir,name,file,slurm,commands,array=False,csv=None,d
 
     '''
     #load SLURM setting from yaml
-    if not yaml and not slurm:
+    if yaml and not slurm:
         exp = yaml[0]
         function = yaml[1]
         
