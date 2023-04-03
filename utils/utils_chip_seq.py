@@ -1531,7 +1531,7 @@ def mergeBigWig(genome):
         #generate slurm script
         slurm_file = os.path.join(work_dir,"slurm",f"{slurm}_{genome}.sh")
         utils.slurmTemplateScript(work_dir,"bigwig",slurm_file,None,None,True,csv_list,dependency,None,["ChIP-Seq","mean_bw"])
-        
+                                 #work_dir,name,file,slurm,commands,array=False,csv=None,dep=None,conda=None,yaml=None
         #submit slurm script to HPC
         job_id = utils.runSLURM(work_dir,slurm_file,slurm)
         
@@ -1559,7 +1559,7 @@ def plotProfileSLURM(genome,gene_list=None):
         puts(colored.green("Generating matrix data for plotProfile"))
         
         #load thread count from yaml
-        threads = utils.loadYaml("slurm")["computeMatrix"]["cpu"]
+        threads = utils.loadYaml("slurm")["ChIP-Seq"]["computeMatrix"]["cpu"]
         
         #load bw files from txt file
         file = open(bw_text, "r")
