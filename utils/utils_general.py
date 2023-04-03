@@ -1169,7 +1169,7 @@ def slurmTemplateScript(work_dir,name,file,slurm,commands,array=False,csv=None,d
         
         slurm = loadYaml("slurm")
         account = slurm["groupname"]
-        partition = slurm["partition"]
+        partition = slurm[exp]["partition"]
         threads = slurm[exp][function]["cpu"]
         mem = slurm[exp][function]["mem"]
         time = slurm[exp][function]["time"]

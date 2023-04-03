@@ -1431,7 +1431,7 @@ def mergeBigWig(genome):
     #load sample info
     sample_info = pd.read_csv(os.path.join(work_dir,"samples.csv"))
     
-    #remove samples that were marked outliers
+    #remove samples that were marked outliers in samples.csv with n in column keep
     if "keep" in sample_info.columns:
         sample_info = sample_info[sample_info["keep"] == "y"]
         
@@ -1472,6 +1472,9 @@ def mergeBigWig(genome):
     #add directory to wig names
     wig_names = [os.path.join(work_dir,"bigwig",genome,"single_bw",x) for x in wig_names]
     
+    #remove files if they already exist (might be faulty or empty)
+    utils.removeFiles(wig_names)
+    
     #lists to contain all replicate samples as a single string and sample names
     bw_samples_norm = []
     wig_names_norm = []
@@ -1492,6 +1495,9 @@ def mergeBigWig(genome):
     #add directory to wig names
     wig_names_norm = [os.path.join(work_dir,"bigwig",genome,"input_vs_ip_bw",x) for x in wig_names_norm]
     
+    #remove files if they already exist (might be faulty or empty)
+    utils.removeFiles(wig_names_norm)
+    
     #create file names for merged bw files
     bigwig_names = [x.replace(".wig",".bw") for x in wig_names]
     bigwig_names_norm = [x.replace(".wig",".bw") for x in wig_names_norm]
@@ -1508,13 +1514,13 @@ def mergeBigWig(genome):
     write2text(bigwig_names_norm,merged_bw_norm_txt)
 
     #create commands to merge bigwigs and submit to HPC
-    def mean_bw(input_bw,wig_files,out_put_files,slurm):
+    def mean_bw(input_bw,wig_files,out_put_files,title):
         #get chrom.sizes file 
         dependency,chrom_sizes = chromSizes(genome)
                 
         #csv files to store commands
-        csv_wiggle = os.path.join(work_dir,"slurm",f"wiggle_{genome}.csv")
-        csv_w2bw = os.path.join(work_dir,"slurm",f"w2bw_{genome}.csv")
+        csv_wiggle = os.path.join(work_dir,"slurm",f"wiggle_{title}_{genome}.csv")
+        csv_w2bw = os.path.join(work_dir,"slurm",f"w2bw_{title}_{genome}.csv")
         
         csv_list = [csv_wiggle,csv_w2bw]
         
@@ -1529,16 +1535,16 @@ def mergeBigWig(genome):
             utils.appendCSV(csv_w2bw, w2bw)
 
         #generate slurm script
-        slurm_file = os.path.join(work_dir,"slurm",f"{slurm}_{genome}.sh")
-        utils.slurmTemplateScript(work_dir,"bigwig",slurm_file,None,None,True,csv_list,dependency,None,["ChIP-Seq","mean_bw"])
+        slurm_file = os.path.join(work_dir,"slurm",f"{title}_{genome}.sh")
+        utils.slurmTemplateScript(work_dir,title,slurm_file,None,None,True,csv_list,dependency,None,["ChIP-Seq","mean_bw"])
                                  #work_dir,name,file,slurm,commands,array=False,csv=None,dep=None,conda=None,yaml=None
         #submit slurm script to HPC
-        job_id = utils.runSLURM(work_dir,slurm_file,slurm)
+        job_id = utils.runSLURM(work_dir,slurm_file,title)
         
         return(job_id)
     
     #run merged bw files commands for non-input normalised bw files
-    job_id_merge = mean_bw(bw_samples,wig_names,bigwig_names,"mean_bw")
+    job_id_merge = mean_bw(bw_samples,wig_names,bigwig_names,"mean_bw_single")
     job_id_merge_norm = mean_bw(bw_samples_norm,wig_names_norm,bigwig_names_norm,"mean_bw_log2")
 
     return job_id_merge,job_id_merge_norm,merged_bw_txt,merged_bw_norm_txt
@@ -1573,9 +1579,9 @@ def plotProfileSLURM(genome,gene_list=None):
         
         #run command on cluster
         slurm_file = os.path.join(work_dir,"slurm",f"computeMatrix_{title}_{genome}.sh")
-        utils.slurmTemplateScript(work_dir,"computeMatrix",slurm_file,None,command,None,None,dependency,None,["ChIP-Seq","mean_bw"])
+        utils.slurmTemplateScript(work_dir,f"computeMatrix_{title}_{genome}",slurm_file,None,command,None,None,dependency,None,["ChIP-Seq","computeMatrix"])
                                  #work_dir,name,           file,      slurm,commands,array=False,csv=None,dep=None,conda=None,yaml=None 
-        job_id = utils.runSLURM(work_dir, slurm_file, "computeMatrix")
+        job_id = utils.runSLURM(work_dir, slurm_file, f"computeMatrix_{title}")
         
         return job_id,matrix
      
@@ -1592,9 +1598,9 @@ def plotProfileSLURM(genome,gene_list=None):
         #run command on cluster
         title = os.path.basename(os.path.dirname(matrix_plot))
         slurm_file = os.path.join(work_dir,"slurm",f"plotProfile_{title}_{genome}.sh")
-        utils.slurmTemplateScript(work_dir,"plotProfile",slurm_file,None,command,None,None,job_id,None,["ChIP-Seq","plotProfile"])
+        utils.slurmTemplateScript(work_dir,f"plotProfile_{title}",slurm_file,None,command,None,None,job_id,None,["ChIP-Seq","plotProfile"])
                                  #work_dir,name,           file,      slurm,commands,array=False,csv=None,dep=None,conda=None,yaml=None 
-        job_id = utils.runSLURM(work_dir,slurm_file,"plotProfile")
+        job_id = utils.runSLURM(work_dir,slurm_file,f"plotProfile_{title}")
         
     #create meta plots for each class of bw files
     job_id_plot = plot(job_id_matrix,matrix)
