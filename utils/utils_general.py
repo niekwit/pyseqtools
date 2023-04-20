@@ -524,7 +524,7 @@ def deduplicationSLURM(script_dir,work_dir,genome):
     puts(colored.green("Performing deduplication of BAM files using PICARD"))
     
     #get bam files
-    bam_list = getBamFiles(work_dir,genome)
+    bam_list = getBamFiles(genome)
     
     #create csv files for arrayed commands
     csv_picard = os.path.join(work_dir,"slurm",f"picard_{genome}.csv")
@@ -537,9 +537,9 @@ def deduplicationSLURM(script_dir,work_dir,genome):
     with open(os.path.join(script_dir,"yaml","slurm.yaml")) as file:
         slurm_settings = yaml.full_load(file)        
 
-    threads = slurm_settings["picard"]["cpu"]
-    mem = slurm_settings["picard"]["mem"]
-    time = slurm_settings["picard"]["time"]
+    threads = slurm_settings["general"]["picard"]["cpu"]
+    mem = slurm_settings["general"]["picard"]["mem"]
+    time = slurm_settings["general"]["picard"]["time"]
     account = slurm_settings["groupname"]
     partition = slurm_settings["partition"]
     
@@ -953,32 +953,41 @@ def pcaBwSLURM(genome,dependency):
     #submit slurm script to HPC
     job_id_bigwigsummary = runSLURM(work_dir, slurm_file, "mBS")
     
-    #prepare symbols for PCA plot (different symbols for ip/input)
-    if "symbols" in sample_info.columns:
-        sample_info = sample_info.drop("symbols", axis=1)
-    symbols = list(sample_info["type"])
-    for i,n in enumerate(symbols):
-        if n == "ip":
-            symbols[i] = "s"
-        else:
-            symbols[i] = "o"
-    
-    sample_info["symbol"] = symbols
-    symbols = " ".join(symbols)
-    
     #prepare colours for PCA plot (unique colours for genotypes per treatment)
     if "colour" in sample_info.columns:
         sample_info = sample_info.drop("colour", axis=1)
     main_colours = ["black","firebrick","dodgerblue","forestgreen","pink",
-                    "#cyan","orchid","purple","navy","slategrey"]
+                    "cyan","orchid","purple","navy","slategrey"]
     genotypes = len(set(sample_info["genotype"]))
     treatments = len(set(sample_info["treatment"]))
     replicates = int(len(sample_info["sample"]) / genotypes / treatments / 2)
     
     colours = main_colours[0:(genotypes * treatments)]
-    colours = list(np.concatenate([([i] * replicates * treatments * 2) for i in colours], axis=0))
+    if treatments == 1:
+        colours = list(np.concatenate([([i] * replicates * treatments * 2) for i in colours], axis=0))
+    else:
+        colours = list(np.concatenate([([i] * replicates * treatments) for i in colours], axis=0))
     sample_info["colour"] = colours
     colours = " ".join(colours)
+    
+    #prepare symbols for PCA plot (different symbols for ip/input per treatment)
+    if "symbol" in sample_info.columns:
+            sample_info = sample_info.drop("symbol", axis=1)
+    
+    if treatments == 1:
+        symbols = list(sample_info["type"])
+        for i,n in enumerate(symbols):
+            if n == "ip":
+                symbols[i] = "s"
+            else:
+                symbols[i] = "o"
+    else:
+        main_symbols = ["'s'","'o'","'<'","'>'","'v'","'^'","'D'","'p'","'X'","'*'","'+'","'H'"]
+        symbols = main_symbols[0:(treatments * 2)]
+        symbols = list(np.concatenate([([i] * replicates) for i in symbols], axis=0))* genotypes
+        
+    sample_info["symbol"] = symbols
+    symbols = " ".join(symbols)
     
     #create plotPCA command
     pca_data = os.path.join(out_dir,"PCA_data.txt")
@@ -993,6 +1002,7 @@ def pcaBwSLURM(genome,dependency):
     job_id_pca = runSLURM(work_dir, slurm_file, "pca")
     
     #save updated samples.csv
+    sample_info["keep"] = "y" #this can be manually set to n to ommit samples for downstream processing (based on PCA)
     sample_info.to_csv(os.path.join(work_dir,"samples.csv"),index=False)
 
 
@@ -1047,16 +1057,20 @@ def bamCompareSLURM(genome):
     os.makedirs(out_dir,exist_ok=True)
         
     #create bamCompare commands and add to csv
-    for i,j in zip(ip_samples,input_samples):
-        ip_bam = [x for x in bam_files if i in x][0]
-        input_bam = [x for x in bam_files if j in x][0]
-        bw = os.path.basename(ip_bam).split("-",1)[0]
-        bw = os.path.join(out_dir,bw) + ".log2.bw"
+    try:
+        for i,j in zip(ip_samples,input_samples):
+            ip_bam = [x for x in bam_files if i in x][0]
+            input_bam = [x for x in bam_files if j in x][0]
+            bw = os.path.basename(ip_bam).split("-",1)[0]
+            bw = os.path.join(out_dir,bw) + ".log2.bw"
         
-        bamCompare = f"bamCompare -p {threads} -b1 {ip_bam} -b2 {input_bam} -o {bw}"
+            bamCompare = f"bamCompare -p {threads} -b1 {ip_bam} -b2 {input_bam} -o {bw}"
 
-        #add command to csv
-        appendCSV(csv,bamCompare)
+            #add command to csv
+            appendCSV(csv,bamCompare)
+    except IndexError: 
+        puts(colored.red("ERROR: BAM file names do not match sample names in samples.csv"))
+        return
     
     #generate slurm script
     slurm_file = os.path.join(work_dir, "slurm", f"bamCompare_{genome}.sh")
@@ -1429,9 +1443,7 @@ def trim(script_dir, threads, work_dir, pe_tags):
 
 
 def trimSLURM(script_dir, work_dir, module, pe_tags):
-    """
-    Creates SLURM bash script for SE/PE-end quality trimming using Trim_galore
-
+    """Creates SLURM bash script for SE/PE-end quality trimming using Trim_galore
     """
            
     if pe_tags != None: #paired-end data
@@ -1458,14 +1470,14 @@ def trimSLURM(script_dir, work_dir, module, pe_tags):
             slurm_settings = yaml.full_load(file)
     
     #load slurm parameters
-    threads = slurm_settings["Trim_galore"]["cpu"]
-    trim_mem = slurm_settings["Trim_galore"]["mem"]
-    trim_time = slurm_settings["Trim_galore"]["time"]
+    threads = slurm_settings["general"]["Trim_galore"]["cpu"]
+    trim_mem = slurm_settings["general"]["Trim_galore"]["mem"]
+    trim_time = slurm_settings["general"]["Trim_galore"]["time"]
     account = slurm_settings["groupname"]
     partition = slurm_settings["partition"]
         
     #write trim commands to file for slurm job array
-    csv = os.path.join(work_dir,"slurm","slurm_trim.csv")
+    csv = os.path.join(work_dir,"slurm","trim.csv")
     if os.path.exists(csv):
         os.remove(csv)
     
@@ -1480,7 +1492,7 @@ def trimSLURM(script_dir, work_dir, module, pe_tags):
                            os.path.join(work_dir,"trim"), "--paired", read1, read2,
                            "--basename", base_name, "\n"]
             trim_galore = " ".join(trim_galore)
-            csv = os.path.join(work_dir,"slurm","slurm_trim.csv")
+            csv = os.path.join(work_dir,"slurm","trim.csv")
             csv = open(csv, "a")  
             csv.write(trim_galore)
             csv.close()
@@ -1488,17 +1500,17 @@ def trimSLURM(script_dir, work_dir, module, pe_tags):
         for read1 in read1_list:
             trim_galore = ["trim_galore","-j", str(threads), "-o", os.path.join(work_dir,"trim"), read1, "\n"]
             trim_galore = " ".join(trim_galore)
-            csv = os.path.join(work_dir,"slurm","slurm_trim.csv")
+            csv = os.path.join(work_dir,"slurm","trim.csv")
             csv = open(csv, "a")  
             csv.write(trim_galore)
             csv.close()
             
             
     #if trimming has already been done return none
-    csv = os.path.join(work_dir,"slurm","slurm_trim.csv")
+    csv = os.path.join(work_dir,"slurm","trim.csv")
         
     #generate slurm bash script
-    script = os.path.join(work_dir,"slurm","slurm_trim.sh")
+    script = os.path.join(work_dir,"slurm","trim.sh")
     script = open(script, "w")  
     script.write("#!/bin/bash" + "\n")
     script.write("\n")
@@ -1513,11 +1525,11 @@ def trimSLURM(script_dir, work_dir, module, pe_tags):
     script.write("#SBATCH -J " + "Trim_galore" + "\n")
     script.write("#SBATCH -a " + "1-" + str(len(read1_list)) + "\n")
     script.write("\n")
-    script.write("sed -n ${SLURM_ARRAY_TASK_ID}p slurm/slurm_trim.csv | bash\n")
+    script.write("sed -n ${SLURM_ARRAY_TASK_ID}p slurm/trim.csv | bash\n")
     script.close()
     
     #run slurm bash script
-    script = os.path.join(work_dir,"slurm","slurm_trim.sh")
+    script = os.path.join(work_dir,"slurm","trim.sh")
         
     print("Submitting slurm_trim.sh to cluster")
     job_id = subprocess.check_output(f"sbatch {script} | cut -d ' ' -f 4", shell = True)

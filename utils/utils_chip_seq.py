@@ -361,21 +361,21 @@ def hisat2SLURM(script_dir, work_dir, threads, chip_seq_settings, genome):
     with open(os.path.join(script_dir,"yaml","slurm.yaml")) as file:
         slurm_settings = yaml.full_load(file)        
 
-    threads = slurm_settings["ChIP-Seq"]["hisat2_CPU"]
-    mem = slurm_settings["ChIP-Seq"]["hisat2_mem"]
-    time = slurm_settings["ChIP-Seq"]["hisat2_time"]
+    threads = slurm_settings["ChIP-Seq"]["hisat2"]["cpu"]
+    mem = slurm_settings["ChIP-Seq"]["hisat2"]["mem"]
+    time = slurm_settings["ChIP-Seq"]["hisat2"]["time"]
     account = slurm_settings["groupname"]
     partition = slurm_settings["ChIP-Seq"]["partition"]
     
-    csv_hisat2 = os.path.join(work_dir,"slurm",f"slurm_hisat2_{genome}.csv")
+    csv_hisat2 = os.path.join(work_dir,"slurm",f"hisat2_{genome}.csv")
     if os.path.exists(csv_hisat2) == True:
         os.remove(csv_hisat2)
         
-    csv_echo = os.path.join(work_dir,"slurm",f"slurm_hisat2_echo_{genome}.csv")
+    csv_echo = os.path.join(work_dir,"slurm",f"hisat2_echo_{genome}.csv")
     if os.path.exists(csv_echo) == True:
         os.remove(csv_echo)
         
-    csv_index = os.path.join(work_dir,"slurm",f"slurm_hisat2_index_{genome}.csv")
+    csv_index = os.path.join(work_dir,"slurm",f"hisat2_index_{genome}.csv")
     if os.path.exists(csv_index) == True:
         os.remove(csv_index)
     
@@ -419,10 +419,10 @@ def hisat2SLURM(script_dir, work_dir, threads, chip_seq_settings, genome):
         
         
             
-    print(f"Generating slurm_hisat2_{genome}.sh")
-    csv = os.path.join(work_dir,"slurm",f"slurm_hisat2_{genome}.csv")
+    print(f"Generating hisat2_{genome}.sh")
+    csv = os.path.join(work_dir,"slurm",f"hisat2_{genome}.csv")
     commands = int(subprocess.check_output(f"cat {csv} | wc -l", shell = True).decode("utf-8"))
-    script_ = os.path.join(work_dir,"slurm",f"slurm_hisat2_{genome}.sh")
+    script_ = os.path.join(work_dir,"slurm",f"hisat2_{genome}.sh")
     script = open(script_, "w")  
     script.write("#!/bin/bash" + "\n")
     script.write("\n")
@@ -430,7 +430,7 @@ def hisat2SLURM(script_dir, work_dir, threads, chip_seq_settings, genome):
     script.write("#SBATCH --mail-type=BEGIN,FAIL,END" + "\n")
     script.write(f"#SBATCH -p {partition}\n")
     script.write(f"#SBATCH -D {work_dir}\n")
-    script.write("#SBATCH -o slurm/slurm_hisat2_%a.log" + "\n")
+    script.write("#SBATCH -o slurm/hisat2_%a.log" + "\n")
     script.write(f"#SBATCH -c {threads}\n")
     script.write(f"#SBATCH -t {time}\n")
     script.write(f"#SBATCH --mem={mem}\n")
@@ -458,14 +458,14 @@ def hisat2SLURM(script_dir, work_dir, threads, chip_seq_settings, genome):
     #plot detailed alignment rates with R
     rscript = os.path.join(script_dir, "R", "chip-seq_plot-alignments-rates-hisat2.R")
     
-    script_ = os.path.join(work_dir,"slurm",f"slurm_hisat2_{genome}_plot.sh")
+    script_ = os.path.join(work_dir,"slurm",f"hisat2_{genome}_plot.sh")
     script = open(script_, "w")  
     script.write("#!/bin/bash" + "\n\n")
     script.write(f"#SBATCH -A {account}\n")
     script.write("#SBATCH --mail-type=BEGIN,FAIL,END" + "\n")
     script.write(f"#SBATCH -p {partition}\n")
     script.write(f"#SBATCH -D {work_dir}\n")
-    script.write("#SBATCH -o slurm/slurm_hisat2_plot.log" + "\n")
+    script.write("#SBATCH -o slurm/hisat2_plot.log" + "\n")
     script.write(f"#SBATCH -c {threads}\n")
     script.write(f"#SBATCH -t {time}\n")
     script.write(f"#SBATCH --mem={mem}\n")
@@ -1003,7 +1003,10 @@ def peakSLURM(work_dir, genome):
                 os.remove(i)
         
         #get path to HOMER annotatePeaks.pl
-        annotatePeaks = '/home/niek/Documents/scripts/pyseqtools/homer/bin/annotatePeaks.pl'#shutil.which("annotatePeaks.pl")
+        annotatePeaks = shutil.which("annotatePeaks.pl")
+        if not annotatePeaks:
+            print("annotatePeaks not found!")
+            return
         
         #prepare csv files with commands for each sample
         for sample,chip_bam,input_bam in zip(sample_list,chip_bams,input_bams):
@@ -1416,7 +1419,7 @@ def chromSizes(genome):
         return job_id, chrom_sizes_file
     else:
         return None, chrom_sizes_file
-   
+
 
 def mergeBigWig(genome):
     '''Merge replicate BigWig files:
@@ -1472,7 +1475,7 @@ def mergeBigWig(genome):
     #add directory to wig names
     wig_names = [os.path.join(work_dir,"bigwig",genome,"single_bw",x) for x in wig_names]
     
-    #remove files if they already exist (might be faulty or empty)
+    #remove files if they already exist (might be faulty/empty)
     utils.removeFiles(wig_names)
     
     #lists to contain all replicate samples as a single string and sample names
@@ -1489,7 +1492,7 @@ def mergeBigWig(genome):
             temp = [os.path.join(work_dir,"bigwig",genome,"input_vs_ip_bw",x + ".log2.bw") for x in temp]
             bw_samples_norm.append(" ".join(temp))
             
-            wig = f"{genotype}_{factor}_{treatment}.log2.wig"
+            wig = f"{genotype}_{factor}_{treatment}_mean.log2.wig"
             wig_names_norm.append(wig)
     
     #add directory to wig names
@@ -1507,10 +1510,10 @@ def mergeBigWig(genome):
         with open(path, "w") as outfile:
             outfile.write("\n".join(str(i) for i in bw_list))
     
-    merged_bw_txt = os.path.join(work_dir,"bigwig",genome,"single_bw","merged_bw_log2.txt")
+    merged_bw_txt = os.path.join(work_dir,"bigwig",genome,"single_bw","merged_bw.txt")
     write2text(bigwig_names,merged_bw_txt)
     
-    merged_bw_norm_txt = os.path.join(work_dir,"bigwig",genome,"input_vs_ip_bw","merged_bw_log2.txt")
+    merged_bw_norm_txt = os.path.join(work_dir,"bigwig",genome,"input_vs_ip_bw","merged_bw.txt")
     write2text(bigwig_names_norm,merged_bw_norm_txt)
 
     #create commands to merge bigwigs and submit to HPC
@@ -1547,11 +1550,14 @@ def mergeBigWig(genome):
     job_id_merge = mean_bw(bw_samples,wig_names,bigwig_names,"mean_bw_single")
     job_id_merge_norm = mean_bw(bw_samples_norm,wig_names_norm,bigwig_names_norm,"mean_bw_log2")
 
+    
+    
     return job_id_merge,job_id_merge_norm,merged_bw_txt,merged_bw_norm_txt
 
 
-def plotProfileSLURM(genome,gene_list=None):
-    '''Create meta plots with plotProfile (deeptools)
+
+def plotProfileSLURM(genome):
+    '''Create meta plots with plotProfile (deeptools) using non-input bw files
     '''
     
     #create merged bw files for input
@@ -1570,12 +1576,18 @@ def plotProfileSLURM(genome,gene_list=None):
         #load bw files from txt file
         file = open(bw_text, "r")
         lines = file.readlines()
-        bw_files = " ".join([x.replace("\n","") for x in lines])
-        matrix = os.path.join(os.path.dirname(bw_files.split(" ",1)[0]),"computeMatrix.mat.gz")
+        if "single_bw" in lines:
+            bw_files = [x for x in lines if not "input" in x] #remove all non-input files
+            bw_files = " ".join([x.replace("\n","") for x in bw_files])
+        else:
+            bw_files = " ".join([x.replace("\n","") for x in lines])
         
+         
         title = os.path.basename(os.path.dirname(bw_files.split(" ",1)[0]))
         
-        command = f"computeMatrix scale-regions -p {threads} -S {bw_files} -R {gtf} -b 3000 -o {matrix}"
+        matrix = os.path.join(os.path.dirname(bw_files.split(" ",1)[0]),f"computeMatrix_{title}.mat.gz")
+        
+        command = f"computeMatrix scale-regions -p {threads} -S {bw_files} -R {gtf} -b 2000 -m 6000 -a 2000 -o {matrix}"
         
         #run command on cluster
         slurm_file = os.path.join(work_dir,"slurm",f"computeMatrix_{title}_{genome}.sh")
@@ -1592,11 +1604,13 @@ def plotProfileSLURM(genome,gene_list=None):
     def plot(job_id,matrix_plot):
         puts(colored.green("Generating meta plots with plotProfile"))
         
-        out_pdf = os.path.join(os.path.dirname(matrix_plot),"meta_plot.pdf")
-        command = f"plotProfile -m {matrix} -o {out_pdf} --perGroup"
+        region_label = os.path.basename(gtf).replace(".gtf","")
+        title = os.path.basename(os.path.dirname(matrix_plot))
+        
+        out_pdf = os.path.join(os.path.dirname(matrix_plot),f"meta_plot_{title}.pdf")
+        command = f"plotProfile -m {matrix} -o {out_pdf} --perGroup --regionsLabel {region_label}"
         
         #run command on cluster
-        title = os.path.basename(os.path.dirname(matrix_plot))
         slurm_file = os.path.join(work_dir,"slurm",f"plotProfile_{title}_{genome}.sh")
         utils.slurmTemplateScript(work_dir,f"plotProfile_{title}",slurm_file,None,command,None,None,job_id,None,["ChIP-Seq","plotProfile"])
                                  #work_dir,name,           file,      slurm,commands,array=False,csv=None,dep=None,conda=None,yaml=None 
@@ -1605,6 +1619,24 @@ def plotProfileSLURM(genome,gene_list=None):
     #create meta plots for each class of bw files
     job_id_plot = plot(job_id_matrix,matrix)
     job_id_plot_norm = plot(job_id_matrix_norm,matrix_norm)
+    
+
+def subsetGTF(genome,gene_list):   
+    '''Subset GTF file for genes in text file
+    '''
+    gtf = loadYaml["gtf"][genome]
+    output = os.path.join(os.path.dirname(gtf), f"{os.path.basename(gtf)}_{os.path.basename(gene_list)}.gtf")
+    if not os.path.exists(output):
+        subprocess.call(["grep", "-w", "-f", gene_list, gtf, ">", output])
+    
+    return output
+
+
+def plotProfileGeneListSLURM(genome,gene_list):
+    '''Create meta plots for genes in list with plotProfile (deeptools) using non-input bw files
+    '''
+    pass
+        
     
     
 def plotProfile(work_dir, chip_seq_settings, genome, threads, slurm=False):
