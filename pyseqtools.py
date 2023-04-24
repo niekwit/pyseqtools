@@ -226,7 +226,7 @@ def main():
                              required = False,
                              action = 'store_true',
                              help = "Create BigWig files")
-    parser_chip.add_argument("--qc",
+    parser_chip.add_argument("--BAMqc",
                              required = False,
                              action = 'store_true',
                              help = "Perform QC analysis of BAM files")
@@ -236,8 +236,10 @@ def main():
                              help = "Call and annotate peaks with MACS3/HOMER")
     parser_chip.add_argument("--metagene",
                              required = False,
-                             action = 'store_true',
-                             help = "Generate metageneplots and heatmaps with plotProfile (deepTools)")
+                             default = False,
+                             nargs = "?",
+                             const = None,
+                             help = "Generate metageneplots and heatmaps with plotProfile (deepTools)\nNOTE: a text file can be parsed with gene names to create a plot for just these genes")
     parser_chip.add_argument("--slurm",
                              required = False,
                              action = 'store_true',
@@ -475,7 +477,7 @@ def main():
                              required = False,
                              action = 'store_true',
                              help = "Submit jobs to Cambridge HPC using SLURM")
-
+    '''
     #create subparser for gene symbol conversion
     parser_conversion = subparsers.add_parser('genesymconv',
                                           description = 'Convert human gene symbols to mouse gene symbols, or vice versa',
@@ -491,23 +493,7 @@ def main():
     parser_conversion.add_argument("-o", "--output",
                              required = True,
                              help = "Output file name")
-
-    #create subparser for subsetting GTF files
-    parser_subsetgtf = subparsers.add_parser('subsetgtf',
-                                             description = "Tools for subsetting GTF files according to input gene list",
-                                             help = 'Subset GTF files for selected genes')
-
-    parser_subsetgtf.add_argument("-l", "--list",
-                             required = True,
-                             help = "Input gene list file. Each gene symbol should be on a new line")
-    parser_subsetgtf.add_argument("-i", "--input",
-                             required = True,
-                             help = "GTF file to be subsetted (must be specified with genome name, loaded from chip-seq.yaml)")
-    parser_subsetgtf.add_argument("-o", "--output",
-                             required = True,
-                             help = "Output file name")
-
-
+    '''
 
     #create dictionary with command line arguments
     args = vars(parser.parse_args())
@@ -767,7 +753,7 @@ def main():
         metagene = args["metagene"]
         dedup = args["deduplication"]
         downscale = args["downsample"]
-        qc = args["qc"]
+        BAMqc = args["BAMqc"]
         
         #set thread count for processing
         max_threads = str(multiprocessing.cpu_count())
@@ -820,7 +806,7 @@ def main():
                 utils.deduplicationBam(script_dir, work_dir, threads, args)
                 utils.indexBam(work_dir, threads)
             
-            if qc == True:
+            if BAMqc == True:
                 chipseq_utils.bam_bwQC(work_dir, threads)
                 
         else:
@@ -838,8 +824,8 @@ def main():
                 utils.bamCompareSLURM(genome)
                 utils.pcaBwSLURM(genome,job_id_bamcoverage)
             
-            if metagene == True:
-                chipseq_utils.plotProfileSLURM(genome)
+            if metagene != False:
+                chipseq_utils.plotProfileSLURM(genome,metagene)
 
             if dedup == True:
                 utils.deduplicationSLURM(script_dir, work_dir, genome)
@@ -847,8 +833,8 @@ def main():
             if downscale == True:
                 chipseq_utils.downsample(script_dir, work_dir, threads, genome, slurm)
                 
-            if qc == True:
-                    chipseq_utils.bamQCslurm(work_dir,script_dir,genome)
+            if BAMqc == True:
+                    chipseq_utils.bamQCslurm(genome)
                     
 
 
@@ -1051,14 +1037,6 @@ def main():
                          conversion,
                          gene_list,
                          out_file])
-
-
-    def subsetGTF(args, chip_seq_settings):
-        genome = args["input"]
-        gene_list = args["list"]
-        gtf = chip_seq_settings["gtf"][genome]
-        output = os.path.join(os.path.dirname(gtf) + args["output"])
-        subprocess.call(["grep", "-w", "-f", gene_list, gtf, ">", output])
 
 
     #check for whitespace in directory

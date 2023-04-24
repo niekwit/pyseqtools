@@ -106,16 +106,15 @@ def checkMd5(work_dir,script_dir,slurm):
         #run slurm script
         job_id = runSLURM(work_dir, slurm_file, "md5sum")
         
-        
-        
+                
 def logCommandLineArgs(work_dir):
     args = sys.argv
     args = " ".join(args)
 
     if "-h" not in args:
             if "--help" not in args:
-                print("Command line arguments: " + args,
-                      file = open(os.path.join(work_dir,"commands.log"), "a"))
+                print(args,file = open(os.path.join(work_dir,"commands.log"), "a"))
+
 
 def write2log(work_dir,command,name=""):
     with open(os.path.join(work_dir,"commands.log"), "a") as file:
@@ -170,6 +169,17 @@ def file_exists(file): #check if file exists/is not size zero
                 return(True)
     else:
         return(False)
+
+
+def getGenome():
+    '''Retrieves previously parsed genome from alignment
+    '''
+    genome_log = os.path.join(work_dir,"genome.log")
+    
+    file = open(genome_log, "r")
+    genome = file.readlines()[0]
+
+    return genome
 
 
 def SLURM_job_id_log(work_dir, name, job_id):
@@ -378,6 +388,7 @@ def checkBowtie2(script_dir):
             subprocess.run(unzip)
             return(bowtie2)
 
+
 def checkPicard(script_dir):
     #check for Java Runtime Environment
     try:
@@ -505,6 +516,19 @@ def removeFiles(file):
         if os.path.exists(file) == True:
             os.remove(file)
             
+
+def createCSV(names):
+    '''Create list of CSV file names to parse to slurmTemplateScript
+    '''
+    #create dictionary with just key values from parsed names
+    d = dict.fromkeys(names)
+    
+    #add CSV file names to each key and remove and pre-existing CSV
+    for key,value in d.items():
+        csv = os.path.join(work_dir,"slurm",f"{key}.csv")
+        d[key] = csv
+        removeFiles(csv)
+    
             
 def appendCSV(csv,command):
     '''Appends a line to a (CSV) file
@@ -1288,9 +1312,9 @@ def fastqcSLURM(work_dir, script_dir):
     with open(os.path.join(script_dir,"yaml","slurm.yaml")) as file:
         slurm_settings = yaml.full_load(file)        
 
-    threads = slurm_settings["fastqc"]["cpu"]
-    mem = slurm_settings["fastqc"]["mem"]
-    time = slurm_settings["fastqc"]["time"]
+    threads = slurm_settings["general"]["fastqc"]["cpu"]
+    mem = slurm_settings["general"]["fastqc"]["mem"]
+    time = slurm_settings["general"]["fastqc"]["time"]
     account = slurm_settings["groupname"]
     partition = slurm_settings["partition"]
     
@@ -1777,8 +1801,7 @@ def getBamFiles(genome):
     
     return(bam_list)
     
-    
-    
+        
 def getSampleNames(work_dir):
     '''Get unique sample names from samples.csv
     '''
