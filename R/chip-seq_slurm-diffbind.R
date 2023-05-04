@@ -1,4 +1,4 @@
-library(tidyverse)
+#library(tidyverse)
 library(DiffBind)
 library(rtracklayer)
 library(ChIPseeker)
@@ -6,9 +6,9 @@ library(org.Hs.eg.db)
 library(clusterProfiler)
 library(ggupset)
 library(ReactomePA)
+library(stringr)
+library(dplyr)
 
-#library(BiocParallel)
-#register(SerialParam())
 
 #get parsed arguments
 args <- commandArgs(trailingOnly = TRUE)
@@ -167,6 +167,9 @@ for(i in 1:conditions){
     bed.file <- file.path(out.dir,condition,paste0("DB-",condition,".bed"))
     export.bed(dbs,con=bed.file)
     
+    #prepend "chr" to chromosome names in bed file
+    system(paste0("sed -i 's/^/chr/' ",bed.file))
+
     #coverage plot
     peak <- readPeakFile(bed.file)
     file <- file.path(out.dir,condition,paste0("coverage-",condition,".pdf"))
