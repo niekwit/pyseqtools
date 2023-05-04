@@ -1,19 +1,123 @@
-groupname: XXX
-email: XXX
+groupname: JNATHAN-SL3-CPU
+partition: cclake
+general:
+  md5sum:
+    cpu: '4'
+    mem: 10G
+    time: '01:00:00'
+  Trim_galore:
+    cpu: '12'
+    mem: 12G
+    time: '01:00:00'
+  fastqc:
+    cpu: '12'
+    mem: 20G
+    time: '01:00:00'
+  picard:
+    cpu: '6'
+    mem: 10G
+    time: '01:30:00'
+  samtools:
+    cpu: '8'
+    mem: '16G'
+    time: '01:00:00'
 TT-Seq:
   partition: cclake
-  Trim_galore_CPU: 4
-  Trim_galore_mem: 3G
-  Trim_galore_time: 01:00:00
-  STAR_CPUs: 48
-  STAR_mem: 1GB
-  STAR_time: 07:00:00
-  splitBAM_CPU: 12
-  splitBAM_mem: 1G
-  splitBAM_time: 00:15:00
-  samtools-index_CPU: 12
-  samtools-index: 1G
-  samtools-index: 00:15:00
-  samtools-merge_CPU: 12
-  samtools-merge: 1G
-  samtools-merge: 00:15:00
+  STAR_CPU: 56
+  STAR_mem: 50GB
+  STAR_time: '11:59:50'
+  samtools: 
+    cpu: '12'
+    mem: 20G
+    time: '01:00:00'
+  bamCoverage_CPU: 12
+  bamCoverage_mem: 10G
+  bamCoverage_time: '05:00:00'
+  readRatio_CPU: '28'
+  readRatio_mem: 90G
+  readRatio_time: '12:00:00'
+  ngsplot:
+    cpu: '28'
+    mem: 40G
+    time: '04:00:00'
+RNA-Seq: 
+  partition: cclake
+  STAR: 
+    cpu: '28'
+    mem: 90G
+    time: '02:00:00'
+  TEtranscript:
+    cpu: '24'
+    mem: 30G
+    time: '12:00:00'
+  deseq2:
+    cpu: '10'
+    mem: 40G
+    time: '06:00:00'
+  bamCoverage_CPU: '28'
+  bamCoverage_mem: 80G
+  bamCoverage_time: '04:00:00'
+  rsem_CPU : '28'
+  rsem_mem: 80G
+  rsem_time: '08:00:00'
+  rsem_strand: 'forward'
+  rMATS:
+    strand: 'fr-firststrand'
+    CPU: '56'
+    mem: 150G
+    time: '12:00:00'
+  rMATS-plot:
+    CPU: '4'
+    mem: 4G
+    time: '00:15:00'
+ChIP-Seq:
+  partition: cclake
+  hisat2:
+    cpu: '12'
+    mem: 30G
+    time: '02:00:00'
+  subsetGTF:
+    cpu: '4'
+    mem: 8G
+    time: '01:00:00'
+  multiBigwigSummary:
+    cpu: '56'
+    mem: 80G
+    time: '02:00:00'
+  bamCoverage:
+    cpu: '12'
+    mem: 20G
+    time: '02:00:00'
+  computeMatrix:  
+    cpu: '56'
+    mem: 180G
+    time: '02:00:00'
+  plotProfile: 
+    cpu: '56'
+    mem: 180G
+    time: '01:00:00'
+  chromSizes:
+    cpu: '26'
+    mem: 50G
+    time: '00:30:00'
+  mean_bw:
+    cpu: '6'
+    mem: 10G
+    time: '01:00:00'
+  macs3:
+    cpu: '10'
+    mem: 20G
+    time: '02:00:00'
+  diffbind:
+    cpu: '56'
+    mem: 180G
+    time: '06:00:00'
+  deeptools:
+    cpu: '56'
+    mem: '100G'
+    time: '06:00:00' 
+DamID: 
+  pipeline:  
+    cpu: '56'
+    mem: 100G
+    time: '12:00:00'

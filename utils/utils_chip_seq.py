@@ -1144,7 +1144,7 @@ def peakSLURM(work_dir, genome):
     #differential peak analysis 
     print("Differential peak analysis using DiffBind")
     diffbind_script = os.path.join(script_dir,"R","chip-seq_slurm-diffbind.R")
-    diffbind = ["Rscript",diffbind_script,work_dir,genome] 
+    diffbind = f"Rscript {diffbind_script} {work_dir} {genome}" 
     
     threads = slurm_settings["ChIP-Seq"]["diffbind"]["cpu"]
     mem = slurm_settings["ChIP-Seq"]["diffbind"]["mem"]

@@ -224,8 +224,10 @@ def main():
                              help = "Perform normalisation based on Drosophila chromatin spike-in")
     parser_chip.add_argument("-b", "--bigwig",
                              required = False,
-                             action = 'store_true',
-                             help = "Create BigWig files")
+                             default = False,
+                             nargs = "?",
+                             const = "bigwig",
+                             help = "Create BigWig or BedGraph files")
     parser_chip.add_argument("--BAMqc",
                              required = False,
                              action = 'store_true',
@@ -819,10 +821,13 @@ def main():
             if peak == True:
                 chipseq_utils.peakSLURM(work_dir, genome)
                 
-            if bigwig == True:
-                job_id_bamcoverage = utils.bamCoverageSLURM(genome)
-                utils.bamCompareSLURM(genome)
-                utils.pcaBwSLURM(genome,job_id_bamcoverage)
+            if bigwig != False:
+                if bigwig == "bigwig":
+                    job_id_bamcoverage = utils.bamCoverageSLURM(genome,"bigwig")
+                    utils.bamCompareSLURM(genome)
+                    utils.pcaBwSLURM(genome,job_id_bamcoverage)
+                elif bigwig == "bedgraph":
+                    job_id_bamcoverage = utils.bamCoverageSLURM(genome,"bedgraph")
             
             if metagene != False:
                 chipseq_utils.plotProfileSLURM(genome,metagene)

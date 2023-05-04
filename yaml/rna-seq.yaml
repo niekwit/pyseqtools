@@ -1,15 +1,45 @@
+BigWig:
+  binSize: '50'
+  normalizeUsing: None
+  read_length: '100'
 FASTA:
-  gencode-v35: /home/niek/Documents/references/fasta/Human/gencode.v35.transcripts/gencode.v35.transcripts.fa
+  R64-1-1: ''
+  gencode-v35: ''
   hg19: ''
-  hg38: ''
+  hg38: /home/nw416/rds/hpc-work/fasta/hg38/Homo_sapiens.GRCh38.dna.primary_assembly.fa
+  hg38_150: ''
+  hg38_50: ''
+  hg38_76: ''
   mm10: ''
   mm9: ''
 HISAT2_index:
   hg19: /home/niek/Documents/references/hisat2-index/GRCh37-hg19ucsc/hg19-index
-  hg38: ''
+  hg38: /home/nw416/rds/hpc-work/index/hisat2/hg38/Homo_sapiens.GRCh38.dna.primary_assembly
+  hg38_150: ''
+  hg38_50: ''
+  hg38_76: ''
   mm10: ''
   mm9: ''
+MISO_index:
+  hg38: /home/nw416/rds/hpc-work/gff3/hg38/miso-index/
+RSEM_STAR_index:
+  hg38: ''
+  hg38_100: /home/nw416/rds/hpc-work/index/RSEM_STAR/hg38_100/hg38_100
+  hg38_50: /home/nw416/rds/hpc-work/index/RSEM_STAR/hg38_50/hg38_50
+  hg38_76: /home/nw416/rds/hpc-work/index/RSEM_STAR/hg38_76bp/hg38_76bp
+STAR_index:
+  R64-1-1: /home/nw416/rds/hpc-work/index/STAR/R64-1-1
+  hg38_150: /home/nw416/rds/hpc-work/index/STAR/hg38_150
+  hg38_100: /home/nw416/rds/hpc-work/index/STAR/hg38
+  hg38_50: /home/nw416/rds/hpc-work/index/STAR/hg38_50bp
+  hg38_76: /home/nw416/rds/hpc-work/index/STAR/hg38_76bp
+TEtranscript:
+  strand: forward
+  hg38: /home/nw416/rds/hpc-work/gtf/GRCh38_rmsk_TE.gtf
+gtf:
+  R64-1-1: /home/nw416/rds/hpc-work/gtf/Saccharomyces_cerevisiae.R64-1-1.106.gtf
+  hg38: /home/nw416/rds/hpc-work/gtf/Homo_sapiens.GRCh38.107.gtf
 salmon_gtf:
-  gencode-v35: /home/niek/Documents/references/gtf/Homo_sapiens.GRCh38.95.gtf
+  gencode-v35: ''
 salmon_index:
-  gencode-v35: /home/niek/Documents/references/fasta/Human/gencode.v35.transcripts/salmon_index
+  gencode-v35: ''

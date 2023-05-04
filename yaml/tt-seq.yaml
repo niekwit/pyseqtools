@@ -22,19 +22,22 @@ fasta:
   hg38: /home/niek/Documents/references/fasta/Human/GRCh38.p13.genome/GRCh38.p13.genome.fa
   mm10: ''
 gtf:
-  hg19: /home/niek/Documents/scripts/pyseqtools/gtf/hg19/gencode.v19.annotation.protein_coding.gtf
-  hg38: /home/niek/Documents/references/gtf/Homo_sapiens.GRCh38.95.gtf
-  yeast: /home/niek/Documents/scripts/pyseqtools/gtf/R64-1-1/Saccharomyces_cerevisiae.R64-1-1.106.gtf
+  hg19: 
+  hg38: /home/nw416/rds/hpc-work/gtf/Homo_sapiens.GRCh38.106.gtf
+  yeast: /home/nw416/rds/hpc-work/gtf/Saccharomyces_cerevisiae.R64-1-1.106.gtf
 STAR:
   dm3-ic: 
   hg19: 
-  hg38: /home/niek/Documents/scripts/pyseqtools/index/STAR/hg38
+  hg38: /home/nw416/rds/hpc-work/index/STAR/hg38
   mm10:
-  yeast: /home/niek/Documents/scripts/pyseqtools/index/STAR/R64-1-1
+  yeast: /home/nw416/rds/hpc-work/index/STAR/R64-1-1
 hisat2:
   dm3-ic: /home/niek/Documents/scripts/pyseqtools/index/hisat2/dm3/dm3-index
   hg19: /home/niek/Documents/scripts/pyseqtools/index/hisat2/hg19/hg19-index
   hg38: /home/niek/Documents/scripts/pyseqtools/index/hisat2/hg38/GRCh38.p13.genome
   mm10: /home/niek/Documents/scripts/pyseqtools/index/hisat2/mm10/mm10/genome
   yeast: /home/niek/Documents/scripts/pyseqtools/index/hisat2/R64-1-1/R64-1-1
-
+readRatio:
+  bed: /home/nw416/rds/hpc-work/bed/Homo_sapiens.GRCh38.95_gene-only_TSS_1kb_TES_1kb_bedtools-sorted.bed
+genome_file:
+  hg38: /home/nw416/rds/hpc-work/chrom.sizes/Homo_sapiens.GRCh38.dna.primary_assembly.chrom.sizes

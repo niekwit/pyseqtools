@@ -859,21 +859,32 @@ def effectiveGenomeSize(genome,readlength):
     return(egs)
 
 
-def bamCoverageSLURM(genome):
-    ''' Create BigWig files for each individual sample with deeptools on HPC
+def bamCoverageSLURM(genome,type):
+    ''' Create BigWig or BedGraph files for each individual sample with deeptools on HPC
     ''' 
-    
-    puts(colored.green("Creating BigWig files and PCA plot"))
+    if type == "bigwig":
+        puts(colored.green("Creating BigWig files and PCA plot"))
+        
+        #create output dir
+        out_dir = os.path.join(work_dir,"bigwig",genome,"single_bw")
+        os.makedirs(out_dir,exist_ok=True)
+        
+    elif type == "bedgraph":
+        puts(colored.green("Creating BedGraph files"))
+        
+        #create output dir
+        out_dir = os.path.join(work_dir,"bedgraph",genome)
+        os.makedirs(out_dir,exist_ok=True)
     
     bam_files = getBamFiles(genome)
     
     #load bamCoverage settings
     chip_seq_settings = loadYaml("chip-seq")
-    readlength = chip_seq_settings["BigWig"]["readLength"]
-    binSize = chip_seq_settings["BigWig"]["binSize"]
+    readlength = chip_seq_settings[type]["readLength"]
+    binSize = chip_seq_settings[type]["binSize"]
     effective_genome_size = effectiveGenomeSize(genome, readlength)
-    normalizeUsing = chip_seq_settings["BigWig"]["normalizeUsing"]
-    extendReads = chip_seq_settings["BigWig"]["extendReads"]
+    normalizeUsing = chip_seq_settings[type]["normalizeUsing"]
+    extendReads = chip_seq_settings[type]["extendReads"]
     
     #load SLURM settings
     slurm = loadYaml("slurm")
@@ -891,28 +902,28 @@ def bamCoverageSLURM(genome):
              }
         
     #csv file for bamCoverage commands
-    csv = os.path.join(work_dir,"slurm",f"bamCoverage_{genome}.csv")
+    csv = os.path.join(work_dir,"slurm",f"bamCoverage_{genome}_{type}.csv")
     
     #remove pre-existing csv
     removeFiles([csv])
-    
-    #create output dir
-    out_dir = os.path.join(work_dir,"bigwig",genome,"single_bw")
-    os.makedirs(out_dir,exist_ok=True)
-    
+        
     #create commands for bamCoverage and add to csv
     for bam in bam_files:
-        bigwig = os.path.join(out_dir,os.path.basename(bam).replace(".bam",".bw"))
+        if type == "bigwig":
+            out_file = os.path.join(out_dir,os.path.basename(bam).replace(".bam",".bw"))
+        elif type == "bedgraph":
+            out_file = os.path.join(out_dir,os.path.basename(bam).replace(".bam",".bedgraph"))
+        
         command = ["bamCoverage", "-p", threads, "--binSize", binSize, "--normalizeUsing",
                    normalizeUsing, "--extendReads", extendReads, "--effectiveGenomeSize",
-                   effective_genome_size,"-b", bam, "-o", bigwig]
+                   effective_genome_size,"--outFileFormat",type,"-b", bam, "-o", out_file]
         
         #add command to csv
         appendCSV(csv,command)
         
     #generate slurm script
-    slurm_file = os.path.join(work_dir, "slurm", f"bamCoverage_{genome}.sh")
-    slurmTemplateScript(work_dir,"bigwig",slurm_file,slurm,None,True,csv)
+    slurm_file = os.path.join(work_dir, "slurm", f"bamCoverage_{genome}_{type}.sh")
+    slurmTemplateScript(work_dir,type,slurm_file,slurm,None,True,csv)
                        #work_dir,name,file,slurm,commands,array=False,csv=None,dep=None
     
     #submit slurm script to HPC

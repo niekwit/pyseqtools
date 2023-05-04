@@ -1,35 +1,40 @@
-BigWig:
+bigwig:
   binSize: '50'
-  effectiveGenomeSize: '2827437033'
+  readLength: '100'
+  extendReads: '200'
+  normalizeUsing: RPKM
+bedgraph:
+  binSize: '500'
+  readLength: '100'
   extendReads: '200'
   normalizeUsing: RPKM
 MACS3:
-  broad-cutoff: 0.1
-  extsize: 200
-  format: AUTO
+  broad-cutoff: '0.1'
+  extsize: '200'
+  format: BAMPE
   genome: hs
-  genome-size: 2.7e9
-  ip: histone
-  qvalue: 0.05
+  genome-size: '2.7e9'
+  ip: tf
+  qvalue: '0.05'
 blacklist:
-  dm3-ic: /home/niek/Documents/scripts/pyseqtools/blacklist/dm3/dm3-blacklist.v2.bed
-  hg19: /home/niek/Documents/scripts/pyseqtools/blacklist/hg19/wgEncodeDukeMapabilityRegionsExcludable.bed
-  hg38: ''
+  dm3: '/home/nw416/rds/hpc-work/blacklist/dm3/dm3-blacklist.v2.bed'
+  hg19: ''
+  hg38: /home/nw416/rds/hpc-work/blacklist/hg38/ENCFF356LFX_ensembl.bed
   mm10: ''
 bwa:
   hg19: ''
   hg38: ''
   mm10: ''
 fasta:
-  dm3-ic: /home/niek/Documents/scripts/pyseqtools/fasta/dm3/dm3.fasta
-  hg19: /home/niek/Programs/pyseqtools/fasta/hg19/ucsc.hg19.fasta
-  hg38: ''
+  dm3: ''
+  hg19: ''
+  hg38: /home/nw416/rds/hpc-work/fasta/hg38/Homo_sapiens.GRCh38.dna.primary_assembly.fa
   mm10: ''
 gtf:
-  hg19: /home/niek/Documents/scripts/pyseqtools/gtf/hg19/gencode.v19.annotation.protein_coding.gtf
-  hg38: null
+  hg19: ''
+  hg38: /home/nw416/rds/hpc-work/gtf/Homo_sapiens.GRCh38.106.gtf
 hisat2:
-  dm3-ic: /home/niek/Documents/scripts/pyseqtools/index/hisat2/dm3/dm3-index
-  hg19: /home/niek/Documents/scripts/pyseqtools/index/hisat2/hg19/hg19-index
-  hg38: ''
-  mm10: /home/niek/Documents/scripts/pyseqtools/index/hisat2/mm10
+  dm3: /home/nw416/rds/hpc-work/index/hisat2/dm3/dm3-index
+  hg19: ''
+  hg38: /home/nw416/rds/hpc-work/index/hisat2/hg38/Homo_sapiens.GRCh38.dna.primary_assembly
+  mm10: 
