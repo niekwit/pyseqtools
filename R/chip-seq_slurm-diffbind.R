@@ -55,7 +55,7 @@ diffbind.sheet$Treatment <- treatment
 factors <- unlist(sampleInfo[sampleInfo$type == "ip",]["factor"])
 diffbind.sheet$Factor <- factors
 
-#add conditions to diffbind.sheet
+#add genotypes to diffbind.sheet
 conditions <- unique(sampleInfo$genotype)
 for (i in conditions){
   for (j in 1: nrow(diffbind.sheet)){
@@ -66,9 +66,11 @@ for (i in conditions){
 }
 
 #add replicate numbers to diffbind.sheet
+diffbind.sheet$temp <- paste0(diffbind.sheet$Condition,"_",diffbind.sheet$Treatment)
 diffbind.sheet <- diffbind.sheet %>% 
-  group_by(Condition) %>% 
+  group_by(temp) %>% 
   mutate(Replicate = row_number())
+diffbind.sheet$temp <- NULL
 
 #add peak caller to diffbind.sheet
 diffbind.sheet$PeakCaller <- "macs"
@@ -95,13 +97,15 @@ for (i in ipSamples){
 }
 
 #write diffbind df to file
-write.csv(diffbind.sheet,file=file.path(out.dir,"diffbind_samples.csv"))
+write.csv(diffbind.sheet,file=file.path(out.dir,"diffbind_samples.csv"),
+          row.names = FALSE)
 
 
 
 
 ###differential binding analysis###
-diffbind <- dba.analyze(diffbind.sheet,bGreylist=FALSE)
+diffbind <- dba.analyze(diffbind.sheet,
+                        bGreylist=FALSE)
 
 #plot correlation heatmap
 pdf(file.path(out.dir,"sample_correlation_heatmap.pdf"))
