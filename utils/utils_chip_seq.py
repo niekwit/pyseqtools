@@ -960,15 +960,29 @@ def peak(work_dir, threads, genome, chip_seq_settings):
             df_merge.to_csv(out_file, index = False)
 
 
-def peakSLURM(work_dir, genome):
+def peakSLURM(work_dir, genome , peak):
     ''' Peak calling with MACS3/HOMER on HPC
+    Call peaks with MACS3 for:
+        - each sample individually (required for DiffBind)
+        - each genotype with conditions separately (replicates pooled)
     '''
-    
     puts(colored.green("Peak calling/annotation using MACS3/HOMER/DiffBind"))
     
+    #load sample info from samples.csv
     sample_info = pd.read_csv(os.path.join(work_dir,"samples.csv"))
     
-    samples = list(set(sample_info["genotype"]))
+    #create sample groups (for pooled peak calling of replicates)
+    if not "sample_group" in sample_info.columns: #check if it is already in samples.csv
+        genotypes = list(sample_info["genotype"])
+        treatments = list(sample_info["treatment"])
+        samples = [f"{i}_{j}" for i,j in zip(genotypes,treatments)]
+        sample_info["sample_group"] = samples
+        samples = list(set(samples))#unique sample groups
+        
+        #write updated samples.csv to file
+        sample_info.to_csv(os.path.join(work_dir,"samples.csv"), index = False)
+    else:
+        samples = set(list(sample_info["sample_group"]))
     
     #create output dirs for replicate peaks
     peak_dir = os.path.join(work_dir, "peaks", genome)
@@ -980,6 +994,7 @@ def peakSLURM(work_dir, genome):
     chip_samples = list(sample_info[sample_info["type"] == "ip"]["sample"]) #list(sample_info["sample"])
     for i in chip_samples:
         os.makedirs(os.path.join(peak_dir, i), exist_ok=True)
+           
            
     def peakCall(work_dir,script_dir,genome,name,sample_list,chip_bams,input_bams):
         '''
@@ -994,7 +1009,7 @@ def peakSLURM(work_dir, genome):
             macs3_genome = "hs"
         elif "mm" in genome:
             macs3_genome = "mm"
-        ip = chip_settings["MACS3"]["ip"]
+        #ip = chip_settings["MACS3"]["ip"]
         cut_off = str(chip_settings["MACS3"]["broad-cutoff"])
         macs3_format = chip_settings["MACS3"]["format"]
         qvalue = str(chip_settings["MACS3"]["qvalue"])
@@ -1024,7 +1039,7 @@ def peakSLURM(work_dir, genome):
             macs3 = ["macs3","callpeak","-t",chip_bam,"-c",input_bam,"-g",macs3_genome
                      ,"-n",sample,"-q",qvalue,"-f",macs3_format,"--outdir",out_dir,
                      "--extsize",extsize]
-            if ip == "histone":
+            if peak == "broad":
                 extension = ["--broad","--broad-cutoff",cut_off]
                 macs3.extend(extension)
             
@@ -1033,9 +1048,9 @@ def peakSLURM(work_dir, genome):
             csv.close()  
             
             #macs3 output file (get file extension based on narrow of broad peaks)
-            if ip == "histone":
+            if peak == "broad":
                 extension = "_peaks.broadPeak"
-            elif ip == "tf":
+            elif peak == "narrow":
                 extension = "_peaks.narrowPeak"
             macs3_output = os.path.join(out_dir, sample + extension)
             
@@ -1068,8 +1083,7 @@ def peakSLURM(work_dir, genome):
             
        
         #load slurm settings
-        with open(os.path.join(script_dir,"yaml","slurm.yaml")) as file:
-            slurm_settings = yaml.full_load(file)        
+        slurm_settings = utils.loadYaml("slurm")
     
         threads = slurm_settings["ChIP-Seq"]["macs3"]["cpu"]
         mem = slurm_settings["ChIP-Seq"]["macs3"]["mem"]
@@ -1085,26 +1099,26 @@ def peakSLURM(work_dir, genome):
                  }
         
         #generate slurm script
-        slurm_file = os.path.join(work_dir, "slurm", f"peak_{genome}.sh")
-        utils.slurmTemplateScript(work_dir,"peak",slurm_file,slurm,None,True,csv_list)
+        slurm_file = os.path.join(work_dir, "slurm", f"peak_{genome}_{name}.sh")
+        utils.slurmTemplateScript(work_dir,f"peak_{name}",slurm_file,slurm,None,True,csv_list)
         
         #run slurm script
         job_id_peak = utils.runSLURM(work_dir, slurm_file, "peak-calling")
         return(job_id_peak)
+    
     
     #get bam files
     bam_list = sorted(glob.glob(os.path.join(work_dir, "bam", genome, "*.bam")))
     dedup = any("dedup" in x for x in bam_list)
     if dedup == True:
         bam_list = sorted(glob.glob(os.path.join(work_dir, "bam", genome, "*dedupl.bam")))
-    
-    
-    #run peak calling for replicate chip/input files
+        
+    #run peak calling for replicate chip/input files (sample groups)
     chip_bams = []
     input_bams = []
     
     for sample in samples:
-        df = sample_info[sample_info["genotype"] == sample]
+        df = sample_info[sample_info["sample_group"] == sample]
         chip_samples = list(df[df["type"] == "ip"]["sample"])
         chip_bam = list(filter(lambda item: any(x in item for x in chip_samples), bam_list))
         chip_bam = " ".join(chip_bam)
@@ -1115,8 +1129,8 @@ def peakSLURM(work_dir, genome):
         input_bam = " ".join(input_bam)
         input_bams.append(input_bam)
     
-    job_id_peak_replicate=peakCall(work_dir,script_dir,genome,"replicate",samples,chip_bams,input_bams)
-                                  #work_dir,script_dir,genome,name,sample_list,chip_bams,input_bams
+    job_id_peak_sg=peakCall(work_dir,script_dir,genome,"sample-groups",samples,chip_bams,input_bams)
+    
     #run peak calling for single chip/input files (required for diffbind)
     chip_samples = sorted(list(sample_info[sample_info["type"] == "ip"]["sample"]))
     input_samples = sorted(list(sample_info[sample_info["type"] == "input"]["sample"]))
@@ -1138,13 +1152,16 @@ def peakSLURM(work_dir, genome):
     job_id_peak_single=peakCall(work_dir,script_dir,genome,"single-sample",chip_samples,chip_bams,input_bams)
     
     #load slurm settings
-    with open(os.path.join(script_dir,"yaml","slurm.yaml")) as file:
-        slurm_settings = yaml.full_load(file)   
-    
+    slurm_settings = utils.loadYaml("slurm")
+        
     #differential peak analysis 
     print("Differential peak analysis using DiffBind")
     diffbind_script = os.path.join(script_dir,"R","chip-seq_slurm-diffbind.R")
     diffbind = f"Rscript {diffbind_script} {work_dir} {genome}" 
+    copy_script = os.path.join(work_dir,"diffbind",os.path.basename(diffbind_script).replace(".R","_copy.R"))
+    copy_script = f"cp {diffbind_script} {copy_script}"
+    
+    commands = [copy_script,diffbind]
     
     threads = slurm_settings["ChIP-Seq"]["diffbind"]["cpu"]
     mem = slurm_settings["ChIP-Seq"]["diffbind"]["mem"]
@@ -1161,12 +1178,20 @@ def peakSLURM(work_dir, genome):
     
     #generate slurm script
     slurm_file = os.path.join(work_dir, "slurm", f"diffbind_{genome}.sh")
-    utils.slurmTemplateScript(work_dir,"diffbind",slurm_file,slurm,diffbind,False,None,job_id_peak_single)
+    utils.slurmTemplateScript(work_dir,"diffbind",slurm_file,slurm,commands,False,None,job_id_peak_single)
     
     #run slurm script
     job_id_diffbind = utils.runSLURM(work_dir, slurm_file, "diffbind")
     
-       
+
+def diffbindPython():
+    '''Run DiffBind from Python via rpy2.
+    R DiffBind script can give many errors.
+    Python has easier error handling so it should be easier to run this analysis via rpy2
+    '''
+    pass
+
+
 def bam_bwQC(work_dir, threads):
     
     #import sample info
