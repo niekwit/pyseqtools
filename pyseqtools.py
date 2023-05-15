@@ -234,8 +234,9 @@ def main():
                              help = "Perform QC analysis of BAM files")
     parser_chip.add_argument("-p", "--peaks",
                              required = False,
-                             action = 'store_true',
-                             help = "Call and annotate peaks with MACS3/HOMER")
+                             choices = ["narrow","broad"],
+                             metavar = "narrow | broad",
+                             help = "Call and annotate peaks with MACS3/HOMER and calculate differential peaks with DiffBind")
     parser_chip.add_argument("--metagene",
                              required = False,
                              default = False,
@@ -818,14 +819,14 @@ def main():
             if fastqc == True:
                 utils.fastqcSLURM(work_dir, script_dir)
                 
-            if peak == True:
-                chipseq_utils.peakSLURM(work_dir, genome)
+            if peak != False:
+                chipseq_utils.peakSLURM(work_dir, genome, peak)
                 
             if bigwig != False:
                 if bigwig == "bigwig":
                     job_id_bamcoverage = utils.bamCoverageSLURM(genome,"bigwig")
                     utils.bamCompareSLURM(genome)
-                    utils.pcaBwSLURM(genome,job_id_bamcoverage)
+                    utils.pcaBwSLURM(genome,job_id_bamcoverage,"bigwig")
                 elif bigwig == "bedgraph":
                     job_id_bamcoverage = utils.bamCoverageSLURM(genome,"bedgraph")
             
