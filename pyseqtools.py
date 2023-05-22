@@ -89,6 +89,10 @@ def main():
                                action = 'store_true',
                                default = False,
                                help = "Skip MAGeCK/BAGEL2")
+    parser_crispr.add_argument("--slurm",
+                             required = False,
+                             action = 'store_true',
+                             help = "Submit jobs to Cambridge HPC using SLURM")
 
     ####RNA-Seq subparser
     parser_rnaseq = subparsers.add_parser('rna-seq',
@@ -99,6 +103,10 @@ def main():
                              action = 'store_true',
                              required = False,
                              help = "Check md5sums of fastq files")
+    parser_rnaseq.add_argument("-r", "--rename",
+                             required = False,
+                             action = 'store_true',
+                             help = "Rename fq files")
     parser_rnaseq.add_argument("-t", "--threads",
                                required = False,
                                default = 1,
@@ -234,6 +242,7 @@ def main():
                              help = "Perform QC analysis of BAM files")
     parser_chip.add_argument("-p", "--peaks",
                              required = False,
+                             default = False,
                              choices = ["narrow","broad"],
                              metavar = "narrow | broad",
                              help = "Call and annotate peaks with MACS3/HOMER and calculate differential peaks with DiffBind")
@@ -315,10 +324,6 @@ def main():
     parser_damid = subparsers.add_parser('damid',
                                           description = "Analysis pipeline for DamID (wrapper for https://github.com/owenjm/damidseq_pipeline)",
                                           help = 'DamID analysis')
-    parser_damid.add_argument("--md5sum",
-                             action = 'store_true',
-                             required = False,
-                             help = "Check md5sums of fastq files")
     parser_damid.add_argument("-r", "--rename",
                                required = False,
                                action = 'store_true',
@@ -332,11 +337,6 @@ def main():
                             required = False,
                             default = 'hg19',
                             help = "Choose reference genome (default is hg19)")
-    parser_damid.add_argument("--skip-fastqc",
-                               required = False,
-                               action = 'store_true',
-                               default = False,
-                               help = "Skip FastQC/MultiQC")
     parser_damid.add_argument("--slurm",
                              required = False,
                              action = 'store_true',
@@ -623,6 +623,7 @@ def main():
         rsemIndex = args["rsemIndex"]
         md5sum = args["md5sum"]
         fastqc = args["fastqc"]
+        rename = args["rename"]
         
         if slurm == False:
             ###set thread count for processing
@@ -710,6 +711,9 @@ def main():
              
              if md5sum == True:
                  utils.checkMd5(work_dir,script_dir,slurm)   
+             
+             if rename == True:
+                 utils.rename(work_dirls)
              
              if fastqc == True:
                  utils.fastqcSLURM(work_dir, script_dir)
@@ -939,7 +943,7 @@ def main():
         slurm = genome = args["slurm"]
         
         #Check md5sums
-        utils.checkMd5(work_dir,script_dir,slurm)
+        #utils.checkMd5(work_dir,script_dir,slurm)
         
         ##rename files
         if rename == True:
@@ -949,8 +953,6 @@ def main():
         max_threads = str(multiprocessing.cpu_count())
         if threads == "max":
             threads = max_threads
-        
-        
         
         #utils.trim(script_dir, threads, work_dir)
         damid_utils.damID(script_dir, work_dir, threads, genome, damid_settings)
